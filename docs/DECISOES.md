@@ -61,3 +61,11 @@ Este documento registra as decisões técnicas tomadas na configuração do proj
 - **Motivo:**
   1. Como não há estruturas de co-cristal para todos os pares droga-alvo em Davis/KIBA, termos de energia aproximados no espaço latente podem introduzir ruído se não forem devidamente calibrados. Por isso, serão avaliados por ablação estrita na Fase 6.
   2. Afirmar eficácia de fármacos reposicionados sem validação experimental/estatística viola a integridade científica do projeto.
+
+---
+
+## 8. Política para Aminoácidos Ambíguos ou Não-Padrão nas Sequências Proteicas (Fase 1)
+- **Decisão:** **Manter** os códigos IUPAC estendidos/ambíguos (`X`, `B`, `U`, `Z`, `O`) intactos na sequência sanitizada, removendo apenas espaços/quebras de linha, convertendo para maiúsculas e rejeitando com erro explícito qualquer caractere fora do vocabulário oficial de aminoácidos do ESM-2 (`ACDEFGHIKLMNPQRSTVWYBXZUO`).
+- **Motivo:**
+  1. O alfabeto nativo do `fair-esm` (treinado sobre UniRef50) inclui explicitamente os tokens `X` (desconhecido), `B` (Asx), `U` (selenocisteína), `Z` (Glx) e `O` (pirrolisina) como tokens válidos com embeddings aprendidos.
+  2. Substituir `B`, `U`, `Z` ou `O` por `X` descartaria informação química/evolutiva já modelada pelo ESM-2 e alteraria o hash SHA-256 da sequência original sem necessidade técnica.
