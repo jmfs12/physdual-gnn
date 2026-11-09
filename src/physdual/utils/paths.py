@@ -10,8 +10,21 @@ DEFAULT_COLAB_ROOT = Path("/content/drive/MyDrive/physdual-gnn")
 
 
 def is_colab() -> bool:
-    """Retorna True se o código estiver executando em um runtime do Google Colab."""
-    return "google.colab" in sys.modules
+    """Retorna True se o código estiver executando em um runtime do Google Colab.
+
+    Verifica `'google.colab' in sys.modules` (kernel IPython) e, caso esteja em um
+    subprocesso CLI (`!python scripts/...`) dentro da VM do Colab, tenta importar
+    `google.colab` para manter `sys.modules` consistente.
+    """
+    if "google.colab" in sys.modules:
+        return True
+    if any(k in os.environ for k in ("COLAB_RELEASE_TAG", "COLAB_GPU", "COLAB_JUPYTER_IP")):
+        try:
+            import google.colab  # noqa: F401
+        except Exception:
+            pass
+        return True
+    return False
 
 
 def get_repo_root() -> Path:
