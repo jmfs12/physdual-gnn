@@ -72,9 +72,18 @@ Este documento registra as decisões técnicas tomadas na configuração do proj
 
 ---
 
-## 9. Fonte de Dados (Kaggle vs. Fallback DeepDTA) e Política de Colapso Químico/Biológico (Fase 1)
+## 9. Fonte Canônica dos Dados (DeepDTA Oficial), Fallback Kaggle e Política de Colapso Químico/Biológico (Fase 1)
 - **Decisão:**
-  1. **Fonte Primária e Fallback:** Utilizar `kagglehub` (`rajaryan2315/davis-and-kiba-datasets`) com credenciais via painel Secrets do Colab como fonte primária. O fallback HTTP para o repositório original do DeepDTA (`hkmztrk/DeepDTA`, que usa `ligands_can.txt`, `proteins.txt` e matriz `Y` em formato específico) fica marcado como **"URL a verificar"** (ou pode ser adiado na Fase 1 caso a verificação cruzada de contagens e amostras confirme a integridade da cópia do Kaggle). Nenhuma URL deve ser escrita de memória sem verificar o caminho real e registrar o commit/data.
+  1. **Fonte Canônica Oficial e Verificação (DeepDTA):**
+     - O repositório canônico oficial dos dados de benchmark é **`hkmztrk/DeepDTA`**. Em verificação técnica em 2026-11-09, os arquivos e caminhos reais foram inspecionados diretamente via API do GitHub e fixados no commit estável **`a546a8433a6822e958f36171c4356ad6f414d623`** (data: 2023-08-16T12:18:16Z).
+     - **Caminhos canônicos validados:**
+       - Davis: `data/davis/ligands_can.txt`, `data/davis/proteins.txt`, `data/davis/Y`
+       - KIBA: `data/kiba/ligands_can.txt`, `data/kiba/proteins.txt`, `data/kiba/Y`
+     - **Checagem cruzada e validação de procedência:**
+       - Davis bruto: exatamente 68 fármacos, 442 alvos, matriz $Y$ de shape $(68, 442)$ com 30.056 pares medidos (zero NaN), $K_d$ em nM ($\min=0.016$, $\max=10.000$, média=7.415,87, com 69,64% dos pares censurados no teto de 10.000 nM / $pK_d=5.0$).
+       - KIBA bruto: exatamente 2.111 fármacos (2.065 SMILES canônicos únicos), 229 alvos, matriz $Y$ de shape $(2.111, 229)$ com 118.254 pares medidos em KIBA score ($\min=0.0$, $\max=17.200$, média=11.72, e valores NaN representando pares não medidos).
+     - **Prioridade de Download:** A função `download_canonical_dataset` em `src/physdual/data/datasets.py` baixa esses arquivos diretamente via HTTP do GitHub raw, tornando o download **completamente autônomo e sem necessidade de credenciais, tokens ou login** em plataformas de terceiros.
+     - **Kaggle como Alternativa Secundária:** A ingestão via `kagglehub` (`rajaryan2315/davis-and-kiba-datasets`) é mantida como opção configurável (`source="kaggle"` ou `use_kaggle=True`), para flexibilidade, lendo credenciais do Colab se disponíveis.
   2. **Separação entre Asserts de Procedência (Tabela Bruta) e Agrupamento por Conteúdo (Tabela Limpa):**
      - Os `assert`s estritos de procedência (Davis: $68 \times 442 = 30.056$; KIBA: $2.111 \times 229 = 118.254$ pares válidos) rodam **sobre os dados brutos de entrada, antes de qualquer filtro ou colapso de canonização**.
      - O relatório de ingestão registra separadamente `num_drugs_by_id` vs. `num_drugs_by_canonical_smiles` e `num_targets_by_id` vs. `num_targets_by_sequence`.

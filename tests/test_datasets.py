@@ -156,3 +156,28 @@ def test_invalid_smiles_recorded_without_crashing_batch():
     assert report["smiles_failed_count"] == 1
     assert report["num_pairs_dropped_recorded"] == 1
     assert report["raw_num_pairs"] - report["clean_num_pairs"] == report["num_pairs_dropped_recorded"]
+
+
+def test_download_canonical_dataset_deepdta(tmp_path):
+    """Verifica download direto do repositório oficial DeepDTA sem credenciais."""
+    from physdual.data.datasets import (
+        CANONICAL_DEEPDTA_COMMIT,
+        download_canonical_dataset,
+        load_raw_dataset,
+    )
+
+    assert len(CANONICAL_DEEPDTA_COMMIT) == 40
+
+    try:
+        dest = download_canonical_dataset("davis", dest_dir=tmp_path)
+    except Exception as exc:
+        pytest.skip(f"Sem conexão com raw.githubusercontent.com: {exc}")
+
+    assert (dest / "ligands_can.txt").exists()
+    assert (dest / "proteins.txt").exists()
+    assert (dest / "Y").exists()
+
+    df = load_raw_dataset("davis", raw_dir=tmp_path, source="canonical")
+    assert len(df) == 30056
+    assert df["drug_id"].nunique() == 68
+    assert df["target_id"].nunique() == 442

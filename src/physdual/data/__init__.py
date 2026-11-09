@@ -5,6 +5,7 @@ from __future__ import annotations
 from physdual.data.datasets import (
     EXPECTED_COUNTS,
     canonicalize_largest_fragment,
+    download_canonical_dataset,
     load_raw_dataset,
     prepare_dataset,
     standardize_dataset,
@@ -41,6 +42,7 @@ __all__ = [
     "compute_seq_hash",
     "create_cache_tarball",
     "create_splits",
+    "download_canonical_dataset",
     "extract_esm_embeddings_batch",
     "generate_sliding_windows",
     "get_embedding_cache_path",

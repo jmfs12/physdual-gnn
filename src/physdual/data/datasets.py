@@ -53,10 +53,13 @@ EXPECTED_COUNTS: dict[str, dict[str, int]] = {
 
 KAGGLE_DATASET_HANDLE = "rajaryan2315/davis-and-kiba-datasets"
 
-# TODO: URL a verificar (repositório oficial hkmztrk/DeepDTA — arquivos ligands_can.txt, proteins.txt, Y).
-# Conforme ADR #9 em docs/DECISOES.md, nenhuma URL deve ser fixada de memória sem verificar
-# o commit/caminho real e validar a estrutura do arquivo no repositório original.
-FALLBACK_DEEPDTA_BASE_URL: str | None = None
+# Repositório canônico oficial do DeepDTA (verificado em 2026-11-09, ADR #9 em docs/DECISOES.md):
+CANONICAL_DEEPDTA_REPO = "hkmztrk/DeepDTA"
+CANONICAL_DEEPDTA_COMMIT = "a546a8433a6822e958f36171c4356ad6f414d623"
+CANONICAL_DEEPDTA_COMMIT_DATE = "2023-08-16T12:18:16Z"
+CANONICAL_DEEPDTA_BASE_URL = (
+    f"https://raw.githubusercontent.com/{CANONICAL_DEEPDTA_REPO}/{CANONICAL_DEEPDTA_COMMIT}/data"
+)
 
 
 def _short_hash(prefix: str, text: str) -> str:
@@ -243,20 +246,49 @@ def _locate_and_read_dataset_in_dir(search_dir: Path, dataset_name: str) -> pd.D
     return pd.concat(dfs, ignore_index=True)
 
 
+def download_canonical_dataset(
+    dataset_name: str,
+    dest_dir: Path,
+    base_url: str = CANONICAL_DEEPDTA_BASE_URL,
+) -> Path:
+    """Baixa os arquivos canônicos (ligands_can.txt, proteins.txt, Y) do repositório oficial DeepDTA.
+
+    Utiliza o commit verificado `a546a8433a6822e958f36171c4356ad6f414d623` (ADR #9 em `docs/DECISOES.md`),
+    dispensando tokens ou credenciais de terceiros.
+    """
+    import urllib.request
+
+    ds = dataset_name.lower().strip()
+    if ds not in EXPECTED_COUNTS:
+        raise ValueError(f"Dataset desconhecido: '{dataset_name}'. Opções válidas: {list(EXPECTED_COUNTS)}")
+
+    target_subdir = Path(dest_dir) / ds
+    target_subdir.mkdir(parents=True, exist_ok=True)
+
+    files = ("ligands_can.txt", "proteins.txt", "Y")
+    for fname in files:
+        out_file = target_subdir / fname
+        if not out_file.exists():
+            file_url = f"{base_url}/{ds}/{fname}"
+            req = urllib.request.Request(file_url, headers={"User-Agent": "physdual-gnn/1.0"})
+            with urllib.request.urlopen(req, timeout=60) as resp, open(out_file, "wb") as fp:
+                shutil.copyfileobj(resp, fp)
+    return target_subdir
+
+
 def load_raw_dataset(
     dataset_name: str,
     raw_dir: Path | None = None,
-    use_kaggle: bool = True,
+    source: Literal["auto", "canonical", "kaggle"] = "auto",
+    use_kaggle: bool = False,
 ) -> pd.DataFrame:
-    """Carrega o DataFrame bruto do dataset (`davis` ou `kiba`) de `data/raw` ou via `kagglehub`.
+    """Carrega o DataFrame bruto do dataset (`davis` ou `kiba`) de `data/raw` ou via download canônico/Kaggle.
 
     Segue a política da ADR #9 (`docs/DECISOES.md`):
     1. Se os arquivos já estiverem em `raw_dir` (`PHYSDUAL_ROOT / "data/raw"`), carrega localmente.
-    2. Caso contrário e `use_kaggle=True`, utiliza `kagglehub.dataset_download` (configurando
-       automaticamente credenciais do painel Secrets do Colab, se disponíveis) e copia os
-       arquivos para `raw_dir`.
-    3. Caso `use_kaggle=False` e não haja dados locais, verifica `FALLBACK_DEEPDTA_BASE_URL`
-       (atualmente marcado como URL a verificar).
+    2. Se `source in ("auto", "canonical")`: baixa diretamente do repositório canônico oficial
+       do DeepDTA (`hkmztrk/DeepDTA` no commit `a546a84`), dispensando qualquer credencial ou login.
+    3. Se `source == "kaggle"` (ou fallback caso `use_kaggle=True`), utiliza `kagglehub.dataset_download`.
     """
     ds = dataset_name.lower().strip()
     if ds not in EXPECTED_COUNTS:
@@ -270,7 +302,19 @@ def load_raw_dataset(
     except FileNotFoundError:
         pass
 
-    if use_kaggle:
+    # 1. Download do repositório canônico DeepDTA (padrão)
+    if source in ("auto", "canonical"):
+        try:
+            download_canonical_dataset(ds, target_raw_dir)
+            return _locate_and_read_dataset_in_dir(target_raw_dir, ds)
+        except Exception as exc:
+            if source == "canonical" or not use_kaggle:
+                raise RuntimeError(
+                    f"Falha ao baixar dados canônicos de '{ds}' do GitHub ({CANONICAL_DEEPDTA_BASE_URL}): {exc}"
+                ) from exc
+
+    # 2. Download via Kagglehub (caso explicitamente solicitado ou fallback)
+    if source == "kaggle" or use_kaggle:
         _configure_colab_kaggle_secrets()
         import kagglehub  # type: ignore[import-untyped]
 
@@ -287,8 +331,7 @@ def load_raw_dataset(
         return _locate_and_read_dataset_in_dir(target_raw_dir, ds)
 
     raise FileNotFoundError(
-        f"Arquivos brutos de '{ds}' não encontrados em '{target_raw_dir}' e download via Kaggle "
-        "desativado (FALLBACK_DEEPDTA_BASE_URL está marcado como 'URL a verificar' conforme ADR #9)."
+        f"Arquivos brutos de '{ds}' não encontrados em '{target_raw_dir}'."
     )
 
 
@@ -556,12 +599,13 @@ def prepare_dataset(
     duplicate_policy: DuplicatePolicy = "keep_both",
     raw_dir: Path | None = None,
     processed_dir: Path | None = None,
-    use_kaggle: bool = True,
+    source: Literal["auto", "canonical", "kaggle"] = "auto",
+    use_kaggle: bool = False,
     enforce_expected_counts: bool = True,
 ) -> tuple[pd.DataFrame, Path, dict[str, Any]]:
     """Executa o pipeline completo de ingestão, validação de procedência e salvamento do dataset limpo."""
     ds = dataset_name.lower().strip()
-    raw_df = load_raw_dataset(ds, raw_dir=raw_dir, use_kaggle=use_kaggle)
+    raw_df = load_raw_dataset(ds, raw_dir=raw_dir, source=source, use_kaggle=use_kaggle)
     clean_df, report = standardize_dataset(
         raw_df,
         dataset_name=ds,

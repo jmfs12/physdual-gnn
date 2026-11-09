@@ -183,9 +183,9 @@ Expected: FAIL com `ModuleNotFoundError: No module named 'physdual.data.datasets
 - [x] **Step 3: Implementar ingestão, validação de procedência e padronização em `src/physdual/data/datasets.py`**
 
 Implementar:
-1. **Fonte Primária e Fallback (ADR #9):**
-   - Fonte primária: `kagglehub.dataset_download("rajaryan2315/davis-and-kiba-datasets")` (lendo credenciais `KAGGLE_USERNAME` / `KAGGLE_KEY` do ambiente ou dos Secrets do Colab).
-   - Fallback: manter marcado como `# TODO: URL a verificar (repositório oficial hkmztrk/DeepDTA — arquivos ligands_can.txt, proteins.txt, Y)`. Nenhuma URL deve ser escrita de memória; quem implementar o fallback deve inspecionar o repositório, implementar o parser do formato original ou adiar o fallback na Fase 1 conforme documentado em `docs/DECISOES.md` (ADR #9), realizando checagem cruzada de contagens e amostras para validar a cópia do Kaggle.
+1. **Fonte Canônica Oficial e Kaggle (ADR #9):**
+   - Fonte canônica padrão: `hkmztrk/DeepDTA` fixado no commit `a546a8433a6822e958f36171c4356ad6f414d623` (download direto via `urllib.request` de `ligands_can.txt`, `proteins.txt`, `Y` sem necessidade de login ou credenciais).
+   - Alternativa secundária: `kagglehub.dataset_download("rajaryan2315/davis-and-kiba-datasets")` com credenciais via Secrets do Colab caso `source="kaggle"`.
 2. **Ordem de Operações e Validação Estrita de Procedência (Tabela Bruta):**
    - Os `assert`s de procedência (`enforce_expected_counts=True` por padrão em `prepare_dataset`) rodam **sobre os dados brutos de entrada antes de qualquer filtro, remoção de falha ou colapso de canonização**:
      - **Davis (bruto):** exatamente 68 fármacos por ID/entrada, 442 alvos por ID/entrada e 30.056 pares ($68 \times 442$).

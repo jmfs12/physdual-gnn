@@ -47,6 +47,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Unidade de afinidade do arquivo de entrada (padrão: auto, detectado no nível do dataset inteiro).",
     )
     parser.add_argument(
+        "--data-source",
+        type=str,
+        default="auto",
+        choices=["auto", "canonical", "kaggle"],
+        help="Fonte dos dados brutos: 'canonical' (DeepDTA oficial, sem login), 'kaggle' (kagglehub) ou 'auto' (padrão: canonical com fallback).",
+    )
+    parser.add_argument(
         "--duplicate-policy",
         type=str,
         default="keep_both",
@@ -145,7 +152,8 @@ def main(argv: list[str] | None = None) -> int:
             duplicate_policy=args.duplicate_policy,  # type: ignore[arg-type]
             raw_dir=raw_dir,
             processed_dir=processed_dir,
-            use_kaggle=True,
+            source=args.data_source,  # type: ignore[arg-type]
+            use_kaggle=(args.data_source == "kaggle"),
             enforce_expected_counts=True,
         )
         print(

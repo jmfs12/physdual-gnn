@@ -6,13 +6,10 @@ Este documento descreve a arquitetura, os protocolos de curadoria e particioname
 
 ## 1. Fontes de Dados, Credenciais e Validação de Procedência
 
-### 1.1 Fonte Primária (`kagglehub`) e Secrets no Colab
-A ingestão padrão utiliza o pacote `kagglehub` (`rajaryan2315/davis-and-kiba-datasets`). Para executar no Google Colab sem expor chaves no código:
-1. Abra o painel lateral **Secrets (ícone de chave)** no Google Colab.
-2. Cadastre os segredos `KAGGLE_USERNAME` e `KAGGLE_KEY` e ative a chave *Notebook access*.
-3. O módulo `src/physdual/data/datasets.py` (e a Célula 1 de `notebooks/01_data_and_esm_cache.ipynb`) lê automaticamente essas variáveis via `google.colab.userdata`.
-
-> **Nota sobre Fallback (ADR #9 em `docs/DECISOES.md`):** O repositório original do DeepDTA (`hkmztrk/DeepDTA`) armazena `ligands_can.txt`, `proteins.txt` e a matriz `Y` em formato específico (que o parser `_parse_deepdta_folder` em `datasets.py` já suporta caso os arquivos sejam baixados em `data/raw/{dataset}/`). A URL remota direta permanece marcada como `"URL a verificar"` para evitar links quebrados ou não auditados.
+### 1.1 Fonte Canônica Oficial (`hkmztrk/DeepDTA`) e Kaggle Opcional
+A ingestão padrão baixa os dados brutos diretamente do repositório canônico oficial [DeepDTA (`hkmztrk/DeepDTA`)](https://github.com/hkmztrk/DeepDTA) fixado no commit `a546a8433a6822e958f36171c4356ad6f414d623` (verificado em 2026-11-09, ADR #9):
+- **Download direto e autônomo:** Não requer conta, token ou configuração de credenciais no Colab ou na máquina local. O script baixa `ligands_can.txt`, `proteins.txt` e a matriz `Y` via HTTP direto do GitHub raw.
+- **Alternativa Kaggle (`kagglehub`):** Caso prefira utilizar o espelho do Kaggle (`rajaryan2315/davis-and-kiba-datasets`), basta passar `--data-source kaggle` na CLI ou cadastrar `KAGGLE_USERNAME` e `KAGGLE_KEY` no painel lateral **Secrets (ícone de chave 🔑)** do Google Colab.
 
 ### 1.2 Volumetria Canônica na Tabela Bruta vs. Tabela Limpa
 Os `assert`s de procedência rodam **sobre a tabela bruta antes de qualquer filtro ou canonização**:
