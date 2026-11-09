@@ -28,8 +28,8 @@
 2. **B2 — Escala de Afinidade ($pK_d$ vs. nM vs. KIBA score) e Valores Censurados:** É proibido usar heurística por linha para detectar $K_d$ vs. $pK_d$ ($K_d = 10\text{ nM}$ cai na faixa numérica de $pK_d$). A função deve receber `affinity_unit: Literal["nM", "pKd", "kiba_score"] | "auto"`. Quando `"auto"`, a detecção ocorre **no nível do dataset inteiro** (ex.: `df["affinity"].max() > 11.0` $\Rightarrow$ `"nM"` para Davis; se ambíguo, falhar com `ValueError` explícito). A conversão $pK_d = -\log_{10}(K_d / 10^9)$ aplica-se **apenas** ao Davis em `"nM"`, **nunca** ao KIBA. Contagens exatas devem ser validadas por `assert` (Davis: $68 \times 442 = 30.056$; KIBA: $2.111 \times 229 = 118.254$), e pares censurados do Davis ($K_d = 10.000\text{ nM} \Rightarrow pK_d = 5.0$) devem ser contabilizados no relatório.
 3. **B3 — Cache de Grafos Compatível com `weights_only=True`:** Instâncias de `torch_geometric.data.Data` falham ao carregar com `torch.load(..., weights_only=True)`. O cache deve persistir cada grafo como um dicionário puro de tensores e metadados primitivos (`{"x": Tensor, "edge_index": Tensor, "edge_attr": Tensor, "smiles": str, "smiles_raw": str, "drug_id": str, "num_atoms": int}`) e reconstruir `Data(...)` em `load_drug_graph`.
 4. **B4 — Isolamento de Cache entre Modelos ESM-2:** `model_name` é obrigatório em todas as assinaturas de `esm_cache.py`. Os arquivos `.pt` ficam em `cache/esm_embeddings/{model_name}/{hash}.pt`, com payload contendo `{"embedding": Tensor(fp16), "model_name": str, "dim": int, "seq_len": int, "windowed": bool}`, validando no carregamento se `dim == expected_dim` (`esm_dim` do config) e gerando tarball por modelo (`esm_embeddings_{model_name}.tar`).
-5. **Vazamento por Conteúdo nos Splits Cold e Baixa Amostragem em Cold-Drug (Davis):** O particionamento e a função `verify_split_leakage` devem agrupar e verificar disjunção pelo **SMILES canônico** (`cold_drug`) e pela **sequência de aminoácidos** (`cold_target`), nunca apenas por `drug_id` ou `target_id` (evitando falsos negativos quando IDs distintos apontam para a mesma estrutura). Documentar que `cold_drug` no Davis (68 fármacos) resulta em ~7 fármacos em val/test por seed, exigindo reporte obrigatório de média ± desvio-padrão nas 5 seeds.
-6. **Política de Aminoácidos e SMILES:** Conforme ADR #8 em `docs/DECISOES.md`, os aminoácidos ambíguos/estendidos `X`, `B`, `U`, `Z`, `O` pertencem ao vocabulário nativo do ESM-2 e devem ser **mantidos**, rejeitando-se apenas caracteres fora de `ACDEFGHIKLMNPQRSTVWYBXZUO` após remoção de quebras de linha/espaços. Para SMILES com sais/múltiplos fragmentos, manter o original em `smiles_raw`, gravar o SMILES canônico do maior fragmento em `smiles` e registrar alterações/falhas em relatório sem abortar o lote.
+5. **Vazamento por Conteúdo nos Splits Cold e Baixa Amostragem em Cold-Drug (Davis):** O particionamento e a função `verify_split_leakage` devem agrupar e verificar disjunção pelo **SMILES canônico** (`cold_drug`) e pela **sequência de aminoácidos** (`cold_target`), nunca apenas por `drug_id` ou `target_id` (evitando falsos negativos quando IDs distintos apontam para a mesma estrutura). Documentar que `cold_drug` no Davis (68 fármacos por ID, podendo ser ligeiramente menor quando agrupado por SMILES canônico) resulta em $\le 7$ grupos químicos em val/test por seed, exigindo reporte do valor efetivo por seed em `docs/FASE1_DADOS.md` e média ± desvio-padrão nas 5 seeds.
+6. **Política de Aminoácidos, SMILES e Colapso Químico/Biológico:** Conforme ADR #8 e ADR #9 em `docs/DECISOES.md`: (a) os aminoácidos ambíguos/estendidos `X`, `B`, `U`, `Z`, `O` pertencem ao vocabulário nativo do ESM-2 e são **mantidos**, contabilizando no relatório quantas sequências os contêm (já que `U` e `O` têm embeddings pouco treinados e são raros/inexistentes em Davis/KIBA); (b) os `assert`s de procedência ($30.056$ e $118.254$) rodam **sobre a tabela bruta antes de qualquer filtro ou colapso**; (c) o relatório reporta separadamente `num_drugs_by_id` vs. `num_drugs_by_canonical_smiles` e `num_targets_by_id` vs. `num_targets_by_sequence`; (d) pares com mesmo `(smiles, sequence)` vindos de IDs distintos **não são descartados silenciosamente** (política padrão `duplicate_policy="keep_both"`, registrando a contagem de duplicatas de conteúdo e garantindo perda zero não registrada).
 
 ---
 
@@ -45,14 +45,14 @@
   - `validate_protein_sequence(seq: str) -> str` (remove espaços/quebras de linha, converte para uppercase, mantém `X, B, U, Z, O`, levanta `ValueError` para caracteres fora do vocabulário ESM-2)
   - `canonicalize_largest_fragment(smiles: str) -> tuple[str | None, bool, str | None]` (retorna `(canonical_smiles, was_modified_or_salt_stripped, error_msg)`)
   - `load_raw_dataset(dataset_name: str, raw_dir: Path | None = None, use_kaggle: bool = True) -> pd.DataFrame`
-  - `standardize_dataset(df: pd.DataFrame, dataset_name: str, affinity_unit: Literal["nM", "pKd", "kiba_score", "auto"] = "auto", enforce_expected_counts: bool = False) -> tuple[pd.DataFrame, dict[str, Any]]`
-  - `prepare_dataset(dataset_name: str, affinity_unit: Literal["nM", "pKd", "kiba_score", "auto"] = "auto", save_clean: bool = True) -> tuple[pd.DataFrame, Path, dict[str, Any]]`
+  - `standardize_dataset(df: pd.DataFrame, dataset_name: str, affinity_unit: Literal["nM", "pKd", "kiba_score", "auto"] = "auto", enforce_expected_counts: bool = False, duplicate_policy: Literal["keep_both", "mean", "median"] = "keep_both") -> tuple[pd.DataFrame, dict[str, Any]]`
+  - `prepare_dataset(dataset_name: str, affinity_unit: Literal["nM", "pKd", "kiba_score", "auto"] = "auto", save_clean: bool = True, duplicate_policy: Literal["keep_both", "mean", "median"] = "keep_both") -> tuple[pd.DataFrame, Path, dict[str, Any]]`
 
 Colunas padronizadas do DataFrame de saída:
 `["drug_id", "smiles", "smiles_raw", "target_id", "sequence", "affinity"]`
 
 Chaves obrigatórias do dicionário de relatório (`report`):
-`{"dataset_name", "num_pairs", "num_drugs", "num_targets", "affinity_unit_detected", "davis_censored_count", "davis_censored_pct", "smiles_modified_count", "smiles_failed_count", "smiles_failures"}`
+`{"dataset_name", "raw_num_pairs", "clean_num_pairs", "num_pairs_dropped_recorded", "num_drugs_by_id", "num_drugs_by_canonical_smiles", "num_targets_by_id", "num_targets_by_sequence", "duplicate_content_pairs_count", "duplicate_policy", "ambiguous_aa_seq_count", "ambiguous_aa_char_counts", "affinity_unit_detected", "davis_censored_count", "davis_censored_pct", "smiles_modified_count", "smiles_failed_count", "smiles_failures"}`
 
 - [ ] **Step 1: Escrever testes pytest que falham em `tests/test_datasets.py`**
 
@@ -65,18 +65,20 @@ from physdual.data.datasets import (
 )
 
 
-def test_standardize_davis_nm_dataset():
-    # Dataset completo simulado em nM (max > 11.0 permite auto-detecção segura em nível de dataset)
+def test_standardize_davis_nm_dataset_and_colapse_reporting():
+    # Simula 2 IDs de fármacos distintos (D1 e D2 com sal) que colapsam no mesmo SMILES canônico (aspirina)
     raw_df = pd.DataFrame({
+        "drug_id": ["D1", "D2", "D3"],
         "compound_iso_smiles": [
             "CC(=O)OC1=CC=CC=C1C(=O)O",
             "CC(=O)NC1=CC=C(O)C=C1",
-            "CC(=O)OC1=CC=CC=C1C(=O)O.[Na+]",  # sal a ser reduzido ao maior fragmento
+            "CC(=O)OC1=CC=CC=C1C(=O)O.[Na+]",  # colapsa no mesmo SMILES de D1
         ],
+        "target_id": ["T1", "T1", "T1"],
         "target_sequence": [
             "MKTVRQERLKSIVRILERSKEPVS",
             "MKTVRQERLKSIVRILERSKEPVS",
-            "MKTVRQERLKSIVRILERSKEPVSXBUZO",  # inclui aminoácidos estendidos válidos no ESM-2
+            "MKTVRQERLKSIVRILERSKEPVSXBUZO",  # inclui aminoácidos estendidos X,B,U,Z,O
         ],
         "affinity": [10.0, 1000.0, 10000.0],  # nM -> pKd: 8.0, 6.0, 5.0 (censurado)
     })
@@ -90,7 +92,29 @@ def test_standardize_davis_nm_dataset():
     assert report["affinity_unit_detected"] == "nM"
     assert report["davis_censored_count"] == 1
     assert report["smiles_modified_count"] >= 1
+    assert report["num_drugs_by_id"] == 3
+    assert report["num_drugs_by_canonical_smiles"] == 2
+    assert report["ambiguous_aa_seq_count"] == 1
+    assert report["raw_num_pairs"] == 3
+    assert report["clean_num_pairs"] == 3
     assert std.loc[2, "smiles_raw"] == "CC(=O)OC1=CC=CC=C1C(=O)O.[Na+]"
+
+
+def test_duplicate_content_pairs_not_silently_dropped():
+    # Dois IDs distintos (D1, D2) colapsam no mesmo SMILES ("CCO") contra o mesmo alvo ("MKTVRQ")
+    raw_df = pd.DataFrame({
+        "drug_id": ["D1", "D2"],
+        "smiles": ["CCO", "CCO.[Na+]"],
+        "target_id": ["T1", "T1"],
+        "sequence": ["MKTVRQ", "MKTVRQ"],
+        "affinity": [7.0, 8.0],
+    })
+    std_keep, rep_keep = standardize_dataset(
+        raw_df, dataset_name="davis", affinity_unit="pKd", duplicate_policy="keep_both"
+    )
+    assert len(std_keep) == 2
+    assert rep_keep["duplicate_content_pairs_count"] == 1
+    assert rep_keep["num_pairs_dropped_recorded"] == 0
 
 
 def test_standardize_davis_pkd_dataset():
@@ -159,17 +183,24 @@ Expected: FAIL com `ModuleNotFoundError: No module named 'physdual.data.datasets
 - [ ] **Step 3: Implementar ingestão, validação de procedência e padronização em `src/physdual/data/datasets.py`**
 
 Implementar:
-1. Download via `kagglehub.dataset_download("rajaryan2315/davis-and-kiba-datasets")` (lendo credenciais `KAGGLE_USERNAME` / `KAGGLE_KEY` do ambiente ou dos Secrets do Colab) e suporte a URL de fallback configurável marcada como `# TODO: URL a verificar (repositório oficial DeepDTA/GraphDTA)`.
-2. Validação estrita de procedência (`enforce_expected_counts=True` por padrão em `prepare_dataset`):
-   - **Davis:** exatamente 68 fármacos únicos, 442 alvos únicos e 30.056 pares ($68 \times 442$).
-   - **KIBA:** exatamente 2.111 fármacos únicos, 229 alvos únicos e 118.254 pares.
-   - Falhar explicitamente com `AssertionError` detalhando os números encontrados vs. esperados caso diverja.
-3. Tratamento de escala de afinidade (`affinity_unit`):
+1. **Fonte Primária e Fallback (ADR #9):**
+   - Fonte primária: `kagglehub.dataset_download("rajaryan2315/davis-and-kiba-datasets")` (lendo credenciais `KAGGLE_USERNAME` / `KAGGLE_KEY` do ambiente ou dos Secrets do Colab).
+   - Fallback: manter marcado como `# TODO: URL a verificar (repositório oficial hkmztrk/DeepDTA — arquivos ligands_can.txt, proteins.txt, Y)`. Nenhuma URL deve ser escrita de memória; quem implementar o fallback deve inspecionar o repositório, implementar o parser do formato original ou adiar o fallback na Fase 1 conforme documentado em `docs/DECISOES.md` (ADR #9), realizando checagem cruzada de contagens e amostras para validar a cópia do Kaggle.
+2. **Ordem de Operações e Validação Estrita de Procedência (Tabela Bruta):**
+   - Os `assert`s de procedência (`enforce_expected_counts=True` por padrão em `prepare_dataset`) rodam **sobre os dados brutos de entrada antes de qualquer filtro, remoção de falha ou colapso de canonização**:
+     - **Davis (bruto):** exatamente 68 fármacos por ID/entrada, 442 alvos por ID/entrada e 30.056 pares ($68 \times 442$).
+     - **KIBA (bruto):** exatamente 2.111 fármacos por ID/entrada, 229 alvos por ID/entrada e 118.254 pares válidos.
+   - Falhar explicitamente com `AssertionError` caso a tabela bruta diverja.
+3. **Relato Duplo de Entidades (ID vs. Conteúdo) e Política de Duplicatas de Conteúdo:**
+   - Calcular e salvar no relatório tanto `num_drugs_by_id` quanto `num_drugs_by_canonical_smiles` (e `num_targets_by_id` vs. `num_targets_by_sequence`).
+   - Se dois IDs colapsarem no mesmo `(smiles, sequence)`, aplicar `duplicate_policy` (padrão `"keep_both"` para não descartar pares silenciosamente; opções `"mean"` e `"median"` documentam quantos pares foram agregados em `num_pairs_dropped_recorded`), registrando `duplicate_content_pairs_count`. Verificar que `raw_num_pairs - clean_num_pairs == num_pairs_dropped_recorded` (nenhum par perdido sem registro).
+4. **Tratamento de Escala de Afinidade (`affinity_unit`):**
    - Para `dataset_name == "kiba"`, exigir `"kiba_score"` (ou `"auto"` resolvendo para `"kiba_score"`) e **jamais** converter para $pK_d$.
    - Para `dataset_name == "davis"`, se `affinity_unit == "auto"`, inspecionar a distribuição do dataset completo (`len(df) >= 100`, `max > 11.0` e `min > 0` $\Rightarrow$ `"nM"`; se `len(df) >= 100` e `4.9 <= min <= 5.1` e `max <= 11.0` $\Rightarrow$ `"pKd"`; caso contrário, levantar `ValueError` exigindo `affinity_unit` explícito).
    - Contabilizar pares censurados no Davis ($K_d \ge 10.000\text{ nM}$ ou $pK_d \le 5.0001$).
-4. Sanitização de SMILES via RDKit preservando `smiles_raw`, extraindo o maior fragmento covalente para `smiles` e registrando falhas em `report["smiles_failures"]` sem derrubar o processamento em lote.
-5. Sanitização de sequência proteica conforme ADR #8 (`docs/DECISOES.md`), mantendo `X, B, U, Z, O`.
+5. **Sanitização de SMILES e Proteínas (ADR #8):**
+   - Preservar `smiles_raw`, extrair o maior fragmento covalente para `smiles` e registrar falhas em `report["smiles_failures"]`.
+   - Manter `X, B, U, Z, O` nas sequências proteicas e contabilizar em `ambiguous_aa_seq_count` e `ambiguous_aa_char_counts` quantas sequências únicas contêm cada um desses 5 resíduos.
 6. Salvamento em `data/processed/{dataset}_clean.csv` e relatório de auditoria em `data/processed/{dataset}_ingestion_report.json`.
 
 - [ ] **Step 4: Executar teste e verificar que passa**
@@ -599,13 +630,13 @@ git commit -m "feat(data): implement model-namespaced fp16 ESM-2 cache with slid
   - Notebook interativo com barras de progresso `tqdm`, instruções de Secrets para o Kaggle e validação na GPU alocada pelo Colab.
 
 Critérios objetivos verificados por `scripts/verify_phase1.py` (Gate de Pronto da Fase 1):
-1. Todas as 442 (Davis) + 229 (KIBA) sequências únicas têm arquivo `.pt` de embedding no cache do `model_name` configurado.
+1. Todas as sequências únicas (442 por ID no Davis; 229 por ID no KIBA; ou o número exato de sequências distintas em `num_targets_by_sequence`) têm arquivo `.pt` de embedding no cache do `model_name` configurado.
 2. Para cada embedding de proteína, `shape[0] == len(sequence)` e `shape[1] == esm_dim` do config.
 3. Nenhum `NaN` ou `Inf` nos embeddings proteicos ou tensores de fármacos; nenhum grafo de fármaco vazio (`num_atoms >= 1`).
 4. Todos os 30 arquivos de splits (3 tipos $\times$ 5 seeds $\times$ 2 datasets) existem, possuem `train`, `val` e `test` não vazios e passam em `verify_split_leakage` por conteúdo (`smiles` e `sequence`).
-5. Contagens de pares e entidades únicas batem exatamente com os valores esperados: Davis ($68 \times 442 = 30.056$) e KIBA ($2.111 \times 229 = 118.254$).
+5. **Procedência na tabela bruta e rastreabilidade na tabela limpa:** Os asserts de procedência verificam sobre o relatório de ingestão (tabela bruta) que Davis tem $68 \times 442 = 30.056$ pares e KIBA tem $2.111 \times 229 = 118.254$ pares (`num_drugs_by_id` e `num_targets_by_id`), e verificam sobre o dataset limpo que nenhum par foi perdido sem registro (`raw_num_pairs - clean_num_pairs == num_pairs_dropped_recorded`).
 6. Todos os arquivos `.pt` (grafos de fármacos e embeddings ESM-2) carregam sem erro com `torch.load(..., weights_only=True)`.
-7. O relatório final consolidado (`outputs/logs/phase1_summary_report.json`) lista explicitamente: quantidade e IDs de sequências processadas com janela deslizante, contagem e percentual de valores censurados do Davis ($K_d = 10.000\text{ nM} / pK_d = 5.0$), e contagem/lista de SMILES alterados (sais removidos) ou falhos.
+7. O relatório final consolidado (`outputs/logs/phase1_summary_report.json`) lista explicitamente: (a) `num_drugs_by_id` vs. `num_drugs_by_canonical_smiles` e `num_targets_by_id` vs. `num_targets_by_sequence`, (b) contagem de pares com conteúdo duplicado (`duplicate_content_pairs_count`), (c) contagem de sequências com aminoácidos estendidos (`X, B, U, Z, O`), (d) quantidade e IDs de sequências processadas com janela deslizante, (e) contagem e percentual de valores censurados do Davis ($K_d = 10.000\text{ nM} / pK_d = 5.0$), e (f) contagem/lista de SMILES alterados (sais removidos) ou falhos.
 
 - [ ] **Step 1: Escrever teste unitário para o verificador de gate em `tests/test_verify_phase1.py`**
 
@@ -622,7 +653,7 @@ Expected: FAIL com `ModuleNotFoundError`
 - Em `scripts/verify_phase1.py`: verificar os 7 itens do Gate de Pronto e retornar código de saída `0` apenas se todos passarem (`1` caso contrário).
 - Em `notebooks/01_data_and_esm_cache.ipynb`:
   - Célula 1: Montagem do Drive, configuração de `KAGGLE_USERNAME`/`KAGGLE_KEY` via `google.colab.userdata` (painel Secrets do Colab) e setup de ambiente.
-  - Célula 2: Download, validação de procedência contra contagens do DeepDTA/GraphDTA e inspeção de Davis (incluindo proporção censurada em $pK_d = 5.0$) e KIBA.
+  - Célula 2: Download, validação de procedência contra contagens e amostras do DeepDTA/GraphDTA, relato de `by_id` vs. `by_canonical_smiles`/`by_sequence` e inspeção de Davis (incluindo proporção censurada em $pK_d = 5.0$) e KIBA.
   - Célula 3: Geração e validação de não-vazamento por conteúdo dos splits (`random`, `cold_drug`, `cold_target`) nas 5 seeds.
   - Célula 4: Featurização de grafos moleculares como dicionários de tensores e salvamento em cache.
   - Célula 5: Extração em lote do ESM-2 em `fp16` na GPU alocada pelo Colab (com janela deslizante para proteínas >1022 resíduos).
@@ -650,11 +681,11 @@ git commit -m "feat(data): add Phase 1 pipeline CLI, verification gate script, a
 - Modify: `docs/PROXIMOS_PASSOS.md`
 
 - [ ] **Step 1: Escrever `docs/FASE1_DADOS.md` cobrindo protocolos, estatísticas e limitações conhecidas**
-  - Contagens canônicas e verificação de procedência (DeepDTA/GraphDTA): Davis ($68 \times 442 = 30.056$) e KIBA ($2.111 \times 229 = 118.254$).
-  - Configuração de credenciais do Kaggle via painel **Secrets** do Google Colab (`KAGGLE_USERNAME` e `KAGGLE_KEY`) e nota sobre URL de fallback a verificar.
+  - Contagens canônicas na tabela bruta vs. entidades únicas por conteúdo após canonização (`num_drugs_by_id` vs. `num_drugs_by_canonical_smiles` e `num_targets_by_id` vs. `num_targets_by_sequence`), política de manutenção de pares com mesmo conteúdo (`duplicate_policy="keep_both"`) e checagem cruzada de amostras com o repositório DeepDTA (`hkmztrk/DeepDTA`).
+  - Configuração de credenciais do Kaggle via painel **Secrets** do Google Colab (`KAGGLE_USERNAME` e `KAGGLE_KEY`) e nota sobre o fallback DeepDTA ("URL a verificar" / parser específico de `ligands_can.txt`, `proteins.txt` e `Y`).
   - Censura à direita no Davis: explicar que grande parte dos pares possui $K_d = 10.000\text{ nM}$ ($pK_d = 5.0$, limite superior do ensaio experimental), documentando o impacto disso nas métricas de regressão (MSE, CI, Pearson) e como o relatório contabiliza esses pares.
-  - Alta variância no regime `cold_drug` do Davis: como o Davis possui apenas 68 fármacos únicos, uma divisão 80/10/10 aloca apenas ~7 fármacos para validação e ~7 para teste em cada seed. Documentar que a variância entre seeds será naturalmente alta e que todas as avaliações a partir da Fase 2 devem reportar **média ± desvio-padrão nas 5 seeds**.
-  - Política de janela deslizante para proteínas >1022 resíduos (`max_len=1022`, `overlap=256`, média nas sobreposições) e política de manutenção de aminoácidos ambíguos (`X, B, U, Z, O`) no vocabulário do ESM-2.
+  - Alta variância e tamanho efetivo no regime `cold_drug` do Davis: como os grupos do split são formados por `smiles` canônico (podendo ser ligeiramente menor que os 68 IDs originais se houver colapso químico), documentar na tabela de `docs/FASE1_DADOS.md` o **número efetivo de grupos de SMILES e de pares em `train`/`val`/`test` para cada uma das 5 seeds**, destacando que todas as avaliações a partir da Fase 2 devem reportar **média ± desvio-padrão nas 5 seeds**.
+  - Política de janela deslizante para proteínas >1022 resíduos (`max_len=1022`, `overlap=256`, média nas sobreposições) e política de manutenção e contagem de aminoácidos ambíguos/raros (`X, B, U, Z, O`, com nota sobre o baixo treinamento de `U` e `O` no ESM-2).
   - Guia de I/O otimizado no Colab: descompactação de `esm_embeddings_{model_name}.tar` no SSD efêmero `/content/local_cache/` e execução do gate `python scripts/verify_phase1.py`.
 - [ ] **Step 2: Atualizar `README.md` e `docs/PROXIMOS_PASSOS.md` refletindo o Gate de Pronto da Fase 1 e transição para a Fase 2**
 - [ ] **Step 3: Commit da Task 6**
@@ -670,13 +701,13 @@ git commit -m "docs(phase1): document data provenance, Davis censoring, cold-dru
 
 A Fase 1 **só é considerada concluída** quando `python scripts/verify_phase1.py` retornar `exit code 0` comprovando:
 
-1. **Cobertura completa de embeddings:** Todas as 442 (Davis) + 229 (KIBA) sequências únicas têm embedding salvo em `cache/esm_embeddings/{model_name}/{hash}.pt`.
+1. **Cobertura completa de embeddings:** Todas as sequências únicas de Davis e KIBA têm embedding salvo em `cache/esm_embeddings/{model_name}/{hash}.pt`.
 2. **Integridade dimensional:** Para cada embedding, `shape[0] == len(sequence)` e `shape[1] == esm_dim` definido em `configs/base.yaml`.
 3. **Estabilidade numérica e topológica:** Nenhum `NaN` ou `Inf` nos embeddings ou features de grafos; nenhum grafo molecular vazio ($\ge 1$ átomo).
 4. **Isolamento de splits por conteúdo:** Os 30 splits (3 tipos $\times$ 5 seeds $\times$ 2 datasets) existem, possuem partições `train`/`val`/`test` não vazias e passam em `verify_split_leakage` comparando `smiles` canônico e `sequence`.
-5. **Procedência e volumetria exatas:** Davis contém exatamente 68 fármacos, 442 alvos e 30.056 pares; KIBA contém exatamente 2.111 fármacos, 229 alvos e 118.254 pares.
+5. **Procedência na tabela bruta e perda zero não registrada:** O relatório de ingestão comprova na tabela bruta exatamente 68 fármacos, 442 alvos e 30.056 pares no Davis e 2.111 fármacos, 229 alvos e 118.254 pares no KIBA, e o dataset limpo comprova que nenhum par foi perdido sem registro (`raw_num_pairs - clean_num_pairs == num_pairs_dropped_recorded`).
 6. **Segurança de desserialização:** Todos os arquivos `.pt` de grafos e embeddings carregam com `torch.load(..., weights_only=True)`.
-7. **Rastreabilidade no relatório final:** `outputs/logs/phase1_summary_report.json` registra: (a) sequências processadas com janela deslizante, (b) contagem e percentual de valores censurados do Davis ($pK_d = 5.0$), e (c) SMILES reduzidos ao maior fragmento ou que falharam na sanitização.
+7. **Rastreabilidade no relatório final:** `outputs/logs/phase1_summary_report.json` registra: (a) contagens `by_id` vs. `by_canonical_smiles`/`by_sequence` e pares de conteúdo duplicado, (b) contagem de sequências com `X, B, U, Z, O`, (c) sequências processadas com janela deslizante, (d) contagem e percentual de valores censurados do Davis ($pK_d = 5.0$), e (e) SMILES reduzidos ao maior fragmento ou que falharam na sanitização.
 
 ---
 

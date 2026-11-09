@@ -65,7 +65,17 @@ Este documento registra as decisões técnicas tomadas na configuração do proj
 ---
 
 ## 8. Política para Aminoácidos Ambíguos ou Não-Padrão nas Sequências Proteicas (Fase 1)
-- **Decisão:** **Manter** os códigos IUPAC estendidos/ambíguos (`X`, `B`, `U`, `Z`, `O`) intactos na sequência sanitizada, removendo apenas espaços/quebras de linha, convertendo para maiúsculas e rejeitando com erro explícito qualquer caractere fora do vocabulário oficial de aminoácidos do ESM-2 (`ACDEFGHIKLMNPQRSTVWYBXZUO`).
+- **Decisão:** **Manter** os códigos IUPAC estendidos/ambíguos (`X`, `B`, `U`, `Z`, `O`) intactos na sequência sanitizada, removendo apenas espaços/quebras de linha, convertendo para maiúsculas, rejeitando com erro explícito qualquer caractere fora do vocabulário oficial de aminoácidos do ESM-2 (`ACDEFGHIKLMNPQRSTVWYBXZUO`) e registrando no relatório de ingestão a contagem exata de sequências que contêm qualquer um desses 5 caracteres.
 - **Motivo:**
-  1. O alfabeto nativo do `fair-esm` (treinado sobre UniRef50) inclui explicitamente os tokens `X` (desconhecido), `B` (Asx), `U` (selenocisteína), `Z` (Glx) e `O` (pirrolisina) como tokens válidos com embeddings aprendidos.
-  2. Substituir `B`, `U`, `Z` ou `O` por `X` descartaria informação química/evolutiva já modelada pelo ESM-2 e alteraria o hash SHA-256 da sequência original sem necessidade técnica.
+  1. O alfabeto nativo do `fair-esm` (treinado sobre UniRef50) inclui explicitamente os tokens `X` (desconhecido), `B` (Asx), `U` (selenocisteína), `Z` (Glx) e `O` (pirrolisina). Normalizá-los para `X` descartaria informação sem ganho e alteraria o hash SHA-256 da sequência original.
+  2. **Ressalvas registradas:** (a) Em Davis e KIBA esses caracteres são raros ou inexistentes (impacto prático mínimo; se a contagem for zero, a decisão permanece documentada mas inócua); (b) os tokens raros `U` e `O` possuem embeddings pouco treinados no ESM-2, razão adicional pela qual o pipeline contabiliza e reporta explicitamente sua ocorrência por dataset.
+
+---
+
+## 9. Fonte de Dados (Kaggle vs. Fallback DeepDTA) e Política de Colapso Químico/Biológico (Fase 1)
+- **Decisão:**
+  1. **Fonte Primária e Fallback:** Utilizar `kagglehub` (`rajaryan2315/davis-and-kiba-datasets`) com credenciais via painel Secrets do Colab como fonte primária. O fallback HTTP para o repositório original do DeepDTA (`hkmztrk/DeepDTA`, que usa `ligands_can.txt`, `proteins.txt` e matriz `Y` em formato específico) fica marcado como **"URL a verificar"** (ou pode ser adiado na Fase 1 caso a verificação cruzada de contagens e amostras confirme a integridade da cópia do Kaggle). Nenhuma URL deve ser escrita de memória sem verificar o caminho real e registrar o commit/data.
+  2. **Separação entre Asserts de Procedência (Tabela Bruta) e Agrupamento por Conteúdo (Tabela Limpa):**
+     - Os `assert`s estritos de procedência (Davis: $68 \times 442 = 30.056$; KIBA: $2.111 \times 229 = 118.254$ pares válidos) rodam **sobre os dados brutos de entrada, antes de qualquer filtro ou colapso de canonização**.
+     - O relatório de ingestão registra separadamente `num_drugs_by_id` vs. `num_drugs_by_canonical_smiles` e `num_targets_by_id` vs. `num_targets_by_sequence`.
+     - **Política para pares duplicados por conteúdo (`(smiles, sequence)` idênticos vindos de IDs distintos):** **Manter ambos os registros** na tabela limpa (não descartar nem agregar silenciosamente para preservar os 30.056 / 118.254 pares de benchmark e permitir auditoria de `num_pairs_lost == 0`), registrando `duplicate_content_pairs_count` e `duplicate_content_affinity_std` no relatório. Como o split `cold_drug`/`cold_target` agrupa estritamente por `smiles` canônico e `sequence`, ambos os registros caem obrigatoriamente na mesma partição (`train`, `val` ou `test`), impedindo vazamento.
