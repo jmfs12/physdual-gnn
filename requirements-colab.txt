@@ -1,0 +1,25 @@
+# Dependências para Google Colab (GPU T4 / L4)
+# IMPORTANTE: O Colab já traz torch, numpy, pandas, scipy e scikit-learn pré-instalados
+# com suporte nativo à GPU do runtime. NÃO adicione nem reinstale esses pacotes aqui.
+
+# Quimioinformática e Bioinformática
+rdkit
+fair-esm
+biopython
+
+# GNN (sem torch-scatter/torch-sparse por padrão; instale extensões C++ apenas se exigido)
+torch_geometric
+
+# Configuração, Progresso, Logging e Métricas (Concordance Index)
+pyyaml
+tqdm
+tensorboard
+lifelines
+
+# Ferramentas de Desenvolvimento e Qualidade
+pytest
+ruff
+
+# --- Opcionais (descomente apenas se necessário) ---
+# PyTDC          # Opcional (Fase 1): pesado; pode forçar downgrade de numpy/pandas no Colab
+# gradio         # Opcional (Fase 9): interface de visualização Grad-AAM

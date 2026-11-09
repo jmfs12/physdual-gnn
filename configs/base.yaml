@@ -1,0 +1,77 @@
+# Configuração Base — PhysDual-GNN
+# Todos os caminhos em `paths` são RELATIVOS à raiz do projeto (PHYSDUAL_ROOT no Colab ou raiz do repo localmente).
+# NUNCA escreva caminhos absolutos (ex.: /content/drive/...) neste arquivo.
+
+project:
+  name: "physdual-gnn"
+  phase: 0
+
+seeds: [0, 1, 2, 3, 4]
+
+splits:
+  available:
+    - "random"
+    - "cold_drug"
+    - "cold_target"
+  default: "cold_target"
+  ratios:
+    train: 0.8
+    val: 0.1
+    test: 0.1
+
+datasets:
+  available:
+    - "davis"
+    - "kiba"
+  default: "davis"
+  davis:
+    metric_unit: "pKd"
+    num_drugs: 68
+    num_targets: 442
+  kiba:
+    metric_unit: "KIBA_score"
+    num_drugs: 2111
+    num_targets: 229
+
+paths:
+  data_dir: "data"
+  raw_data_dir: "data/raw"
+  processed_data_dir: "data/processed"
+  cache_dir: "cache"
+  esm_cache_dir: "cache/esm_embeddings"
+  outputs_dir: "outputs"
+  checkpoints_dir: "outputs/checkpoints"
+  results_dir: "outputs/results"
+  logs_dir: "outputs/logs"
+
+esm:
+  # Modelo padrão para extração offline de embeddings em GPU T4/L4 (fp16)
+  model_name: "esm2_t33_650M_UR50D"
+  esm_dim: 1280
+  repr_layer: 33
+  freeze_backbone: true
+  fp16_inference: true
+  batch_tokens: 2048
+
+  # Alternativa leve caso haja restrição severa de VRAM ou tempo de extração
+  lightweight_alternative:
+    model_name: "esm2_t30_150M_UR50D"
+    esm_dim: 640
+    repr_layer: 30
+
+  # Modelo mínimo usado exclusivamente no smoke test da Fase 0
+  smoke_test:
+    model_name: "esm2_t6_8M_UR50D"
+    esm_dim: 320
+    repr_layer: 6
+
+evaluation:
+  metrics:
+    - "ci"
+    - "mse"
+    - "pearson"
+    - "spearman"
+    - "rm2"
+
+physics:
+  enabled: false  # Módulo opcional (Fase 6), avaliado por ablação

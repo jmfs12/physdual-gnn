@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "physdual"
+version = "0.1.0"
+description = "PhysDual-GNN: Predição de afinidade droga-alvo (DTA) com Graph Neural Networks voltada ao reposicionamento de fármacos"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "João Miguel Francisco de Souza", email = "joanomiguel@gmail.com" }
+]
+dependencies = [
+    "rdkit",
+    "fair-esm",
+    "biopython",
+    "pyyaml",
+    "tqdm",
+    "tensorboard",
+    "lifelines",
+    "torch_geometric",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+tdc = [
+    "PyTDC",
+]
+ui = [
+    "gradio",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "scripts"]
+addopts = "-v"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "scripts", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
