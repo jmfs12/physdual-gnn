@@ -1,33 +1,31 @@
-# Próximos Passos — Roteiro para a Fase 1 (Dados e Cache ESM-2)
+# Próximos Passos — Execução do Gate da Fase 1 no Colab e Transição para a Fase 2
 
-Este documento registra as atividades planejadas para a **Fase 1**, mantendo o escopo da **Fase 0** estritamente focado em infraestrutura e configuração.
-
----
-
-## Checklist de Entrada para a Fase 1 (Ação do Usuário no Colab)
-
-Antes de iniciarmos a implementação da Fase 1:
-1. Abra e execute `notebooks/00_colab_bootstrap.ipynb` no Google Colab com GPU T4 ou L4 ativada.
-2. Confirme que todos os itens do smoke test retornaram `[  OK  ]` (ou `[PULADO]` apenas para o item 7 opcional `PyTDC`).
-3. Faça commit/envie de volta o arquivo `docs/colab_env_snapshot.txt` gerado pela Célula 6 no runtime do Colab e o output do smoke test.
+A implementação de código e testes da **Fase 1 (Dados, Splits, Featurização Molecular e Cache ESM-2)** está concluída.
 
 ---
 
-## Escopo Técnico da Fase 1 (A Implementar Após Aprovação da Fase 0)
+## 1. Checklist de Execução da Fase 1 no Google Colab (Gate de Pronto)
 
-1. **Ingestão e Padronização dos Datasets (`src/physdual/data/datasets.py`):**
-   - Download automatizado e reprodutível de **Davis** ($68 \times 442$, $pK_d = -\log_{10}(K_d / 10^9)$) e **KIBA** ($2111 \times 229$, KIBA score) diretamente das fontes canônicas (DeepDTA/GraphDTA), com suporte opcional ao `PyTDC`.
-   - Validação de SMILES via RDKit (canonização, remoção de sais se aplicável) e verificação de integridade das sequências FASTA.
+Para materializar os artefatos no Google Drive e validar o Gate de Pronto da Fase 1:
 
-2. **Divisões Experimentais Determinísticas (`src/physdual/data/splits.py`):**
-   - Geração e persistência em `data/processed/splits/` dos índices de treino/validação/teste (80/10/10) para as 5 seeds `[0, 1, 2, 3, 4]` nos três cenários:
-     - `random`: divisão aleatória de pares $(d, t)$.
-     - `cold_drug`: fármacos do conjunto de teste/validação nunca vistos no treino.
-     - `cold_target`: proteínas do conjunto de teste/validação nunca vistas no treino.
+1. No Google Colab (com GPU ativada e credenciais `KAGGLE_USERNAME` / `KAGGLE_KEY` configuradas no painel **Secrets**), abra e execute `notebooks/01_data_and_esm_cache.ipynb` (ou rode via terminal: `python scripts/run_phase1_data.py --dataset all`).
+2. Execute o verificador automatizado do Gate de Pronto:
+   ```bash
+   python scripts/verify_phase1.py --config configs/base.yaml
+   ```
+3. Confirme que todos os 7 critérios retornam `[OK]` (`exit code 0`) e que o relatório `outputs/logs/phase1_summary_report.json` foi gerado.
 
-3. **Featurização Atômica de Ligantes (`src/physdual/data/featurizer_drug.py`):**
-   - Conversão de SMILES únicos em grafos PyG com features atômicas e de ligação química completas, salvos em cache para evitar recomputação a cada época.
+---
 
-4. **Extração Offline de Embeddings do ESM-2 (`scripts/precompute_esm.py`):**
-   - Processamento das proteínas únicas de Davis (442) e KIBA (229) com `esm2_t33_650M_UR50D` congelado em `fp16` (ou `esm2_t30_150M_UR50D`).
-   - Persistência de um arquivo `<sha256>.pt` por sequência em `cache/esm_embeddings/` no Google Drive e utilitário de cópia rápida para `/content/local_cache/` no início da sessão de treino.
+## 2. Escopo Planejado para a Fase 2 (Métricas, Loop de Treino e Baseline GraphDTA)
+
+Após a aprovação do `verify_phase1.py`:
+
+1. **Métricas de Avaliação (`src/physdual/eval/metrics.py`):**
+   - Implementação validada e testada de **MSE**, **RMSE**, **Pearson ($r$)**, **Spearman ($\rho$)**, **$r_m^2$** e **Concordance Index (CI)** (com validação cruzada contra `lifelines.utils.concordance_index`).
+2. **Dataset PyTorch / PyG e DataLoader Otimizado (`src/physdual/data/datamodule.py`):**
+   - Descompactação automática do tarball `esm_embeddings_{model_name}.tar` para `/content/local_cache/` no início da sessão do Colab.
+   - Collate customizado combinando `Batch` de grafos moleculares PyG (`load_drug_graph`) com tensores de proteínas.
+3. **Baseline GraphDTA (`src/physdual/models/graphdta.py`) e Loop de Treino:**
+   - Reprodução do codificador GIN atômico + CNN 1D sobre sequência proteica.
+   - Treinamento com checkpointing por época no Google Drive, early stopping em `val` e agregação de **média ± desvio-padrão nas 5 seeds** (`[0, 1, 2, 3, 4]`) para `random`, `cold_drug` e `cold_target`.

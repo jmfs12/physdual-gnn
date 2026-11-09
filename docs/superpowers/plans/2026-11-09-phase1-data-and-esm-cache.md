@@ -54,7 +54,7 @@ Colunas padronizadas do DataFrame de saída:
 Chaves obrigatórias do dicionário de relatório (`report`):
 `{"dataset_name", "raw_num_pairs", "clean_num_pairs", "num_pairs_dropped_recorded", "num_drugs_by_id", "num_drugs_by_canonical_smiles", "num_targets_by_id", "num_targets_by_sequence", "duplicate_content_pairs_count", "duplicate_policy", "ambiguous_aa_seq_count", "ambiguous_aa_char_counts", "affinity_unit_detected", "davis_censored_count", "davis_censored_pct", "smiles_modified_count", "smiles_failed_count", "smiles_failures"}`
 
-- [ ] **Step 1: Escrever testes pytest que falham em `tests/test_datasets.py`**
+- [x] **Step 1: Escrever testes pytest que falham em `tests/test_datasets.py`**
 
 ```python
 import pytest
@@ -175,12 +175,12 @@ def test_validate_protein_sequence_policy():
         validate_protein_sequence("MKTVRQ*J123")
 ```
 
-- [ ] **Step 2: Executar teste e verificar que falha**
+- [x] **Step 2: Executar teste e verificar que falha**
 
 Run: `pytest tests/test_datasets.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'physdual.data.datasets'`
 
-- [ ] **Step 3: Implementar ingestão, validação de procedência e padronização em `src/physdual/data/datasets.py`**
+- [x] **Step 3: Implementar ingestão, validação de procedência e padronização em `src/physdual/data/datasets.py`**
 
 Implementar:
 1. **Fonte Primária e Fallback (ADR #9):**
@@ -203,12 +203,12 @@ Implementar:
    - Manter `X, B, U, Z, O` nas sequências proteicas e contabilizar em `ambiguous_aa_seq_count` e `ambiguous_aa_char_counts` quantas sequências únicas contêm cada um desses 5 resíduos.
 6. Salvamento em `data/processed/{dataset}_clean.csv` e relatório de auditoria em `data/processed/{dataset}_ingestion_report.json`.
 
-- [ ] **Step 4: Executar teste e verificar que passa**
+- [x] **Step 4: Executar teste e verificar que passa**
 
 Run: `pytest tests/test_datasets.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit da Task 1**
+- [x] **Step 5: Commit da Task 1**
 
 ```bash
 git add docs/DECISOES.md src/physdual/data/datasets.py tests/test_datasets.py
@@ -236,7 +236,7 @@ Regras críticas de domínio:
 - Em `cold_target`, o agrupamento e a verificação de vazamento usam a coluna `sequence`, **não** apenas `target_id`. Dois `target_id` distintos com a mesma `sequence` devem cair obrigatoriamente na mesma partição.
 - `verify_split_leakage` verifica também que `train`, `val` e `test` são não vazios, mutuamente disjuntos em índices e cobrem 100% do DataFrame.
 
-- [ ] **Step 1: Escrever bateria de testes pytest em `tests/test_splits.py`**
+- [x] **Step 1: Escrever bateria de testes pytest em `tests/test_splits.py`**
 
 ```python
 import pytest
@@ -342,21 +342,21 @@ def test_splits_determinism_proportions_and_non_empty(synthetic_dta_df, tmp_path
     assert loaded == s1
 ```
 
-- [ ] **Step 2: Executar teste e verificar que falha**
+- [x] **Step 2: Executar teste e verificar que falha**
 
 Run: `pytest tests/test_splits.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'physdual.data.splits'`
 
-- [ ] **Step 3: Implementar particionamento por conteúdo em `src/physdual/data/splits.py`**
+- [x] **Step 3: Implementar particionamento por conteúdo em `src/physdual/data/splits.py`**
 
 Implementar geração determinística com `np.random.RandomState(seed)`, agrupando entidades únicas por `smiles` em `cold_drug` e por `sequence` em `cold_target` (ordenando chaves únicas antes do shuffle para reprodutibilidade total entre plataformas), garantindo que `train`, `val` e `test` nunca fiquem vazios, e persistindo JSON `{ "train": [...], "val": [...], "test": [...] }` sob `data/processed/splits/{dataset}_{split_type}_seed{seed}.json`.
 
-- [ ] **Step 4: Executar teste e verificar que passa**
+- [x] **Step 4: Executar teste e verificar que passa**
 
 Run: `pytest tests/test_splits.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit da Task 2**
+- [x] **Step 5: Commit da Task 2**
 
 ```bash
 git add src/physdual/data/splits.py tests/test_splits.py
@@ -383,7 +383,7 @@ git commit -m "feat(data): implement content-aware leakage-free random, cold-dru
 
 Features atômicas (9 dimensões por nó: atomic number, formal charge, degree, explicit valence, total num H, hybridization, aromaticity, is in ring, chirality) e arestas bidirecionais com atributos de ligação (bond type, stereochemistry, is conjugated). Moléculas com 0 átomos ou falha no RDKit são registradas no `failure_report` e rejeitadas com erro claro em chamadas unitárias.
 
-- [ ] **Step 1: Escrever testes pytest de featurização e round-trip `weights_only=True` em `tests/test_featurizer_drug.py`**
+- [x] **Step 1: Escrever testes pytest de featurização e round-trip `weights_only=True` em `tests/test_featurizer_drug.py`**
 
 ```python
 import pytest
@@ -438,21 +438,21 @@ def test_drug_graph_cache_roundtrip_weights_only(tmp_path):
     assert torch.equal(g_orig.edge_attr, g_loaded.edge_attr)
 ```
 
-- [ ] **Step 2: Executar teste e verificar que falha (ou skip caso sem RDKit/PyG local)**
+- [x] **Step 2: Executar teste e verificar que falha (ou skip caso sem RDKit/PyG local)**
 
 Run: `pytest tests/test_featurizer_drug.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'physdual.data.featurizer_drug'` (ou SKIP se dependências de ML ausentes).
 
-- [ ] **Step 3: Implementar featurizador molecular em `src/physdual/data/featurizer_drug.py`**
+- [x] **Step 3: Implementar featurizador molecular em `src/physdual/data/featurizer_drug.py`**
 
 Implementar sanitização RDKit com seleção do maior fragmento covalente (`rdMolStandardize.LargestFragmentChooser` ou `Chem.GetMolFrags`), construção de tensores `x` (`float32`), `edge_index` (`int64`) e `edge_attr` (`float32`), serialização em dicionários primitivos compatíveis com `weights_only=True`, reconstrução em `torch_geometric.data.Data` sob demanda e relatório de falhas de parsing.
 
-- [ ] **Step 4: Executar teste e verificar que passa**
+- [x] **Step 4: Executar teste e verificar que passa**
 
 Run: `pytest tests/test_featurizer_drug.py -v`
 Expected: PASS (ou SKIP justificado se sem stack ML local).
 
-- [ ] **Step 5: Commit da Task 3**
+- [x] **Step 5: Commit da Task 3**
 
 ```bash
 git add src/physdual/data/featurizer_drug.py tests/test_featurizer_drug.py
@@ -481,7 +481,7 @@ Política de Janela Deslizante (B1):
 - Se `L <= max_len` (padrão `1022`): extrai em passagem única, removendo `<cls>` (índice 0) e `<eos>` (índice `L + 1`), resultando em `[L, dim]`.
 - Se `L > max_len`: avança com passo `stride = max_len - overlap` (ex.: `1022 - 256 = 766`), garantindo que a última janela cubra até o final da sequência (`[start, end)`). Em cada janela, descarta `<cls>` e `<eos>` daquela sub-sequência, acumula as representações em um buffer `sum_emb` de shape `[L, dim]` (`float32`) e um contador `counts` de shape `[L, 1]`, dividindo `sum_emb / counts` ao final antes de salvar em `fp16`.
 
-- [ ] **Step 1: Atualizar `configs/base.yaml` com `max_len` e `overlap` e escrever testes pytest em `tests/test_esm_cache.py`**
+- [x] **Step 1: Atualizar `configs/base.yaml` com `max_len` e `overlap` e escrever testes pytest em `tests/test_esm_cache.py`**
 
 Adicionar em `configs/base.yaml` sob `esm:`:
 ```yaml
@@ -585,12 +585,12 @@ def test_long_sequence_sliding_window_1500aa(tmp_path):
     assert not torch.isinf(emb).any()
 ```
 
-- [ ] **Step 2: Executar teste e verificar que falha**
+- [x] **Step 2: Executar teste e verificar que falha**
 
 Run: `pytest tests/test_esm_cache.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'physdual.data.esm_cache'`
 
-- [ ] **Step 3: Implementar motor de extração com janela deslizante e cache isolado em `src/physdual/data/esm_cache.py`**
+- [x] **Step 3: Implementar motor de extração com janela deslizante e cache isolado em `src/physdual/data/esm_cache.py`**
 
 Implementar:
 1. Carregamento do modelo ESM-2 utilizando o gerenciador de contexto escopado `_scoped_esm_weights_load` (ADR #5 em `docs/DECISOES.md`), congelando pesos (`model.eval()`, `requires_grad_(False)`).
@@ -598,12 +598,12 @@ Implementar:
 3. Persistência em `fp16` no caminho `cache/esm_embeddings/{model_name}/{hash}.pt` com metadados primitivos (`model_name`, `dim`, `seq_len`, `windowed`) e conversão para `fp32` em `load_cached_protein_embedding` com validação de `expected_dim`.
 4. Empacotamento em tarball por modelo (`esm_embeddings_{model_name}.tar`).
 
-- [ ] **Step 4: Executar teste e verificar que passa**
+- [x] **Step 4: Executar teste e verificar que passa**
 
 Run: `pytest tests/test_esm_cache.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit da Task 4**
+- [x] **Step 5: Commit da Task 4**
 
 ```bash
 git add configs/base.yaml src/physdual/data/esm_cache.py tests/test_esm_cache.py
@@ -638,16 +638,16 @@ Critérios objetivos verificados por `scripts/verify_phase1.py` (Gate de Pronto 
 6. Todos os arquivos `.pt` (grafos de fármacos e embeddings ESM-2) carregam sem erro com `torch.load(..., weights_only=True)`.
 7. O relatório final consolidado (`outputs/logs/phase1_summary_report.json`) lista explicitamente: (a) `num_drugs_by_id` vs. `num_drugs_by_canonical_smiles` e `num_targets_by_id` vs. `num_targets_by_sequence`, (b) contagem de pares com conteúdo duplicado (`duplicate_content_pairs_count`), (c) contagem de sequências com aminoácidos estendidos (`X, B, U, Z, O`), (d) quantidade e IDs de sequências processadas com janela deslizante, (e) contagem e percentual de valores censurados do Davis ($K_d = 10.000\text{ nM} / pK_d = 5.0$), e (f) contagem/lista de SMILES alterados (sais removidos) ou falhos.
 
-- [ ] **Step 1: Escrever teste unitário para o verificador de gate em `tests/test_verify_phase1.py`**
+- [x] **Step 1: Escrever teste unitário para o verificador de gate em `tests/test_verify_phase1.py`**
 
 Testar a função `run_phase1_verification(...)` sobre um diretório temporário contendo um mini-dataset mockado completo (ou validando que falha quando falta um split, quando `shape[0] != len(seq)` ou quando há `NaN`).
 
-- [ ] **Step 2: Executar teste e verificar que falha**
+- [x] **Step 2: Executar teste e verificar que falha**
 
 Run: `pytest tests/test_verify_phase1.py -v`
 Expected: FAIL com `ModuleNotFoundError`
 
-- [ ] **Step 3: Implementar `src/physdual/data/__init__.py`, `scripts/run_phase1_data.py`, `scripts/verify_phase1.py` e `notebooks/01_data_and_esm_cache.ipynb`**
+- [x] **Step 3: Implementar `src/physdual/data/__init__.py`, `scripts/run_phase1_data.py`, `scripts/verify_phase1.py` e `notebooks/01_data_and_esm_cache.ipynb`**
 
 - Em `scripts/run_phase1_data.py`: aceitar `--dataset` (`davis`, `kiba`, `all`), `--affinity-unit` (`auto`, `nM`, `pKd`, `kiba_score`), `--esm-model`, `--skip-esm`, `--batch-tokens`, salvando `outputs/logs/phase1_summary_report.json`.
 - Em `scripts/verify_phase1.py`: verificar os 7 itens do Gate de Pronto e retornar código de saída `0` apenas se todos passarem (`1` caso contrário).
@@ -659,12 +659,12 @@ Expected: FAIL com `ModuleNotFoundError`
   - Célula 5: Extração em lote do ESM-2 em `fp16` na GPU alocada pelo Colab (com janela deslizante para proteínas >1022 resíduos).
   - Célula 6: Criação do tarball `esm_embeddings_{model_name}.tar` no Drive e execução de `scripts/verify_phase1.py`.
 
-- [ ] **Step 4: Validar testes e sintaxe CLI**
+- [x] **Step 4: Validar testes e sintaxe CLI**
 
 Run: `pytest tests/test_verify_phase1.py -v && python scripts/run_phase1_data.py --help && python scripts/verify_phase1.py --help`
 Expected: PASS nos testes e retorno 0 nos comandos `--help`.
 
-- [ ] **Step 5: Commit da Task 5**
+- [x] **Step 5: Commit da Task 5**
 
 ```bash
 git add src/physdual/data/__init__.py scripts/run_phase1_data.py scripts/verify_phase1.py notebooks/01_data_and_esm_cache.ipynb tests/test_verify_phase1.py
@@ -680,15 +680,15 @@ git commit -m "feat(data): add Phase 1 pipeline CLI, verification gate script, a
 - Modify: `README.md`
 - Modify: `docs/PROXIMOS_PASSOS.md`
 
-- [ ] **Step 1: Escrever `docs/FASE1_DADOS.md` cobrindo protocolos, estatísticas e limitações conhecidas**
+- [x] **Step 1: Escrever `docs/FASE1_DADOS.md` cobrindo protocolos, estatísticas e limitações conhecidas**
   - Contagens canônicas na tabela bruta vs. entidades únicas por conteúdo após canonização (`num_drugs_by_id` vs. `num_drugs_by_canonical_smiles` e `num_targets_by_id` vs. `num_targets_by_sequence`), política de manutenção de pares com mesmo conteúdo (`duplicate_policy="keep_both"`) e checagem cruzada de amostras com o repositório DeepDTA (`hkmztrk/DeepDTA`).
   - Configuração de credenciais do Kaggle via painel **Secrets** do Google Colab (`KAGGLE_USERNAME` e `KAGGLE_KEY`) e nota sobre o fallback DeepDTA ("URL a verificar" / parser específico de `ligands_can.txt`, `proteins.txt` e `Y`).
   - Censura à direita no Davis: explicar que grande parte dos pares possui $K_d = 10.000\text{ nM}$ ($pK_d = 5.0$, limite superior do ensaio experimental), documentando o impacto disso nas métricas de regressão (MSE, CI, Pearson) e como o relatório contabiliza esses pares.
   - Alta variância e tamanho efetivo no regime `cold_drug` do Davis: como os grupos do split são formados por `smiles` canônico (podendo ser ligeiramente menor que os 68 IDs originais se houver colapso químico), documentar na tabela de `docs/FASE1_DADOS.md` o **número efetivo de grupos de SMILES e de pares em `train`/`val`/`test` para cada uma das 5 seeds**, destacando que todas as avaliações a partir da Fase 2 devem reportar **média ± desvio-padrão nas 5 seeds**.
   - Política de janela deslizante para proteínas >1022 resíduos (`max_len=1022`, `overlap=256`, média nas sobreposições) e política de manutenção e contagem de aminoácidos ambíguos/raros (`X, B, U, Z, O`, com nota sobre o baixo treinamento de `U` e `O` no ESM-2).
   - Guia de I/O otimizado no Colab: descompactação de `esm_embeddings_{model_name}.tar` no SSD efêmero `/content/local_cache/` e execução do gate `python scripts/verify_phase1.py`.
-- [ ] **Step 2: Atualizar `README.md` e `docs/PROXIMOS_PASSOS.md` refletindo o Gate de Pronto da Fase 1 e transição para a Fase 2**
-- [ ] **Step 3: Commit da Task 6**
+- [x] **Step 2: Atualizar `README.md` e `docs/PROXIMOS_PASSOS.md` refletindo o Gate de Pronto da Fase 1 e transição para a Fase 2**
+- [x] **Step 3: Commit da Task 6**
 
 ```bash
 git add docs/FASE1_DADOS.md README.md docs/PROXIMOS_PASSOS.md
