@@ -52,6 +52,8 @@ esm:
   freeze_backbone: true
   fp16_inference: true
   batch_tokens: 2048
+  max_len: 1022
+  overlap: 256
 
   # Alternativa leve caso haja restrição severa de VRAM ou tempo de extração
   lightweight_alternative:
