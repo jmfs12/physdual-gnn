@@ -779,7 +779,7 @@ git commit -m "feat(training): implement training engine with strict test isolat
     - Caso alguma run apresente `best_epoch > 0.8 * epochs`, emite **`[WARN]`** reportando quais runs atingiram a zona próxima ao teto de épocas.
     - **Não exige queda obrigatória** nos splits cold; apenas reporta os valores observados.
 
-- [ ] **Step 1: Escrever testes unitários em `tests/test_verify_phase2.py` (testando `--smoke`, idempotência de runs concluídas e agregação multi-seed)**
+- [x] **Step 1: Escrever testes unitários em `tests/test_verify_phase2.py` (testando `--smoke`, idempotência de runs concluídas e agregação multi-seed)**
 
 ```python
 from pathlib import Path
@@ -804,19 +804,19 @@ def test_verify_phase2_smoke_mode():
     assert "RESULTADO FINAL: APROVADO" in result.stdout
 ```
 
-- [ ] **Step 2: Executar teste e verificar que falha**
+- [x] **Step 2: Executar teste e verificar que falha**
 
 Run: `pytest tests/test_verify_phase2.py -v`
 Expected: FAIL (script `verify_phase2.py` ainda não existe)
 
-- [ ] **Step 3: Implementar `scripts/run_phase2_baseline.py`, `scripts/verify_phase2.py` e `notebooks/02_graphdta_baseline.ipynb`**
+- [x] **Step 3: Implementar `scripts/run_phase2_baseline.py`, `scripts/verify_phase2.py` e `notebooks/02_graphdta_baseline.ipynb`**
 
-- [ ] **Step 4: Executar testes e validar CLIs**
+- [x] **Step 4: Executar testes e validar CLIs**
 
 Run: `pytest tests/test_verify_phase2.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit da Task 5**
+- [x] **Step 5: Commit da Task 5**
 
 ```bash
 git add scripts/run_phase2_baseline.py scripts/verify_phase2.py notebooks/02_graphdta_baseline.ipynb tests/test_verify_phase2.py
