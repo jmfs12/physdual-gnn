@@ -375,7 +375,7 @@ git commit -m "feat(eval): implement DTA metrics, uncensored/length stratificati
   - `prepare_local_cache(tar_path: Path, local_cache_dir: Path) -> Path`:
     - Utilitário antecipado para a Fase 3 (descompactação de tarballs de cache no SSD `/content/local_cache/`).
 
-- [ ] **Step 1: Escrever testes unitários em `tests/test_datamodule.py` (incluindo verificação de pré-construção única e consistência de canonização SMILES)**
+- [x] **Step 1: Escrever testes unitários em `tests/test_datamodule.py` (incluindo verificação de pré-construção única e consistência de canonização SMILES)**
 
 ```python
 import numpy as np
@@ -431,19 +431,19 @@ def test_dta_dataset_prebuilds_unique_entities_and_collates():
     assert batch["seq_lengths"].tolist() == [4, 1200]
 ```
 
-- [ ] **Step 2: Executar teste e verificar que falha**
+- [x] **Step 2: Executar teste e verificar que falha**
 
 Run: `pytest tests/test_datamodule.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'physdual.data.datamodule'`
 
-- [ ] **Step 3: Implementar `src/physdual/data/datamodule.py`**
+- [x] **Step 3: Implementar `src/physdual/data/datamodule.py`**
 
-- [ ] **Step 4: Executar teste e verificar que passa**
+- [x] **Step 4: Executar teste e verificar que passa**
 
 Run: `pytest tests/test_datamodule.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit da Task 2**
+- [x] **Step 5: Commit da Task 2**
 
 ```bash
 git add src/physdual/data/datamodule.py tests/test_datamodule.py
