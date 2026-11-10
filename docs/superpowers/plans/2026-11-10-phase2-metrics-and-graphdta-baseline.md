@@ -596,7 +596,7 @@ git commit -m "feat(models): implement official GraphDTAGIN and secondary GraphD
     - **Alerta de proximidade do teto de épocas:** registra `best_epoch` e emite `[WARN]` (e grava `near_epoch_ceiling_warn: true` no resultado da run) quando `best_epoch > 0.8 * epochs`.
     - Ao encerrar o loop de épocas (por `EarlyStopping` ou `epochs` máximo), recarrega `checkpoint_best.pt` com `weights_only=True` e avalia `test_loader` **uma única vez**, calculando métricas completas, subconjunto não-censurado (para Davis) e estratificação por faixa de comprimento ($\le 1000$ vs. $> 1000$).
 
-- [ ] **Step 1: Escrever testes unitários em `tests/test_trainer_checkpoint.py` (incluindo sanitização NumPy, atomicidade no mesmo diretório, `EarlyStopping` com `delta`, isolamento estrito do `test_loader` e 1–2 épocas em subconjunto real do Davis)**
+- [x] **Step 1: Escrever testes unitários em `tests/test_trainer_checkpoint.py` (incluindo sanitização NumPy, atomicidade no mesmo diretório, `EarlyStopping` com `delta`, isolamento estrito do `test_loader` e 1–2 épocas em subconjunto real do Davis)**
 
 ```python
 from pathlib import Path
@@ -699,19 +699,19 @@ def test_train_model_evaluates_test_loader_only_once_at_end(tmp_path):
     assert "best_epoch" in result
 ```
 
-- [ ] **Step 2: Executar teste e verificar que falha**
+- [x] **Step 2: Executar teste e verificar que falha**
 
 Run: `pytest tests/test_trainer_checkpoint.py -v`
 Expected: FAIL com `ModuleNotFoundError`
 
-- [ ] **Step 3: Implementar `src/physdual/training/checkpoint.py`, `src/physdual/training/trainer.py` e `src/physdual/training/__init__.py` (e adicionar teste de 1–2 épocas em subconjunto real do Davis quando `data/processed/davis_clean.csv` existir)**
+- [x] **Step 3: Implementar `src/physdual/training/checkpoint.py`, `src/physdual/training/trainer.py` e `src/physdual/training/__init__.py` (e adicionar teste de 1–2 épocas em subconjunto real do Davis quando `data/processed/davis_clean.csv` existir)**
 
-- [ ] **Step 4: Executar teste e verificar que passa**
+- [x] **Step 4: Executar teste e verificar que passa**
 
 Run: `pytest tests/test_trainer_checkpoint.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit da Task 4**
+- [x] **Step 5: Commit da Task 4**
 
 ```bash
 git add src/physdual/training/ tests/test_trainer_checkpoint.py
