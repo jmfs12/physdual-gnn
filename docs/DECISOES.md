@@ -112,3 +112,33 @@ Este documento registra as decisões técnicas tomadas na configuração do proj
   2. Implementar a auditoria formal `audit_content_and_target_duplicates` reportando a contagem de alvos que compartilham sequência e pares com afinidades divergentes.
   3. **Registro de Limitação Metodológica (Fase 7):** Documentar formalmente que os 442 `target_id`s do Davis colapsam em 379 sequências únicas (e 2.111 fármacos do KIBA em 2.065 SMILES únicos). Se variantes mutantes ou estados fosforilados no Davis compartilham a sequência de aminoácidos do tipo selvagem (*wild-type*) no arquivo `proteins.txt` fornecido pelo DeepDTA, **o objetivo de predição de impacto de mutações (Fase 7) não é mensurável diretamente a partir dessas entradas sem a reconstrução explícita das sequências com a mutação pontual**. Para a Fase 7, qualquer teste com mutantes exigirá sequências contendo a substituição do resíduo ou datasets dedicados de mutações.
 
+---
+
+## 12. Adoção do Baseline Oficial GraphDTA GIN, Seleção por Validação vs. Teste e Orçamento Computacional (Fase 2)
+- **Contexto:**
+  1. O repositório original `thinng/GraphDTA` implementa quatro variantes para grafos de fármacos (GCN, GIN, GAT, GAT-GCN) e uma arquitetura convolucional 1D para alvos proteicos baseada em `Conv1d(1000, 32, 8)` com flatten e projeção linear. Dentre todas as variantes, o GraphDTA com **GIN (5 camadas)** obteve o melhor desempenho no benchmark Davis no artigo original de Nguyen et al. (2021) (*Bioinformatics*, CI = 0.893, MSE = 0.229).
+  2. Diversas reimplementações secundárias na literatura adaptaram o codificador proteico do DeepDTA (uma CNN de 3 camadas com `Conv1d(128, 32, 4) -> Conv1d(32, 64, 8) -> Conv1d(64, 96, 12)` com max pooling) para o GraphDTA, gerando divergências conceituais sobre o que constitui a arquitetura "GraphDTA".
+  3. No repositório oficial do GraphDTA (`training.py:L70-L86`), o conjunto de teste era avaliado a cada época ao longo de 1000 épocas, e o modelo persistido como final era aquele que atingisse o menor MSE no conjunto de teste. Essa prática introduz **viés de seleção otimista (*data leakage* de hiperparâmetros de parada antecipada no conjunto de teste)**, inflacionando artificialmente as métricas reportadas na literatura.
+  4. O treinamento completo de 5 seeds nos 3 regimes de split (`random`, `cold_drug`, `cold_target`) para Davis e KIBA exige centenas de épocas por modelo, sob limites estritos de cota de GPU no Google Colab (sessões preemptíveis com teto de 12 horas).
+- **Decisões:**
+  1. **Adoção do Baseline Oficial (`graphdta_gin`) vs. Variante Secundária (`graphdta_cnn3`):**
+     - O modelo oficial de referência para a Fase 2 é o `GraphDTAGIN` (`src/physdual/models/graphdta.py`), reproduzindo com exatidão a implementação original do commit `6162245c6776684b391d30610850fe7077478435`: `GINEncoder` com 5 camadas `GINConv` (dimensão oculta 32) + `OfficialGraphDTATargetEncoder` com `Conv1d(1000, 32, 8)` linearizada para 128 dimensões + MLP de fusão `256 -> 1024 -> 256 -> 1`.
+     - A variante de 3 camadas (`GraphDTACNN3`) é mantida e implementada com o rótulo explícito *"GraphDTA-style com CNN estilo DeepDTA"*, servindo estritamente como controle e referência secundária.
+  2. **Isolamento Estrito de Teste (Eliminação do Data Leakage):**
+     - O conjunto de teste (`test_loader`) é avaliado **estritamente uma única vez ao término do treinamento**.
+     - Durante as épocas de treino, o critério de salvamento do melhor checkpoint (`checkpoint_best.pt`) e de parada antecipada (*early stopping*) baseia-se **exclusivamente na perda de validação (`val_loader`)**.
+     - Todos os relatórios de execução e verificações de integridade auditam e exigem a flag `test_isolation_verified: true`.
+  3. **Paciência Diferenciada para Splits Cold no Davis:**
+     - Definir `patience = 50` épocas para o split `random` e estender para `davis_cold_patience = 80` épocas para os regimes `cold_drug` e `cold_target`. Em virtude da alta variância induzida pela pequena quantidade de entidades agrupadas no Davis (apenas 68 fármacos), as curvas de perda em splits cold apresentam estagnação transitória antes de convergir.
+  4. **Orçamento Computacional e Priorização Davis vs. KIBA:**
+     - **Prioridade 1 (Obrigatória):** Treinar integralmente o Davis nos 3 splits (`random`, `cold_drug`, `cold_target`) em 5 seeds (`0, 1, 2, 3, 4`) para `graphdta_gin` (15 runs) e `graphdta_cnn3` (15 runs).
+     - **Prioridade 2 (Condicional):** O dataset KIBA (~118 mil pares) só é executado no Colab se a medição preliminar de benchmark confirmar tempo $\le 15\text{ s/época}$. Caso contrário, prioriza-se o split `random` com 3 seeds para economizar unidades de computação de GPU para a Fase 3 (Fusão com ESM-2).
+- **Consequências Científicas e Técnicas:**
+  - *Positivas:*
+    - **Rigor Metodológico Superior:** Eliminação total do viés de parada antecipada no conjunto de teste, garantindo comparabilidade honesta com os futuros modelos PhysDual-GNN.
+    - **Transparência na Saturação do Split Aleatório:** Como o GraphDTA GIN atinge CI de 0.893 no Davis `random` (próximo à meta global de ~0.89), fica explicitado que a contribuição científica do PhysDual-GNN reside na generalização para novas drogas e alvos (`cold_drug`, `cold_target`), em afinidades não censuradas ($pK_d > 5.0$) e na captura de contexto em sequências longas via ESM-2.
+    - **Resiliência Operacional:** A persistência atômica por run individual (`save_json_atomic`) e o checkpointing seguro por época tornam a execução no Google Colab completamente tolerante a preempções de hardware.
+  - *Negativas / Mitigações:*
+    - As métricas obtidas pelo nosso baseline oficial no Davis `random` podem ser ligeiramente menores ou mais conservadoras do que o CI = 0.893 e MSE = 0.229 reportados na Tabela 2 de Nguyen et al. (2021). Esse desvio é esperado e documentado formalmente como reflexo do protocolo de isolamento estrito de teste.
+
+

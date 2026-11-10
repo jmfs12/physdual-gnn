@@ -6,6 +6,23 @@ Predição de afinidade droga-alvo (**DTA** — $pK_d$, $pK_i$, KIBA) com **Grap
 
 ---
 
+## Status do Projeto e Fases
+
+| Fase | Título | Status | Principais Entregas |
+| :---: | :--- | :---: | :--- |
+| **0** | Setup de Ambiente e Governança | **Concluída** | Bootstrap Colab + Drive, governança de dependências sem pin agressivo (ADRs #1-#7). |
+| **1** | Pipeline de Dados, Splits e Cache ESM-2 | **Concluída** | Ingestão autônoma DeepDTA, splits `random`/`cold_drug`/`cold_target` (5 seeds), grafos PyG e cache offline ESM-2 ([`docs/FASE1_DADOS.md`](docs/FASE1_DADOS.md), ADRs #8-#9). |
+| **2** | Baseline Oficial GraphDTA e Métricas | **Implementada** | Baseline oficial `GraphDTAGIN` e variante `GraphDTACNN3`, isolamento estrito de teste sem data leakage, métricas (CI, MSE, Pearson, Spearman, $r_m^2$), orquestrador idempotente e gate verificado com 100% dos testes passando ([`docs/FASE2_BASELINE.md`](docs/FASE2_BASELINE.md), ADRs #10-#12). |
+| **3** | Dual-Encoder PhysDual (GIN + ESM-2) | *Planejada* | Fusão multimodal do encoder molecular GIN com embeddings evolutivos contextuais do ESM-2. |
+| **4** | Cross-Attention e Interpretabilidade | *Planejada* | Mecanismo de atenção cruzada droga-resíduo para mapeamento de sítios catalíticos. |
+| **5** | Otimização de Hiperparâmetros e Eficiência | *Planejada* | Ajuste fino guiado e inferência acelerada em GPU. |
+| **6** | Restrições Físicas Covalentes (Opcional) | *Planejada* | Módulo indutivo analítico baseado em potenciais LJ e Coulomb. |
+| **7** | Resiliência a Mutações e Generalização | *Planejada* | Testes em mutantes pontuais de resistência clínica com sequências explícitas. |
+| **8** | Triagem Virtual em Larga Escala | *Planejada* | Triagem virtual para reposicionamento contra alvos selecionados. |
+| **9** | Relatório Científico e Apresentação | *Planejada* | Consolidação de resultados, benchmarks e documentação final. |
+
+---
+
 ## Setup no Google Colab (≤ 5 Passos)
 
 O ambiente principal de execução é o **Google Colab (GPU L4 22.5 GB ou T4 16 GB)** integrado ao **Google Drive**:
@@ -46,36 +63,46 @@ python scripts/smoke_test.py
 ```text
 physdual-gnn/
 ├── configs/
-│   └── base.yaml                  # Seeds, splits, datasets, modelos ESM-2 e caminhos relativos
+│   └── base.yaml                  # Seeds, splits, datasets, modelos ESM-2, GraphDTA e treinamento
 ├── src/physdual/
 │   ├── utils/                     # paths.py, config.py, seed.py, env_info.py
-│   ├── data/                      # (Fase 1) datasets.py, splits.py, featurizer_drug.py, esm_cache.py
-│   ├── models/                    # (Fases 2-5) GraphDTA baseline e PhysDual-GNN
+│   ├── data/                      # (Fase 1) datasets.py, splits.py, featurizer_drug.py, esm_cache.py, datamodule.py
+│   ├── models/                    # (Fases 2-5) GraphDTA (graphdta.py) e PhysDual-GNN
+│   ├── training/                  # (Fases 2-5) trainer.py, checkpoint.py (isolamento estrito de teste)
 │   ├── physics/                   # (Fase 6, opcional) Bias analítico LJ/Coulomb via ablação
-│   ├── eval/                      # Métricas: CI, MSE, Pearson, Spearman, rm²
+│   ├── eval/                      # (Fase 2) metrics.py (CI, MSE, RMSE, Pearson, Spearman, rm²)
 │   └── screening/                 # (Fases 8-9) Triagem virtual e Grad-AAM
 ├── scripts/
 │   ├── diagnose_env.py            # Diagnóstico de SO, Python, Torch/CUDA, GPU, RAM e Disco
 │   ├── smoke_test.py              # Verificação fim-a-fim dos 8 critérios de pronto da Fase 0
 │   ├── run_phase1_data.py         # Orquestrador CLI da Fase 1 (Dados, Splits, Grafos e ESM-2)
-│   └── verify_phase1.py           # Auditoria dos 7 itens do Gate de Pronto da Fase 1
+│   ├── verify_phase1.py           # Auditoria dos 7 itens do Gate de Pronto da Fase 1
+│   ├── run_phase2_baseline.py     # Orquestrador CLI idempotente da Fase 2 (GraphDTA, 5 seeds, benchmarks)
+│   └── verify_phase2.py           # Auditoria dos 6 critérios do Gate de Pronto da Fase 2 (--smoke / --full)
 ├── notebooks/
 │   ├── 00_colab_bootstrap.ipynb   # Fluxo idempotente de setup no Google Colab + Drive
 │   ├── 00_smoke_test.ipynb        # Execução interativa do smoke test no Colab
-│   └── 01_data_and_esm_cache.ipynb# Execução interativa da Fase 1 no Colab
+│   ├── 01_data_and_esm_cache.ipynb# Execução interativa da Fase 1 no Colab
+│   └── 02_graphdta_baseline.ipynb # Execução interativa do baseline GraphDTA da Fase 2 no Colab
 ├── tests/
 │   ├── test_env.py                # Testes de ambiente e configuração (Fase 0)
 │   ├── test_datasets.py           # Testes de ingestão, procedência e padronização (Fase 1)
 │   ├── test_splits.py             # Testes de splits sem vazamento por conteúdo (Fase 1)
 │   ├── test_featurizer_drug.py    # Testes de grafos PyG com weights_only=True (Fase 1)
 │   ├── test_esm_cache.py          # Testes de cache ESM-2 fp16 e janela deslizante (Fase 1)
-│   └── test_verify_phase1.py      # Testes do verificador de Gate da Fase 1
+│   ├── test_verify_phase1.py      # Testes do verificador de Gate da Fase 1
+│   ├── test_metrics.py            # Testes de métricas DTA e concordância lifelines (Fase 2)
+│   ├── test_datamodule.py         # Testes de collate customizado e carregamento de batches (Fase 2)
+│   ├── test_graphdta.py           # Testes de integridade do GraphDTAGIN e CNN3 (Fase 2)
+│   ├── test_trainer.py            # Testes de treino, early stopping e checkpoints atômicos (Fase 2)
+│   └── test_verify_phase2.py      # Testes do orquestrador e do verificador de Gate da Fase 2
 └── docs/
     ├── PLANO_AJUSTADO.md          # Escopo, fases (0 a 9) e arquitetura ajustada
-    ├── DECISOES.md                # Decisões técnicas (ADRs #1 a #9)
+    ├── DECISOES.md                # Decisões técnicas (ADRs #1 a #12)
     ├── COLAB.md                   # Guia operacional do Google Colab + Google Drive
     ├── FASE1_DADOS.md             # Protocolos de dados, splits, censura do Davis e cache ESM-2
-    ├── PROXIMOS_PASSOS.md         # Roteiro de transição para a Fase 2
+    ├── FASE2_BASELINE.md          # Especificação do baseline GraphDTA, tabelas verificadas e protocolo de treino
+    ├── PROXIMOS_PASSOS.md         # Roteiro de transição para a Fase 3
     └── colab_env_snapshot.txt     # Snapshot do ambiente gerado no bootstrap
 ```
 
@@ -84,7 +111,8 @@ physdual-gnn/
 ## Documentação Essencial
 
 - [`docs/PLANO_AJUSTADO.md`](docs/PLANO_AJUSTADO.md) — Fonte de verdade para escopo, arquitetura e fases do projeto.
-- [`docs/DECISOES.md`](docs/DECISOES.md) — Racional das decisões de engenharia (ADRs #1 a #9).
+- [`docs/DECISOES.md`](docs/DECISOES.md) — Racional das decisões de arquitetura e engenharia (ADRs #1 a #12).
 - [`docs/COLAB.md`](docs/COLAB.md) — Guia de operação no Google Colab e otimização de I/O com Google Drive.
 - [`docs/FASE1_DADOS.md`](docs/FASE1_DADOS.md) — Documentação técnica da Fase 1 (procedência, censura em $pK_d=5.0$, variância em `cold_drug`, janela deslizante ESM-2 e Gate de Pronto).
-- [`docs/PROXIMOS_PASSOS.md`](docs/PROXIMOS_PASSOS.md) — Próximas etapas planejadas para a Fase 2.
+- [`docs/FASE2_BASELINE.md`](docs/FASE2_BASELINE.md) — Documentação técnica da Fase 2 (baseline GraphDTA oficial vs. secundário, tabelas verificadas de Nguyen et al. (2021), isolamento de teste e auditoria de mutantes).
+- [`docs/PROXIMOS_PASSOS.md`](docs/PROXIMOS_PASSOS.md) — Roteiro de execução no Colab e transição para a Fase 3 (Dual-Encoder PhysDual: GIN + ESM-2).
