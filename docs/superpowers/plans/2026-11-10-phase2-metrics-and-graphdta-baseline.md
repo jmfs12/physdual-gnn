@@ -140,7 +140,7 @@ Os arquivos oficiais do repositório [`thinng/GraphDTA`](https://github.com/thin
     - `duplicate_pairs_diff_affinity_count`: quantos pares `(smiles, sequence)` repetidos possuem desvio-padrão de afinidade $> 0$
     - `duplicate_policy`: `"keep_all"` (mantém todos os pares para preservar a volumetria canônica 30.056 / 118.254; como os splits cold agrupam por `smiles` e `sequence`, duplicatas nunca vazam entre partições).
 
-- [ ] **Step 1: Atualizar `tests/test_featurizer_drug.py` e `tests/test_datasets.py` para cobrir `v2_onehot78_l1norm` (soma 1.0), `v2_onehot78_raw` (soma 4.0 ou 5.0), `v1_int9` (9d), validação de versão/dimensão/flag e auditoria de duplicatas**
+- [x] **Step 1: Atualizar `tests/test_featurizer_drug.py` e `tests/test_datasets.py` para cobrir `v2_onehot78_l1norm` (soma 1.0), `v2_onehot78_raw` (soma 4.0 ou 5.0), `v1_int9` (9d), validação de versão/dimensão/flag e auditoria de duplicatas**
 
 ```python
 # Trecho adicional em tests/test_featurizer_drug.py
@@ -198,19 +198,19 @@ def test_versioned_cache_rejects_mismatched_version_dim_or_norm_flag(tmp_path):
         )
 ```
 
-- [ ] **Step 2: Executar testes e verificar que falham**
+- [x] **Step 2: Executar testes e verificar que falham**
 
 Run: `pytest tests/test_featurizer_drug.py tests/test_datasets.py -v`
 Expected: FAIL (assinatura `featurizer_version` e validação ainda não implementadas)
 
-- [ ] **Step 3: Implementar as atualizações em `configs/base.yaml`, `src/physdual/data/featurizer_drug.py`, `src/physdual/data/datasets.py`, `scripts/run_phase1_data.py` (adicionando flag `--only-drug-graphs` para regenerar apenas o cache de grafos v2 sem tocar no ESM-2 ou nos splits), `scripts/verify_phase1.py` e registrar ADRs #10 e #11 em `docs/DECISOES.md`**
+- [x] **Step 3: Implementar as atualizações em `configs/base.yaml`, `src/physdual/data/featurizer_drug.py`, `src/physdual/data/datasets.py`, `scripts/run_phase1_data.py` (adicionando flag `--only-drug-graphs` para regenerar apenas o cache de grafos v2 sem tocar no ESM-2 ou nos splits), `scripts/verify_phase1.py` e registrar ADRs #10 e #11 em `docs/DECISOES.md`**
 
-- [ ] **Step 4: Executar testes da Fase 1 atualizados e verificar que passam**
+- [x] **Step 4: Executar testes da Fase 1 atualizados e verificar que passam**
 
 Run: `pytest tests/test_featurizer_drug.py tests/test_datasets.py tests/test_verify_phase1.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit da Task 0 (Emenda à Fase 1)**
+- [x] **Step 5: Commit da Task 0 (Emenda à Fase 1)**
 
 ```bash
 git add configs/base.yaml src/physdual/data/featurizer_drug.py src/physdual/data/datasets.py scripts/run_phase1_data.py scripts/verify_phase1.py docs/DECISOES.md tests/test_featurizer_drug.py tests/test_datasets.py
