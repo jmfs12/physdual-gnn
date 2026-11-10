@@ -5,7 +5,7 @@
 **Goal:** Realizar a emenda versionada da featurização molecular para 78 dimensões one-hot (fiel ao GraphDTA original), auditar duplicatas de conteúdo/variantes nos datasets, implementar a suíte de métricas DTA (incluindo avaliação no subconjunto não-censurado, por faixa de comprimento proteico e baselines triviais), o pipeline eficiente de DataLoaders PyG, o baseline oficial `graphdta_gin` (reprodução fiel de `thinng/GraphDTA`) e a variante secundária `graphdta_cnn3` ("GraphDTA-style com CNN estilo DeepDTA"), e o motor de treinamento multi-seed retomável por run com isolamento estrito do conjunto de teste e escrita atômica de checkpoints compatíveis com `weights_only=True`.
 
 **Architecture:**
-- **Emenda à Fase 1 (`src/physdual/data/featurizer_drug.py`, `configs/base.yaml`, `scripts/verify_phase1.py`):** Implementação do featurizador atômico one-hot de 78 dimensões (`featurizer_version: "v2_onehot78"`, mantendo `"v1_int9"` para eventual ablação), cache de grafos versionado (`{dataset}_drug_graphs_v2_onehot78.pt`) com validação estrita de versão/dimensão e auditoria de colapso de `target_id`s/SMILES.
+- **Emenda à Fase 1 (`src/physdual/data/featurizer_drug.py`, `configs/base.yaml`, `scripts/verify_phase1.py`):** Implementação do featurizador atômico de 78 dimensões normalizado em $L_1$ (`featurizer_version: "v2_onehot78_l1norm"`, suportando também `"v2_onehot78_raw"` sem normalização e mantendo `"v1_int9"` para eventual ablação), cache de grafos versionado (`{dataset}_drug_graphs_v2_onehot78_l1norm.pt`) com validação estrita de versão, dimensão e flag `normalize_atom_features`, além de auditoria de colapso de `target_id`s/SMILES.
 - **Métricas e Baselines Triviais (`src/physdual/eval/metrics.py`):** Cálculo vetorizado de CI (validado contra `lifelines`), MSE, RMSE, Pearson, Spearman e $r_m^2$, além de avaliação estratificada no subconjunto não-censurado do Davis ($pK_d > 5.0$), por faixa de comprimento de sequência ($\le 1000$ vs. $> 1000$ resíduos) e preditores triviais (média do treino e Ridge sobre composição de aminoácidos).
 - **DataModule Eficiente (`src/physdual/data/datamodule.py`):** Tokenizador canônico de 25 resíduos, pré-construção em memória de objetos `Data` por SMILES único e de tensores tokenizados por sequência única (uma única vez no `__init__`), `dta_collate_fn` e DataLoaders com `num_workers`, `pin_memory` e `persistent_workers` configuráveis.
 - **Modelos (`src/physdual/models/graphdta.py`):**
@@ -45,7 +45,7 @@ Os arquivos oficiais do repositório [`thinng/GraphDTA`](https://github.com/thin
      - `atom.GetTotalNumHs()` com `one_of_k_encoding_unk` em `[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]` (**11 dims**).
      - `atom.GetImplicitValence()` com `one_of_k_encoding_unk` em `[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]` (**11 dims**).
      - `[atom.GetIsAromatic()]` (**1 dim**).
-   - **Normalização L1 por átomo (`create_data.py:L256`):** No `smile_to_graph` oficial, cada vetor atômico de 78 dimensões é dividido pela sua soma: `feature = feature / sum(feature)`.
+   - **Normalização L1 por átomo (`create_data.py:L256`):** No `smile_to_graph` oficial, cada vetor atômico binário de 78 dimensões é dividido pela sua soma (`feature = feature / sum(feature)`). Com essa normalização ativa (`v2_onehot78_l1norm`), **o vetor deixa de ser one-hot binário estrito (`{0, 1}`)** e passa a conter valores fracionários em $\{0, 0.25\}$ (para átomos não-aromáticos, cuja soma bruta é 4) ou $\{0, 0.20\}$ (para átomos aromáticos, cuja soma bruta é 5).
 2. **Vocabulário e Tokenização de Proteínas (`create_data.py:L268-L273, L319-L322`):**
    - `seq_voc = "ABCDEFGHIKLMNOPQRSTUVWXYZ"` (25 caracteres mapeados para `1..25`, `0` para padding à direita até `max_seq_len = 1000`).
 3. **Arquitetura `GINConvNet` (`models/ginconv.py:L34-L111`):**
@@ -53,22 +53,22 @@ Os arquivos oficiais do repositório [`thinng/GraphDTA`](https://github.com/thin
    - **Ramo do fármaco:** 5 camadas `GINConv(Sequential(Linear(in_d, 32), ReLU(), Linear(32, 32)))`, cada uma seguida de `ReLU` e `BatchNorm1d(32)` (`x = F.relu(self.conv_k(x, edge_index)); x = self.bn_k(x)`). Agregação `global_add_pool(x, batch)`, seguida de `F.relu(self.fc1_xd(x))` (`Linear(32, 128)`) e `F.dropout(x, p=0.2, training=self.training)`.
    - **Ramo da proteína:** `embedding_xt = nn.Embedding(26, 128)` gerando `[B, 1000, 128]`. Aplica **uma única** `conv_xt_1 = nn.Conv1d(in_channels=1000, out_channels=32, kernel_size=8)` diretamente sobre `[B, 1000, 128]` (tratando o comprimento `1000` como canais de entrada e convoluindo sobre o eixo `128`, resultando em `[B, 32, 121]`), seguida de `conv_xt.view(-1, 32 * 121)` e `fc1_xt = nn.Linear(32 * 121, 128)`.
    - **MLP final:** Concatena `[x, xt]` (`256d`) $\rightarrow$ `fc1 = Linear(256, 1024)` $\rightarrow$ `ReLU` $\rightarrow$ `Dropout(0.2)` $\rightarrow$ `fc2 = Linear(1024, 256)` $\rightarrow$ `ReLU` $\rightarrow$ `Dropout(0.2)` $\rightarrow$ `out = Linear(256, 1)`.
-4. **Treinamento Oficial (`training.py` e `training_validation.py`):**
-   - `TRAIN_BATCH_SIZE = 512`, `TEST_BATCH_SIZE = 512`, `LR = 0.0005`, `optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)`, `loss_fn = nn.MSELoss()`, `NUM_EPOCHS = 1000`, seleção do melhor modelo pelo menor `mse`.
+4. **Treinamento Oficial (`training.py` e Tabela 1 de Nguyen et al., 2021):**
+   - `TRAIN_BATCH_SIZE = 512`, `TEST_BATCH_SIZE = 512`, `LR = 0.0005` (constante, **sem** `ReduceLROnPlateau`), `optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)`, `loss_fn = nn.MSELoss()`, `NUM_EPOCHS = 1000`, camadas por variante na Tabela 1: `GCN=3`, `GIN=5`, `GAT=2`, `GAT_GCN=2`.
 
 ---
 
 ## Review Focus
 
-1. **Prevenção de Vazamento do Conjunto de Teste (C1):** No `training.py` original do GraphDTA, o teste era avaliado a cada época. No PhysDual-GNN, `train_model` **jamais** passa `test_loader` pelo modelo durante o loop de épocas. A seleção de `checkpoint_best.pt`, o `EarlyStopping` e o escalonador operam exclusivamente sobre `val_loader`. O `test_loader` é consumido **uma única vez** após restaurar `checkpoint_best.pt`.
-2. **Versionamento Estrito do Cache de Grafos (D2):** O cache v2 (`{dataset}_drug_graphs_v2_onehot78.pt`) embute `featurizer_version="v2_onehot78"` e `atom_feature_dim=78`. Tentativas de carregar um cache com versão ou dimensão divergente do `configs/base.yaml` devem falhar imediatamente com `ValueError`.
+1. **Prevenção de Vazamento do Conjunto de Teste (C1):** No `training.py` original do GraphDTA, o teste era avaliado a cada época (viés otimista de seleção no teste). No PhysDual-GNN, `train_model` **jamais** passa `test_loader` pelo modelo durante o loop de épocas. A seleção de `checkpoint_best.pt` e o `EarlyStopping` operam exclusivamente sobre `val_loader`. O `test_loader` é consumido **uma única vez** após restaurar `checkpoint_best.pt`.
+2. **Versionamento Estrito do Cache de Grafos e Normalização L1 (D2):** O cache v2 (`{dataset}_drug_graphs_v2_onehot78_l1norm.pt`) embute `featurizer_version="v2_onehot78_l1norm"`, `atom_feature_dim=78` e `normalize_atom_features=True`. Tentativas de carregar um cache com versão, dimensão ou flag de normalização divergente do `configs/base.yaml` devem falhar imediatamente com `ValueError`.
 3. **Escrita Atômica no Mesmo Filesystem e Checkpointing Seguro (C4):** `os.replace` só é atômico dentro do mesmo sistema de arquivos. O arquivo temporário deve ser gravado no **mesmo diretório do arquivo alvo** (`path.parent / f".tmp_{path.name}"`). Escalares NumPy devem ser convertidos para tipos nativos Python antes de `torch.save` para compatibilidade com `weights_only=True`.
 4. **Censura (69,64% em $pK_d = 5.0$) e Truncamento em 1000 Resíduos:** Avaliar métricas tanto no conjunto de teste completo quanto no subconjunto não-censurado ($pK_d > 5.0$ no Davis) e estratificar o desempenho por faixa de comprimento ($\le 1000$ vs. $> 1000$ aa, dado que 83 proteínas excedem 1022 aa na Fase 1).
-5. **Ruído de Validação no `cold_drug` do Davis:** Com apenas ~7 fármacos na validação por seed, a curva de perda de validação oscila fortemente; permitir `patience` estendida ou suavização configurável para `cold_drug` e registrar `best_epoch` em cada run.
+5. **Ruído de Validação nos Splits Cold do Davis e Alerta de Teto de Épocas:** Usar `patience: 80` tanto para `cold_drug` (~7 fármacos na validação) quanto para `cold_target` no Davis (`davis_cold_patience: 80`), desligar `ReduceLROnPlateau` por padrão (`use_lr_scheduler: false`), registrar `best_epoch` em cada run e emitir `[WARN]` se `best_epoch > 0.8 * epochs`.
 
 ---
 
-### Task 0: Emenda à Fase 1 — Featurização Atômica One-Hot (78d), Cache Versionado, Auditoria de Duplicatas e Configuração Base (D2, C3)
+### Task 0: Emenda à Fase 1 — Featurização Atômica One-Hot L1-Normalizada (78d), Cache Versionado, Auditoria de Duplicatas e Configuração Base (D2, C3)
 
 **Files:**
 - Modify: `configs/base.yaml`
@@ -85,12 +85,12 @@ Os arquivos oficiais do repositório [`thinng/GraphDTA`](https://github.com/thin
   - Adicionar seção `featurizer`:
     ```yaml
     featurizer:
-      version: "v2_onehot78"
+      version: "v2_onehot78_l1norm"
       atom_feature_dim: 78
       edge_feature_dim: 4
       normalize_atom_features: true
     ```
-  - Adicionar seção `graphdta` com os hiperparâmetros verificados no repositório oficial (`thinng/GraphDTA`):
+  - Adicionar seção `graphdta` com os hiperparâmetros verificados no repositório oficial (`thinng/GraphDTA` e Tabela 1 de Nguyen et al., 2021):
     ```yaml
     graphdta:
       official_model: "graphdta_gin"
@@ -110,10 +110,11 @@ Os arquivos oficiais do repositório [`thinng/GraphDTA`](https://github.com/thin
         optimizer: "adam"
         lr: 0.0005
         weight_decay: 0.0
+        use_lr_scheduler: false
         batch_size: 512
         epochs: 500
         patience: 50
-        cold_drug_patience: 80
+        davis_cold_patience: 80
         monitor: "mse"
         save_last_every: 10
         num_workers: 2
@@ -121,12 +122,15 @@ Os arquivos oficiais do repositório [`thinng/GraphDTA`](https://github.com/thin
         persistent_workers: true
     ```
 - Em `src/physdual/data/featurizer_drug.py` (D2):
-  - Suportar `featurizer_version: Literal["v2_onehot78", "v1_int9"] = "v2_onehot78"`.
-  - Em `"v2_onehot78"`: implementar a codificação exata de 78 dimensões de `thinng/GraphDTA` (`create_data.py:L230-L256`: 44 símbolos atômicos com `'Unknown'`, 11 graus `0..10`, 11 H totais `0..10` com unk, 11 valências implícitas `0..10` com unk, 1 aromaticidade, normalizado por `feature / sum(feature)`). Manter `edge_index` e `edge_attr` (`[E, 4]`) intactos.
+  - Suportar `featurizer_version: Literal["v2_onehot78_l1norm", "v2_onehot78_raw", "v1_int9"] = "v2_onehot78_l1norm"` e `normalize_atom_features: bool = True`.
+  - Nas versões `v2_onehot78_*`: implementar a codificação exata de 78 dimensões de `thinng/GraphDTA` (`create_data.py:L230-L256`: 44 símbolos atômicos com `'Unknown'`, 11 graus `0..10`, 11 H totais `0..10` com unk, 11 valências implícitas `0..10` com unk, 1 aromaticidade):
+    - Quando `featurizer_version == "v2_onehot78_l1norm"` (`normalize_atom_features=True`): aplicar **guarda contra soma zero** (`row_sum = float(feature.sum()); if row_sum > 0.0: feature = feature / row_sum`), reproduzindo `create_data.py:L256` onde cada linha soma `1.0` (deixando de ser one-hot binário estrito).
+    - Quando `featurizer_version == "v2_onehot78_raw"` (`normalize_atom_features=False`): manter os valores binários `{0.0, 1.0}`, cuja soma por linha é `4.0` (átomo não-aromático) ou `5.0` (átomo aromático).
+    - Manter `edge_index` e `edge_attr` (`[E, 4]`) intactos.
   - Manter `"v1_int9"` (9 dimensões escalares) acessível por parâmetro para eventual ablação futura.
   - `get_drug_graph_cache_filename(dataset_name: str, featurizer_version: str) -> str`: retorna `f"{dataset_name}_drug_graphs_{featurizer_version}.pt"`.
-  - Em `build_drug_graph_cache(..., featurizer_version="v2_onehot78")`: incluir em cada `graph_dict` as chaves `"featurizer_version": featurizer_version` e `"atom_feature_dim": int(x.size(1))`.
-  - Em `load_drug_graph_cache(cache_path: Path, expected_version: str = "v2_onehot78", expected_dim: int = 78)`: carregar com `weights_only=True` e validar que todos os grafos possuem `featurizer_version == expected_version` e `x.size(1) == expected_dim`, levantando `ValueError` claro caso contrário.
+  - Em `build_drug_graph_cache(..., featurizer_version="v2_onehot78_l1norm", normalize_atom_features=True)`: incluir em cada `graph_dict` as chaves `"featurizer_version": featurizer_version`, `"atom_feature_dim": int(x.size(1))` e `"normalize_atom_features": bool(normalize_atom_features)`.
+  - Em `load_drug_graph_cache(cache_path: Path, expected_version: str = "v2_onehot78_l1norm", expected_dim: int = 78, expected_normalize: bool = True)`: carregar com `weights_only=True` e validar que todos os grafos possuem `featurizer_version == expected_version`, `x.size(1) == expected_dim` e `normalize_atom_features == expected_normalize`, levantando `ValueError` claro se qualquer um divergir do config.
 - Em `src/physdual/data/datasets.py` (Auditoria de duplicatas de conteúdo e mutantes):
   - Adicionar `audit_content_and_target_duplicates(df: pd.DataFrame) -> dict[str, Any]` retornando:
     - `num_unique_drugs_by_id`, `num_unique_drugs_by_smiles`
@@ -136,33 +140,62 @@ Os arquivos oficiais do repositório [`thinng/GraphDTA`](https://github.com/thin
     - `duplicate_pairs_diff_affinity_count`: quantos pares `(smiles, sequence)` repetidos possuem desvio-padrão de afinidade $> 0$
     - `duplicate_policy`: `"keep_all"` (mantém todos os pares para preservar a volumetria canônica 30.056 / 118.254; como os splits cold agrupam por `smiles` e `sequence`, duplicatas nunca vazam entre partições).
 
-- [ ] **Step 1: Atualizar `tests/test_featurizer_drug.py` e `tests/test_datasets.py` para cobrir `v2_onehot78` (78d), `v1_int9` (9d), validação de versão/dimensão e auditoria de duplicatas**
+- [ ] **Step 1: Atualizar `tests/test_featurizer_drug.py` e `tests/test_datasets.py` para cobrir `v2_onehot78_l1norm` (soma 1.0), `v2_onehot78_raw` (soma 4.0 ou 5.0), `v1_int9` (9d), validação de versão/dimensão/flag e auditoria de duplicatas**
 
 ```python
 # Trecho adicional em tests/test_featurizer_drug.py
-def test_smiles_to_graph_dict_v2_onehot78_aspirin():
+def test_smiles_to_graph_dict_v2_onehot78_l1norm_and_raw_aspirin():
     aspirin = "CC(=O)Oc1ccccc1C(=O)O"
-    g_v2 = smiles_to_graph_dict(aspirin, drug_id="ASP", featurizer_version="v2_onehot78")
-    assert g_v2["x"].shape == (13, 78)
-    assert g_v2["edge_index"].shape == (2, 26)
-    assert g_v2["edge_attr"].shape == (26, 4)
-    assert g_v2["featurizer_version"] == "v2_onehot78"
-    assert g_v2["atom_feature_dim"] == 78
-    # Verifica normalização L1 por átomo (soma == 1.0)
-    row_sums = g_v2["x"].sum(dim=1)
-    assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+    # Com normalização L1 (padrão oficial v2_onehot78_l1norm): linhas somam 1.0
+    g_l1 = smiles_to_graph_dict(
+        aspirin,
+        drug_id="ASP",
+        featurizer_version="v2_onehot78_l1norm",
+        normalize_atom_features=True,
+    )
+    assert g_l1["x"].shape == (13, 78)
+    assert g_l1["edge_index"].shape == (2, 26)
+    assert g_l1["edge_attr"].shape == (26, 4)
+    assert g_l1["featurizer_version"] == "v2_onehot78_l1norm"
+    assert g_l1["atom_feature_dim"] == 78
+    assert g_l1["normalize_atom_features"] is True
+    row_sums_l1 = g_l1["x"].sum(dim=1)
+    assert torch.allclose(row_sums_l1, torch.ones_like(row_sums_l1), atol=1e-5)
+
+    # Sem normalização L1 (v2_onehot78_raw): linhas somam 4.0 (não-aromático) ou 5.0 (aromático)
+    g_raw = smiles_to_graph_dict(
+        aspirin,
+        drug_id="ASP",
+        featurizer_version="v2_onehot78_raw",
+        normalize_atom_features=False,
+    )
+    assert g_raw["x"].shape == (13, 78)
+    assert g_raw["normalize_atom_features"] is False
+    row_sums_raw = g_raw["x"].sum(dim=1)
+    assert all(val in (4.0, 5.0) for val in row_sums_raw.tolist())
 
     # Versão legada v1_int9 preservada para ablação
-    g_v1 = smiles_to_graph_dict(aspirin, drug_id="ASP", featurizer_version="v1_int9")
+    g_v1 = smiles_to_graph_dict(aspirin, drug_id="ASP", featurizer_version="v1_int9", normalize_atom_features=False)
     assert g_v1["x"].shape == (13, 9)
 
 
-def test_versioned_cache_rejects_mismatched_version_or_dim(tmp_path):
-    out_path = tmp_path / "davis_drug_graphs_v1_int9.pt"
-    build_drug_graph_cache(["CCO"], out_path, drug_ids=["D1"], featurizer_version="v1_int9")
+def test_versioned_cache_rejects_mismatched_version_dim_or_norm_flag(tmp_path):
+    out_path = tmp_path / "davis_drug_graphs_v2_onehot78_raw.pt"
+    build_drug_graph_cache(
+        ["CCO"],
+        out_path,
+        drug_ids=["D1"],
+        featurizer_version="v2_onehot78_raw",
+        normalize_atom_features=False,
+    )
 
-    with pytest.raises(ValueError, match="featurizer_version|dim"):
-        load_drug_graph_cache(out_path, expected_version="v2_onehot78", expected_dim=78)
+    with pytest.raises(ValueError, match="featurizer_version|normalize_atom_features|dim"):
+        load_drug_graph_cache(
+            out_path,
+            expected_version="v2_onehot78_l1norm",
+            expected_dim=78,
+            expected_normalize=True,
+        )
 ```
 
 - [ ] **Step 2: Executar testes e verificar que falham**
@@ -374,8 +407,8 @@ def test_dta_dataset_prebuilds_unique_entities_and_collates():
     from torch_geometric.data import Batch
 
     cache = {
-        "CCO": smiles_to_graph_dict("CCO", drug_id="D1", featurizer_version="v2_onehot78"),
-        "CCN": smiles_to_graph_dict("CCN", drug_id="D2", featurizer_version="v2_onehot78"),
+        "CCO": smiles_to_graph_dict("CCO", drug_id="D1", featurizer_version="v2_onehot78_l1norm"),
+        "CCN": smiles_to_graph_dict("CCN", drug_id="D2", featurizer_version="v2_onehot78_l1norm"),
     }
     rows = [
         {"drug_id": "D1", "smiles": "CCO", "target_id": "T1", "sequence": "MKTV", "affinity": 7.5},
@@ -476,8 +509,8 @@ def test_drug_in_dim_has_no_magic_default():
 def test_both_models_forward_backward_and_small_batch_overfit(model_cls):
     torch.manual_seed(42)
     cache = {
-        "CCO": smiles_to_graph_dict("CCO", drug_id="D1", featurizer_version="v2_onehot78"),
-        "CCN": smiles_to_graph_dict("CCN", drug_id="D2", featurizer_version="v2_onehot78"),
+        "CCO": smiles_to_graph_dict("CCO", drug_id="D1", featurizer_version="v2_onehot78_l1norm"),
+        "CCN": smiles_to_graph_dict("CCN", drug_id="D2", featurizer_version="v2_onehot78_l1norm"),
     }
     df = pd.DataFrame([
         {"drug_id": "D1", "smiles": "CCO", "target_id": "T1", "sequence": "MKTVRQ", "affinity": 7.0},
@@ -558,7 +591,9 @@ git commit -m "feat(models): implement official GraphDTAGIN and secondary GraphD
     - **Regra explícita para `delta`:** `best` só é atualizado e `counter` só é zerado quando a melhora supera estritamente `delta` (`metric < self.best - self.delta` no modo `"min"`, ou `metric > self.best + self.delta` no modo `"max"`). Se a variação for menor ou igual a `delta`, `best` mantém seu valor anterior e `counter` é incrementado em 1. Retorna `self.should_stop`.
   - `train_model(model, train_loader, val_loader, test_loader, config, checkpoint_dir, ...) -> dict[str, Any]` (C1):
     - **Isolamento estrito do teste:** durante o loop de épocas (`1..epochs`), avalia **apenas** `val_loader`. `test_loader` **nunca** é iterado dentro do loop de épocas.
-    - Suporta `patience` diferenciada quando `split_type == "cold_drug"` (`cold_drug_patience` do config) e suavização opcional da métrica de validação.
+    - **LR constante por padrão:** `use_lr_scheduler: false` por padrão (mantendo `Adam` com `lr=0.0005` constante fiel ao GraphDTA original; `ReduceLROnPlateau` só é instanciado se `use_lr_scheduler=True` for solicitado explicitamente).
+    - **Paciência para splits cold no Davis:** quando `dataset_name == "davis"` e `split_type in ("cold_drug", "cold_target")`, utiliza `davis_cold_patience` (`80` épocas) em vez da `patience` padrão (`50`).
+    - **Alerta de proximidade do teto de épocas:** registra `best_epoch` e emite `[WARN]` (e grava `near_epoch_ceiling_warn: true` no resultado da run) quando `best_epoch > 0.8 * epochs`.
     - Ao encerrar o loop de épocas (por `EarlyStopping` ou `epochs` máximo), recarrega `checkpoint_best.pt` com `weights_only=True` e avalia `test_loader` **uma única vez**, calculando métricas completas, subconjunto não-censurado (para Davis) e estratificação por faixa de comprimento ($\le 1000$ vs. $> 1000$).
 
 - [ ] **Step 1: Escrever testes unitários em `tests/test_trainer_checkpoint.py` (incluindo sanitização NumPy, atomicidade no mesmo diretório, `EarlyStopping` com `delta`, isolamento estrito do `test_loader` e 1–2 épocas em subconjunto real do Davis)**
@@ -623,8 +658,8 @@ def test_early_stopping_both_modes_and_delta_rule():
 
 def test_train_model_evaluates_test_loader_only_once_at_end(tmp_path):
     cache = {
-        "CCO": smiles_to_graph_dict("CCO", drug_id="D1", featurizer_version="v2_onehot78"),
-        "CCN": smiles_to_graph_dict("CCN", drug_id="D2", featurizer_version="v2_onehot78"),
+        "CCO": smiles_to_graph_dict("CCO", drug_id="D1", featurizer_version="v2_onehot78_l1norm"),
+        "CCN": smiles_to_graph_dict("CCN", drug_id="D2", featurizer_version="v2_onehot78_l1norm"),
     }
     df = pd.DataFrame([
         {"drug_id": "D1", "smiles": "CCO", "target_id": "T1", "sequence": "MKTVRQ", "affinity": 5.0},
@@ -704,11 +739,13 @@ git commit -m "feat(training): implement training engine with strict test isolat
       "dataset": "davis",
       "split": "random",
       "seed": 0,
-      "featurizer_version": "v2_onehot78",
+      "featurizer_version": "v2_onehot78_l1norm",
+      "normalize_atom_features": true,
       "drug_in_dim": 78,
       "effective_config": { "...": "..." },
       "best_epoch": 142,
       "total_epochs_run": 192,
+      "near_epoch_ceiling_warn": false,
       "elapsed_sec": 215.4,
       "sec_per_epoch": 1.12,
       "val_metrics_at_best": {"ci": 0.889, "mse": 0.221, "rmse": 0.470, "pearson": 0.845, "spearman": 0.701, "rm2": 0.692},
@@ -728,15 +765,19 @@ git commit -m "feat(training): implement training engine with strict test isolat
 - **Agregação como Etapa Separada:**
   - `python scripts/run_phase2_baseline.py --aggregate-only` (também chamada ao final de um lote) lê os JSONs em `outputs/results/runs/` das 5 seeds `[0, 1, 2, 3, 4]` e gera:
     `outputs/results/baseline_{model}_{dataset}_{split}.json` contendo `per_seed_results`, `aggregated` (`mean` e `std` para `test_metrics_full`, `test_metrics_uncensored`, `test_metrics_by_seq_len`, `trivial_baselines`, `best_epoch` e `sec_per_epoch`).
-- **Passo Obrigatório de Medição e Ordem Condicional de Execução no Colab (GPU L4 recomendada):**
+- **Passo Obrigatório de Medição, Run de Controle Opcional (1000 épocas) e Ordem Condicional de Execução no Colab:**
   1. **Passo 1 (Medição):** `python scripts/run_phase2_baseline.py --benchmark-epochs 3 --dataset davis,kiba --model graphdta_gin` mede `sec_per_epoch` em Davis e KIBA e salva `outputs/results/phase2_timing_benchmark.json`.
-  2. **Passo 2 (Oficial Davis):** `graphdta_gin` no Davis (`random`, `cold_drug`, `cold_target` $\times$ 5 seeds = 15 runs).
-  3. **Passo 3 (Oficial KIBA):** `graphdta_gin` no KIBA (`random`, `cold_drug`, `cold_target` $\times$ 5 seeds = 15 runs).
-  4. **Passo 4 (Variante Secundária Davis):** `graphdta_cnn3` no Davis (3 splits $\times$ 5 seeds = 15 runs).
-  5. **Passo 5 Condicional (Variante Secundária KIBA):** Executar `graphdta_cnn3` no KIBA **somente se** o tempo medido por época no KIBA for $\le 15\text{ s/época}$ (ou se o tempo estimado para 15 runs for $\le 4\text{ horas}$ de sessão L4); caso contrário, pular e registrar a justificativa de orçamento computacional em `docs/FASE2_BASELINE.md`.
+  2. **Passo 2 (Oficial Davis):** `graphdta_gin` no Davis (`random`, `cold_drug`, `cold_target` $\times$ 5 seeds = 15 runs, com `epochs=500`, `patience=50` para `random` e `davis_cold_patience=80` para `cold_drug` e `cold_target`).
+  3. **Passo 2b Opcional (Run de Controle de 1000 Épocas):** `python scripts/run_phase2_baseline.py --dataset davis --split random --seeds 0 --epochs 1000 --patience 200 --model graphdta_gin --tag control_1000ep` para verificar empiricamente se há ganho relevante entre 500 e 1000 épocas sob seleção por validação.
+  4. **Passo 3 (Oficial KIBA):** `graphdta_gin` no KIBA (`random`, `cold_drug`, `cold_target` $\times$ 5 seeds = 15 runs).
+  5. **Passo 4 (Variante Secundária Davis):** `graphdta_cnn3` no Davis (3 splits $\times$ 5 seeds = 15 runs).
+  6. **Passo 5 Condicional (Variante Secundária KIBA):** Executar `graphdta_cnn3` no KIBA **somente se** o tempo medido por época no KIBA for $\le 15\text{ s/época}$ (ou se o tempo estimado para 15 runs for $\le 4\text{ horas}$ de sessão); caso contrário, pular e registrar a justificativa de orçamento computacional em `docs/FASE2_BASELINE.md`.
 - **Verificador `scripts/verify_phase2.py` (`--smoke` e `--full`):**
   - No teste `tests/test_verify_phase2.py`, resolver o caminho do script via `Path(__file__).resolve().parents[1] / "scripts" / "verify_phase2.py"` (sem depender do diretório atual e sem meta de tempo artificial).
-  - No modo `--full`, o critério de CI $\ge 0{,}86$ no Davis `random` emite **`[WARN]` (alerta de sanidade)** caso fique abaixo, sem reprovar o código de saída (`exit code 0`), e **não exige queda obrigatória** nos splits cold.
+  - No modo `--full`:
+    - O critério de CI $\ge 0{,}86$ no Davis `random` emite **`[WARN]` (alerta de sanidade)** caso fique abaixo, sem reprovar o código de saída (`exit code 0`).
+    - Caso alguma run apresente `best_epoch > 0.8 * epochs`, emite **`[WARN]`** reportando quais runs atingiram a zona próxima ao teto de épocas.
+    - **Não exige queda obrigatória** nos splits cold; apenas reporta os valores observados.
 
 - [ ] **Step 1: Escrever testes unitários em `tests/test_verify_phase2.py` (testando `--smoke`, idempotência de runs concluídas e agregação multi-seed)**
 
@@ -784,35 +825,60 @@ git commit -m "feat(pipeline): add resumable per-run Phase 2 orchestrator, aggre
 
 ---
 
-### Task 6: Documentação Científica da Fase 2, Tabela Verificada de Literatura e ADRs
+### Task 6: Documentação Científica da Fase 2, Tabelas Verificadas de Literatura e ADRs
 
 **Files:**
 - Create: `docs/FASE2_BASELINE.md`
-- Modify: `docs/DECISOES.md` (ADR #12: protocolo de validação e early stopping vs. 1000 épocas do GraphDTA original)
+- Modify: `docs/DECISOES.md` (ADRs #10, #11 e #12)
 - Modify: `README.md`
 - Modify: `docs/PROXIMOS_PASSOS.md`
 
 - [ ] **Step 1: Escrever `docs/FASE2_BASELINE.md` contendo:**
   1. **Especificação exata do Baseline Oficial (`graphdta_gin`) vs. Variante Secundária (`graphdta_cnn3`):**
      - Documentar os valores extraídos diretamente de `thinng/GraphDTA` (`commit 6162245c6776684b391d30610850fe7077478435`) e deixar claro que todas as tabelas destacam `graphdta_gin` como baseline oficial e rotulam `graphdta_cnn3` apenas como referência adicional ("GraphDTA-style com CNN estilo DeepDTA").
-  2. **Tabela de Referência da Literatura (Apenas Valores Verificados de Nguyen et al., 2021):**
+  2. **Tabelas 1 e 2 Verificadas de Nguyen et al. (2021):**
      - Citação: Nguyen, T. et al. (2021). *"GraphDTA: predicting drug–target binding affinity with graph neural networks"*, Bioinformatics, 37(8), 1140–1147, Tabelas 1 e 2.
-     - Incluir os valores verificados da Tabela 1 para o Davis (split `random` / 5-fold setting 1): `GINConvNet` **MSE = 0.229**, **CI = 0.893** (e `DeepDTA` MSE = 0.261, CI = 0.878).
-     - Marcar todas as métricas e regimes não verificados diretamente nas tabelas do PDF original (como Pearson, Spearman, $r_m^2$, valores exatos de KIBA e splits `cold_drug`/`cold_target`) estritamente como **"a verificar em Nguyen et al. (2021)"** — nunca preencher de memória.
-     - **Análise crítica da meta do projeto:** Registrar explicitamente que o CI do `GINConvNet` no Davis `random` reportado no paper (0,893) já está no nível da meta global originalmente estipulada ($\text{CI} > 0{,}89$), demonstrando que o valor científico real do PhysDual-GNN reside na superação do baseline nos regimes **`cold_drug` e `cold_target`**, no subconjunto não-censurado e nas proteínas longas ($> 1000$ resíduos).
-  3. **Auditoria de Duplicatas, Mutantes e Limitação para a Fase 7:**
+     - **Tabela 1 Verificada (Hiperparâmetros do GraphDTA):**
+       | Hyper-parameters | Setting |
+       | :--- | :--- |
+       | Learning rate | `0.0005` |
+       | Batch size | `512` |
+       | Optimizer | `Adam` |
+       | GCN layers | `3` |
+       | GIN layers | `5` |
+       | GAT layers | `2` |
+       | GAT_GCN layers | `2` |
+     - **Tabela 2 Verificada (Desempenho no Dataset Davis — Setting 1 / Random Split):**
+       | Method | Protein rep. | Compound rep. | CI | MSE |
+       | :--- | :--- | :--- | :---: | :---: |
+       | DeepDTA (Öztürk et al., 2018) | Smith-Waterman | Pubchem-Sim | 0.790 | 0.608 |
+       | DeepDTA (Öztürk et al., 2018) | Smith-Waterman | 1D | 0.886 | 0.420 |
+       | DeepDTA (Öztürk et al., 2018) | 1D | Pubchem-Sim | 0.835 | 0.419 |
+       | KronRLS (Cichonska et al., 2017, 2018) | Smith-Waterman | Pubchem-Sim | 0.871 | 0.379 |
+       | SimBoost (He et al., 2017) | Smith-Waterman | Pubchem-Sim | 0.872 | 0.282 |
+       | DeepDTA (Öztürk et al., 2018) | 1D | 1D | 0.878 | 0.261 |
+       | WideDTA (Öztürk et al., 2019) | 1D + PDM | 1D + LMCS | 0.886 | 0.262 |
+       | **GraphDTA — GCN** | 1D | Graph | 0.880 | 0.254 |
+       | **GraphDTA — GAT_GCN** | 1D | Graph | 0.881 | 0.245 |
+       | **GraphDTA — GAT** | 1D | Graph | 0.892 | 0.232 |
+       | **GraphDTA — GIN** | 1D | Graph | **0.893** | **0.229** |
+     - Marcar a Tabela 3 (KIBA) e métricas/regimes não incluídos na Tabela 2 (Pearson, Spearman, $r_m^2$, `cold_drug`, `cold_target`) como **"a verificar em Nguyen et al. (2021)"**.
+     - **Análise crítica da meta do projeto e diferença metodológica (ADR #12):**
+       1. Registrar que o CI do `GIN` no Davis reportado na Tabela 2 (`0.893`) já está no patamar da meta original do projeto ($\text{CI} > 0{,}89$), demonstrando que o valor científico real do PhysDual-GNN reside na superação do baseline nos regimes **`cold_drug` e `cold_target`**, no subconjunto não-censurado e nas proteínas longas ($> 1000$ resíduos).
+       2. Registrar que o script `training.py` original do GraphDTA seleciona a melhor época avaliando o conjunto de teste a cada época ao longo de 1.000 épocas (introduzindo viés otimista de seleção no teste), enquanto o nosso protocolo seleciona `checkpoint_best.pt` exclusivamente pelo conjunto de validação (`val_loader`, com `epochs=500`, `patience=50` e `davis_cold_patience=80` para `cold_drug` e `cold_target`, sem `ReduceLROnPlateau`) e avalia o teste uma única vez ao final — portanto, os números não são diretamente comparáveis sem considerar essa distinção metodológica.
+  3. **Auditoria de Duplicatas, Mutantes e Limitação para a Fase 7 (ADR #11):**
      - Documentar que os 442 `target_id`s do Davis colapsam em 379 sequências únicas (e 2.111 fármacos do KIBA em 2.065 SMILES únicos). Explicar que se variantes mutantes ou estados fosforilados no Davis compartilham a sequência de aminoácidos do tipo selvagem (wild-type) no arquivo `proteins.txt` do DeepDTA, **o objetivo de resiliência a mutações (Fase 7) não é testável diretamente com essas entradas sem construir explicitamente as sequências mutadas** (substituindo o resíduo na posição da mutação).
   4. **Determinismo, Censura e Truncamento:**
      - Explicar como cada `seed` $\in \{0, 1, 2, 3, 4\}$ controla simultaneamente a partição de dados (`{dataset}_{split}_seed{seed}.json`) e a inicialização de pesos/DataLoader (`seed_everything(seed)`), e registrar que `global_add_pool`/`scatter_add` em CUDA possui determinismo aproximado devido a operações atômicas em ponto flutuante.
      - Documentar o impacto da censura em $pK_d = 5.0$ (69,64% do Davis) e do truncamento em 1000 resíduos (83 proteínas $> 1022$ aa).
 
-- [ ] **Step 2: Atualizar `docs/DECISOES.md`, `README.md` e `docs/PROXIMOS_PASSOS.md`**
+- [ ] **Step 2: Atualizar `docs/DECISOES.md` (ADRs #10, #11 e #12), `README.md` e `docs/PROXIMOS_PASSOS.md`**
 
 - [ ] **Step 3: Commit da Task 6**
 
 ```bash
 git add docs/FASE2_BASELINE.md docs/DECISOES.md README.md docs/PROXIMOS_PASSOS.md
-git commit -m "docs(phase2): document verified GraphDTA architecture, literature table, and duplicate/mutation analysis"
+git commit -m "docs(phase2): document verified GraphDTA tables, ADR #10-#12, and duplicate/mutation analysis"
 ```
 
 ---
@@ -822,15 +888,15 @@ git commit -m "docs(phase2): document verified GraphDTA architecture, literature
 1. **Métricas:** As 6 métricas (`ci`, `mse`, `rmse`, `pearson`, `spearman`, `rm2`) retornam `float` nativo do Python, sem `NaN` em predições degeneradas, com CI idêntico ao `lifelines.utils.concordance_index`.
 2. **`--smoke`:** Forward e backward do modelo oficial (`graphdta_gin`) e da variante secundária (`graphdta_cnn3`) executam sem `NaN`, com gradientes não nulos nos dois ramos (droga e proteína) e com `drug_in_dim` lido obrigatoriamente do config.
 3. **Checkpoints Seguros e Atômicos:** Checkpoints sanitizados de escalares NumPy, gravados atomicamente no mesmo diretório via `os.replace`, incluindo estados de RNG (`torch.get_rng_state()` e `torch.cuda.get_rng_state_all()`), e recarregáveis estritamente com `torch.load(..., weights_only=True)`.
-4. **Cache de Grafos v2 (One-Hot 78d):** O cache `{dataset}_drug_graphs_v2_onehot78.pt` carrega com `weights_only=True` e valida estritamente `featurizer_version == "v2_onehot78"` e `atom_feature_dim == 78`.
+4. **Cache de Grafos v2 (`v2_onehot78_l1norm`):** O cache `{dataset}_drug_graphs_v2_onehot78_l1norm.pt` carrega com `weights_only=True` e valida estritamente `featurizer_version == "v2_onehot78_l1norm"`, `atom_feature_dim == 78` e `normalize_atom_features is True`.
 5. **`--full`:** JSON individual por run gravado em `outputs/results/runs/` para todos os runs do escopo, e JSONs agregados (`outputs/results/baseline_{model}_{dataset}_{split}.json`) com média ± desvio-padrão nas 5 seeds, incluindo métricas no subconjunto não-censurado, desempenho por faixa de comprimento ($\le 1000$ vs. $> 1000$) e baselines triviais.
-6. **Alerta de Sanidade (`WARN`):** Alerta não-bloqueante para CI no Davis `random` ($\text{CI} < 0{,}86 \Rightarrow \text{WARN}$), **sem** critério de queda obrigatória nos splits cold.
+6. **Alertas de Sanidade (`WARN`):** Alertas não-bloqueantes para CI no Davis `random` ($\text{CI} < 0{,}86 \Rightarrow \text{WARN}$) e para proximidade do teto de épocas (`best_epoch > 0.8 * epochs` $\Rightarrow \text{WARN}$), **sem** critério de queda obrigatória nos splits cold.
 7. **Relatório Operacional e Auditoria:** Relatório consolidado contendo tempo medido por época, `best_epoch` escolhido por run e contagens auditadas de duplicatas de conteúdo/sequência.
 
 ---
 
 ## Auto-Verificação do Plano (Self-Review)
 
-1. **Alinhamento com Decisões D1 e D2:** Separa rigorosamente o baseline oficial `graphdta_gin` (verificado linha a linha contra `thinng/GraphDTA` no commit `6162245c6776684b391d30610850fe7077478435`) da variante secundária `graphdta_cnn3`, e inclui a Emenda à Fase 1 na Task 0 para o cache one-hot de 78 dimensões versionado.
-2. **Isolamento do Teste e Orquestração Retomável (C1–C4):** `test_loader` é avaliado uma única vez ao final com `checkpoint_best.pt`; hiperparâmetros são fixados em `configs/base.yaml` na Task 0; escrita atômica usa temporário no mesmo diretório de destino; orquestrador grava 1 JSON por run e separa a etapa de agregação.
+1. **Alinhamento com Decisões D1 e D2:** Separa rigorosamente o baseline oficial `graphdta_gin` (verificado contra `thinng/GraphDTA` e Tabelas 1 e 2 de Nguyen et al., 2021) da variante secundária `graphdta_cnn3`, e inclui a Emenda à Fase 1 na Task 0 para o cache de 78 dimensões normalizado em $L_1$ (`v2_onehot78_l1norm`).
+2. **Isolamento do Teste e Orquestração Retomável (C1–C4):** `test_loader` é avaliado uma única vez ao final com `checkpoint_best.pt`; hiperparâmetros são fixados em `configs/base.yaml` na Task 0 (`lr=0.0005` constante sem scheduler, `epochs=500`, `patience=50`, `davis_cold_patience=80`); escrita atômica usa temporário no mesmo diretório de destino; orquestrador grava 1 JSON por run, emite `WARN` se `best_epoch > 0.8 * epochs` e separa a etapa de agregação.
 3. **Integridade Científica:** Inclui auditoria de colapso de `target_id`s (impacto de mutantes no Davis para a Fase 7), métricas no subconjunto não-censurado, avaliação por faixa de comprimento ($\le 1000$ vs. $> 1000$) e baselines triviais.
