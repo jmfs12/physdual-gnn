@@ -483,7 +483,7 @@ git commit -m "feat(data): implement pre-cached DTADataset, protein tokenizer, a
   - `build_baseline_model(model_name: Literal["graphdta_gin", "graphdta_cnn3"], config: dict[str, Any]) -> nn.Module`:
     - Lê `drug_in_dim = config["featurizer"]["atom_feature_dim"]` e demais hiperparâmetros de `config["graphdta"]`.
 
-- [ ] **Step 1: Escrever testes unitários em `tests/test_graphdta_model.py` (incluindo verificação de ausência de default para `drug_in_dim`, forward/backward de ambos os modelos e overfit de um lote pequeno)**
+- [x] **Step 1: Escrever testes unitários em `tests/test_graphdta_model.py` (incluindo verificação de ausência de default para `drug_in_dim`, forward/backward de ambos os modelos e overfit de um lote pequeno)**
 
 ```python
 import inspect
@@ -542,19 +542,19 @@ def test_both_models_forward_backward_and_small_batch_overfit(model_cls):
     assert final_loss < initial_loss * 0.2, f"Overfit falhou: {initial_loss} -> {final_loss}"
 ```
 
-- [ ] **Step 2: Executar teste e verificar que falha**
+- [x] **Step 2: Executar teste e verificar que falha**
 
 Run: `pytest tests/test_graphdta_model.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'physdual.models.graphdta'`
 
-- [ ] **Step 3: Implementar `src/physdual/models/graphdta.py` e `src/physdual/models/__init__.py`**
+- [x] **Step 3: Implementar `src/physdual/models/graphdta.py` e `src/physdual/models/__init__.py`**
 
-- [ ] **Step 4: Executar teste e verificar que passa**
+- [x] **Step 4: Executar teste e verificar que passa**
 
 Run: `pytest tests/test_graphdta_model.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit da Task 3**
+- [x] **Step 5: Commit da Task 3**
 
 ```bash
 git add src/physdual/models/graphdta.py src/physdual/models/__init__.py tests/test_graphdta_model.py
