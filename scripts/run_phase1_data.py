@@ -19,7 +19,10 @@ from physdual.data.esm_cache import (  # noqa: E402
     create_cache_tarball,
     extract_esm_embeddings_batch,
 )
-from physdual.data.featurizer_drug import build_drug_graph_cache  # noqa: E402
+from physdual.data.featurizer_drug import (  # noqa: E402
+    build_drug_graph_cache,
+    get_drug_graph_cache_filename,
+)
 from physdual.data.splits import (  # noqa: E402
     create_splits,
     save_splits,
@@ -78,6 +81,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Pula a extração em GPU dos embeddings do ESM-2 (útil para validação rápida de dados/splits).",
     )
     parser.add_argument(
+        "--only-drug-graphs",
+        action="store_true",
+        help="Gera exclusivamente o cache de grafos de fármacos (v2) sem reexecutar splits nem extração ESM-2.",
+    )
+    parser.add_argument(
         "--config",
         type=str,
         default=None,
@@ -127,7 +135,56 @@ def main(argv: list[str] | None = None) -> int:
     ratios_cfg = cfg.get("splits", {}).get("ratios", {"train": 0.8, "val": 0.1, "test": 0.1})
     ratios = (float(ratios_cfg["train"]), float(ratios_cfg["val"]), float(ratios_cfg["test"]))
 
+    feat_cfg = cfg.get("featurizer", {})
+    feat_version = str(feat_cfg.get("version", "v2_onehot78_l1norm"))
+    norm_atoms = bool(feat_cfg.get("normalize_atom_features", True))
+
     datasets_to_run = _resolve_datasets_arg(args.dataset)
+
+    if args.only_drug_graphs:
+        import pandas as pd
+
+        print(f"[Fase 1] Modo --only-drug-graphs ativo: gerando cache de grafos {feat_version} (norm={norm_atoms}) ...")
+        for ds in datasets_to_run:
+            clean_path = processed_dir / f"{ds}_clean.csv"
+            if clean_path.exists():
+                df = pd.read_csv(clean_path)
+            else:
+                unit_arg = "kiba_score" if (ds == "kiba" and args.affinity_unit == "auto") else args.affinity_unit
+                df, _, _ = prepare_dataset(
+                    dataset_name=ds,
+                    affinity_unit=unit_arg,  # type: ignore[arg-type]
+                    save_clean=True,
+                    duplicate_policy=args.duplicate_policy,  # type: ignore[arg-type]
+                    raw_dir=raw_dir,
+                    processed_dir=processed_dir,
+                    source=args.data_source,  # type: ignore[arg-type]
+                    use_kaggle=(args.data_source == "kaggle"),
+                    enforce_expected_counts=True,
+                )
+            unique_drugs_df = df[["drug_id", "smiles"]].drop_duplicates(subset=["smiles"])
+            cache_name = get_drug_graph_cache_filename(ds, feat_version)
+            graph_cache_path = processed_dir / cache_name
+            _, report_versioned = build_drug_graph_cache(
+                smiles_list=unique_drugs_df["smiles"].tolist(),
+                output_path=graph_cache_path,
+                drug_ids=unique_drugs_df["drug_id"].tolist(),
+                featurizer_version=feat_version,  # type: ignore[arg-type]
+                normalize_atom_features=norm_atoms,
+            )
+            legacy_cache_path = processed_dir / f"{ds}_drug_graphs.pt"
+            build_drug_graph_cache(
+                smiles_list=unique_drugs_df["smiles"].tolist(),
+                output_path=legacy_cache_path,
+                drug_ids=unique_drugs_df["drug_id"].tolist(),
+                featurizer_version=feat_version,  # type: ignore[arg-type]
+                normalize_atom_features=norm_atoms,
+            )
+            print(
+                f"  -> Cache de grafos salvo em {graph_cache_path} "
+                f"(sucesso={report_versioned['num_succeeded']}, falhas={report_versioned['num_failed']})"
+            )
+        return 0
 
     summary_report: dict[str, Any] = {
         "model_name": model_name,
@@ -199,15 +256,26 @@ def main(argv: list[str] | None = None) -> int:
 
         # Cache de grafos de fármacos (weights_only=True)
         unique_drugs_df = df[["drug_id", "smiles"]].drop_duplicates(subset=["smiles"])
-        graph_cache_path = processed_dir / f"{ds}_drug_graphs.pt"
+        cache_name = get_drug_graph_cache_filename(ds, feat_version)
+        graph_cache_path = processed_dir / cache_name
         _, graph_report = build_drug_graph_cache(
             smiles_list=unique_drugs_df["smiles"].tolist(),
             output_path=graph_cache_path,
             drug_ids=unique_drugs_df["drug_id"].tolist(),
+            featurizer_version=feat_version,  # type: ignore[arg-type]
+            normalize_atom_features=norm_atoms,
+        )
+        legacy_cache_path = processed_dir / f"{ds}_drug_graphs.pt"
+        build_drug_graph_cache(
+            smiles_list=unique_drugs_df["smiles"].tolist(),
+            output_path=legacy_cache_path,
+            drug_ids=unique_drugs_df["drug_id"].tolist(),
+            featurizer_version=feat_version,  # type: ignore[arg-type]
+            normalize_atom_features=norm_atoms,
         )
         print(
             f"  -> Cache de grafos moleculares salvo em {graph_cache_path} "
-            f"(sucesso={graph_report['num_succeeded']}, falhas={graph_report['num_failed']})"
+            f"(versão={feat_version}, sucesso={graph_report['num_succeeded']}, falhas={graph_report['num_failed']})"
         )
 
         # Coleta sequências únicas para extração do ESM-2

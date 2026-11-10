@@ -31,7 +31,7 @@ import pandas as pd
 from physdual.utils.paths import get_project_root
 
 AffinityUnit = Literal["nM", "pKd", "kiba_score", "auto"]
-DuplicatePolicy = Literal["keep_both", "mean", "median"]
+DuplicatePolicy = Literal["keep_both", "keep_all", "mean", "median"]
 
 # Vocabulário de aminoácidos suportado nativamente pelo alfabeto do ESM-2 (UniRef50):
 # 20 canônicos + 5 ambíguos/estendidos (X, B, U, Z, O).
@@ -410,7 +410,7 @@ def standardize_dataset(
     ds = dataset_name.lower().strip()
     if ds not in EXPECTED_COUNTS:
         raise ValueError(f"Dataset desconhecido: '{dataset_name}'. Opções válidas: {list(EXPECTED_COUNTS)}")
-    if duplicate_policy not in ("keep_both", "mean", "median"):
+    if duplicate_policy not in ("keep_both", "keep_all", "mean", "median"):
         raise ValueError(f"duplicate_policy inválida: '{duplicate_policy}'")
 
     smiles_col = _resolve_column(
@@ -624,3 +624,56 @@ def prepare_dataset(
         report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
     return clean_df, clean_path, report
+
+
+def audit_content_and_target_duplicates(df: pd.DataFrame) -> dict[str, Any]:
+    """Audita duplicatas por conteúdo (SMILES e sequência) e alvos com sequências compartilhadas.
+
+    Retorna métricas para documentação de procedência e limitações de modelagem (ADR #11):
+    - `num_unique_drugs_by_id`: contagem de drug_ids únicos
+    - `num_unique_drugs_by_smiles`: contagem de SMILES canônicos únicos
+    - `num_unique_targets_by_id`: contagem de target_ids únicos
+    - `num_unique_targets_by_sequence`: contagem de sequências únicas
+    - `shared_sequence_target_groups`: grupos de target_ids que mapeiam para a mesma sequência
+    - `duplicate_smiles_seq_pairs_count`: contagem de pares (smiles, sequence) que se repetem
+    - `duplicate_pairs_diff_affinity_count`: contagem de pares repetidos com afinidades divergentes (std > 0)
+    - `duplicate_policy`: "keep_all"
+    """
+    num_unique_drugs_by_id = int(df["drug_id"].nunique()) if "drug_id" in df.columns else 0
+    num_unique_drugs_by_smiles = int(df["smiles"].nunique()) if "smiles" in df.columns else 0
+    num_unique_targets_by_id = int(df["target_id"].nunique()) if "target_id" in df.columns else 0
+    num_unique_targets_by_sequence = int(df["sequence"].nunique()) if "sequence" in df.columns else 0
+
+    shared_sequence_target_groups: list[list[str]] = []
+    if "sequence" in df.columns and "target_id" in df.columns:
+        grouped_targets = df.groupby("sequence")["target_id"].unique()
+        for t_ids in grouped_targets:
+            uniq_ids = sorted(list(set(str(t) for t in t_ids)))
+            if len(uniq_ids) > 1:
+                shared_sequence_target_groups.append(uniq_ids)
+        shared_sequence_target_groups.sort()
+
+    duplicate_smiles_seq_pairs_count = 0
+    duplicate_pairs_diff_affinity_count = 0
+
+    if "smiles" in df.columns and "sequence" in df.columns:
+        pair_counts = df.groupby(["smiles", "sequence"], sort=False).size()
+        dup_mask = pair_counts > 1
+        duplicate_smiles_seq_pairs_count = int(dup_mask.sum())
+
+        if "affinity" in df.columns and duplicate_smiles_seq_pairs_count > 0:
+            dup_pairs = df[df.duplicated(subset=["smiles", "sequence"], keep=False)]
+            stds = dup_pairs.groupby(["smiles", "sequence"])["affinity"].std(ddof=0)
+            duplicate_pairs_diff_affinity_count = int((stds > 0.0).sum())
+
+    return {
+        "num_unique_drugs_by_id": num_unique_drugs_by_id,
+        "num_unique_drugs_by_smiles": num_unique_drugs_by_smiles,
+        "num_unique_targets_by_id": num_unique_targets_by_id,
+        "num_unique_targets_by_sequence": num_unique_targets_by_sequence,
+        "shared_sequence_target_groups": shared_sequence_target_groups,
+        "duplicate_smiles_seq_pairs_count": duplicate_smiles_seq_pairs_count,
+        "duplicate_pairs_diff_affinity_count": duplicate_pairs_diff_affinity_count,
+        "duplicate_policy": "keep_all",
+    }
+

@@ -181,3 +181,38 @@ def test_download_canonical_dataset_deepdta(tmp_path):
     assert len(df) == 30056
     assert df["drug_id"].nunique() == 68
     assert df["target_id"].nunique() == 442
+
+
+def test_audit_content_and_target_duplicates():
+    from physdual.data.datasets import audit_content_and_target_duplicates
+
+    # Criando DataFrame sintético:
+    # 2 fármacos com IDs diferentes mas mesmo SMILES
+    # 2 alvos com IDs diferentes mas mesma sequência (ex. variantes/mutantes)
+    # Pares duplicados com mesma afinidade e com afinidade diferente
+    data = [
+        {"drug_id": "D1", "smiles": "CCO", "target_id": "T1", "sequence": "MKVL", "affinity": 5.0},
+        {"drug_id": "D1", "smiles": "CCO", "target_id": "T1", "sequence": "MKVL", "affinity": 6.0},  # mesmo par, aff dif
+        {"drug_id": "D2", "smiles": "CCO", "target_id": "T2", "sequence": "MKVL", "affinity": 7.0},  # mesmo smiles/seq, ids dif
+        {"drug_id": "D3", "smiles": "CC", "target_id": "T3", "sequence": "AAAA", "affinity": 4.0},
+        {"drug_id": "D3", "smiles": "CC", "target_id": "T3", "sequence": "AAAA", "affinity": 4.0},  # mesmo par, aff igual
+    ]
+    df = pd.DataFrame(data)
+
+    report = audit_content_and_target_duplicates(df)
+
+    assert report["num_unique_drugs_by_id"] == 3
+    assert report["num_unique_drugs_by_smiles"] == 2
+    assert report["num_unique_targets_by_id"] == 3
+    assert report["num_unique_targets_by_sequence"] == 2
+    assert report["duplicate_policy"] == "keep_all"
+
+    # Alvos T1 e T2 compartilham a sequência "MKVL"
+    assert report["shared_sequence_target_groups"] == [["T1", "T2"]]
+
+    # Pares (smiles, sequence) repetidos: ("CCO", "MKVL") e ("CC", "AAAA") -> 2 pares
+    assert report["duplicate_smiles_seq_pairs_count"] == 2
+
+    # ("CCO", "MKVL") tem afinidades [5.0, 6.0, 7.0] (std > 0); ("CC", "AAAA") tem [4.0, 4.0] (std == 0)
+    assert report["duplicate_pairs_diff_affinity_count"] == 1
+

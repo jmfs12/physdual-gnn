@@ -8,6 +8,41 @@ project:
 
 seeds: [0, 1, 2, 3, 4]
 
+featurizer:
+  version: "v2_onehot78_l1norm"
+  atom_feature_dim: 78
+  edge_feature_dim: 4
+  normalize_atom_features: true
+
+graphdta:
+  official_model: "graphdta_gin"
+  secondary_model: "graphdta_cnn3"
+  drug_in_dim: 78
+  protein_vocab_size: 25
+  max_seq_len: 1000
+  embedding_dim: 128
+  gin_hidden_dim: 32
+  gin_num_layers: 5
+  cnn_num_filters: 32
+  cnn_kernel_size: 8
+  output_dim: 128
+  mlp_hidden_dims: [1024, 256]
+  dropout: 0.2
+  training:
+    optimizer: "adam"
+    lr: 0.0005
+    weight_decay: 0.0
+    use_lr_scheduler: false
+    batch_size: 512
+    epochs: 500
+    patience: 50
+    davis_cold_patience: 80
+    monitor: "mse"
+    save_last_every: 10
+    num_workers: 2
+    pin_memory: true
+    persistent_workers: true
+
 splits:
   available:
     - "random"

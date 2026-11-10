@@ -88,3 +88,27 @@ Este documento registra as decisões técnicas tomadas na configuração do proj
      - Os `assert`s estritos de procedência (Davis: $68 \times 442 = 30.056$; KIBA: $2.111 \times 229 = 118.254$ pares válidos) rodam **sobre os dados brutos de entrada, antes de qualquer filtro ou colapso de canonização**.
      - O relatório de ingestão registra separadamente `num_drugs_by_id` vs. `num_drugs_by_canonical_smiles` e `num_targets_by_id` vs. `num_targets_by_sequence`.
      - **Política para pares duplicados por conteúdo (`(smiles, sequence)` idênticos vindos de IDs distintos):** **Manter ambos os registros** na tabela limpa (não descartar nem agregar silenciosamente para preservar os 30.056 / 118.254 pares de benchmark e permitir auditoria de `num_pairs_lost == 0`), registrando `duplicate_content_pairs_count` e `duplicate_content_affinity_std` no relatório. Como o split `cold_drug`/`cold_target` agrupa estritamente por `smiles` canônico e `sequence`, ambos os registros caem obrigatoriamente na mesma partição (`train`, `val` ou `test`), impedindo vazamento.
+
+---
+
+## 10. Featurização Atômica One-Hot com Normalização L1 (78d) vs. Representação Escalar Inteira (9d) (Fase 2)
+- **Decisão:** Adotar como featurização atômica molecular padrão (`v2_onehot78_l1norm`) a codificação exata de 78 dimensões especificada no repositório oficial do GraphDTA (`thinng/GraphDTA`, `create_data.py:L230-L256`), composta por:
+  1. `atom.GetSymbol()` com `one_of_k_encoding_unk` em 44 categorias atômicas;
+  2. `atom.GetDegree()` em 11 categorias (`0..10`);
+  3. `atom.GetTotalNumHs()` com `one_of_k_encoding_unk` em 11 categorias (`0..10`);
+  4. `atom.GetImplicitValence()` com `one_of_k_encoding_unk` em 11 categorias (`0..10`);
+  5. `atom.GetIsAromatic()` (1 dimensão binária).
+  Além disso, aplicar **normalização L1 por átomo com guarda contra soma zero** (`row_sum = float(feature.sum()); if row_sum > 0.0: feature = feature / row_sum`), reproduzindo fielmente a implementação oficial em que cada vetor atômico tem soma igual a 1.0. A versão binária sem normalização (`v2_onehot78_raw`, com soma 4.0 ou 5.0) e a versão legada (`v1_int9`, 9 dimensões escalares inteiras da Fase 1) são preservadas no código e selecionáveis por parâmetro para eventuais estudos de ablação.
+- **Motivo:**
+  1. A representação de 9 dimensões escalares inteiras utilizada na Fase 1 tratava propriedades qualitativas/nominais (ex.: símbolo atômico `atomic_num` e tipo de hibridização) como escalares contínuos, impondo uma métrica euclidiana artificial entre elementos químicos (ex.: flúor vs. carbono).
+  2. A arquitetura convolucional GIN (`GINConvNet`) do GraphDTA original foi projetada e validada na literatura para projetar vetores atômicos esparsos de 78 dimensões (`x.shape[1] == 78`). Usar a featurização exata do GraphDTA elimina divergências de representação no baseline oficial, garantindo reproducibilidade estrita.
+  3. O cache de grafos passa a ser explicitamente versionado em disco (`{dataset}_drug_graphs_{version}.pt`), incluindo metadados (`featurizer_version`, `atom_feature_dim`, `normalize_atom_features`) validados na deserialização com `weights_only=True`.
+
+---
+
+## 11. Auditoria de Colapso de Alvos/Fármacos e Limitação Metodológica para Mutações (Fase 2 / Fase 7)
+- **Decisão:**
+  1. Manter a política de duplicatas `keep_all` (preservando todos os pares para manter a volumetria canônica de 30.056 pares no Davis e 118.254 no KIBA), garantindo que os particionamentos `cold_drug` e `cold_target` agrupem estritamente por conteúdo químico (`smiles`) e biológico (`sequence`), o que impede vazamento entre partições mesmo com IDs distintos.
+  2. Implementar a auditoria formal `audit_content_and_target_duplicates` reportando a contagem de alvos que compartilham sequência e pares com afinidades divergentes.
+  3. **Registro de Limitação Metodológica (Fase 7):** Documentar formalmente que os 442 `target_id`s do Davis colapsam em 379 sequências únicas (e 2.111 fármacos do KIBA em 2.065 SMILES únicos). Se variantes mutantes ou estados fosforilados no Davis compartilham a sequência de aminoácidos do tipo selvagem (*wild-type*) no arquivo `proteins.txt` fornecido pelo DeepDTA, **o objetivo de predição de impacto de mutações (Fase 7) não é mensurável diretamente a partir dessas entradas sem a reconstrução explícita das sequências com a mutação pontual**. Para a Fase 7, qualquer teste com mutantes exigirá sequências contendo a substituição do resíduo ou datasets dedicados de mutações.
+

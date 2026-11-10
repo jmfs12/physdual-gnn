@@ -52,6 +52,11 @@ def run_phase1_verification(
     model_name = str(esm_cfg.get("model_name", "esm2_t33_650M_UR50D"))
     expected_dim = int(esm_cfg.get("esm_dim", 1280))
 
+    feat_cfg = cfg.get("featurizer", {})
+    feat_version = str(feat_cfg.get("version", "v2_onehot78_l1norm"))
+    expected_atom_dim = int(feat_cfg.get("atom_feature_dim", 78))
+    expected_norm = bool(feat_cfg.get("normalize_atom_features", True))
+
     datasets = ["davis", "kiba"]
     split_types = ["random", "cold_drug", "cold_target"]
     seeds = [int(s) for s in cfg.get("seeds", [0, 1, 2, 3, 4])]
@@ -187,21 +192,35 @@ def run_phase1_verification(
                         f"NaN ou Inf detectado no embedding: {pt_path}"
                     )
 
-            # Verifica caches de grafos moleculares
+            # Verifica caches de grafos moleculares (considerando featurizer version/dimensão)
+            from physdual.data.featurizer_drug import (
+                get_drug_graph_cache_filename,
+                load_drug_graph_cache,
+            )
+
             for ds in datasets:
-                g_path = processed_dir / f"{ds}_drug_graphs.pt"
+                versioned_filename = get_drug_graph_cache_filename(ds, feat_version)
+                v_path = processed_dir / versioned_filename
+                legacy_path = processed_dir / f"{ds}_drug_graphs.pt"
+                g_path = v_path if v_path.exists() else legacy_path
+
                 if not g_path.exists():
                     checks["3_no_nan_inf_and_non_empty_graphs"]["passed"] = False
                     checks["3_no_nan_inf_and_non_empty_graphs"]["errors"].append(
-                        f"Cache de grafos ausente: {g_path}"
+                        f"Cache de grafos ausente: {v_path} (ou {legacy_path})"
                     )
                     continue
                 try:
-                    g_cache = torch.load(g_path, map_location="cpu", weights_only=True)
+                    g_cache = load_drug_graph_cache(
+                        g_path,
+                        expected_version=feat_version,
+                        expected_dim=expected_atom_dim,
+                        expected_normalize=expected_norm,
+                    )
                 except Exception as exc:
                     checks["6_weights_only_deserialization"]["passed"] = False
                     checks["6_weights_only_deserialization"]["errors"].append(
-                        f"Falha em weights_only=True no cache de grafos {g_path}: {exc}"
+                        f"Falha em weights_only=True / validação no cache de grafos {g_path}: {exc}"
                     )
                     continue
 
@@ -223,6 +242,11 @@ def run_phase1_verification(
                         checks["3_no_nan_inf_and_non_empty_graphs"]["passed"] = False
                         checks["3_no_nan_inf_and_non_empty_graphs"]["errors"].append(
                             f"NaN/Inf em features atômicas de '{smi_key}' em {g_path}"
+                        )
+                    elif int(x.size(1)) != expected_atom_dim:
+                        checks["3_no_nan_inf_and_non_empty_graphs"]["passed"] = False
+                        checks["3_no_nan_inf_and_non_empty_graphs"]["errors"].append(
+                            f"Dimensão atômica inesperada ({x.size(1)} != {expected_atom_dim}) para '{smi_key}' em {g_path}"
                         )
 
     overall_passed = all(c["passed"] for c in checks.values())
