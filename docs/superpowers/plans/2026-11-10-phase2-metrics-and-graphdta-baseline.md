@@ -833,7 +833,7 @@ git commit -m "feat(pipeline): add resumable per-run Phase 2 orchestrator, aggre
 - Modify: `README.md`
 - Modify: `docs/PROXIMOS_PASSOS.md`
 
-- [ ] **Step 1: Escrever `docs/FASE2_BASELINE.md` contendo:**
+- [x] **Step 1: Escrever `docs/FASE2_BASELINE.md` contendo:**
   1. **Especificação exata do Baseline Oficial (`graphdta_gin`) vs. Variante Secundária (`graphdta_cnn3`):**
      - Documentar os valores extraídos diretamente de `thinng/GraphDTA` (`commit 6162245c6776684b391d30610850fe7077478435`) e deixar claro que todas as tabelas destacam `graphdta_gin` como baseline oficial e rotulam `graphdta_cnn3` apenas como referência adicional ("GraphDTA-style com CNN estilo DeepDTA").
   2. **Tabelas 1 e 2 Verificadas de Nguyen et al. (2021):**
@@ -872,9 +872,9 @@ git commit -m "feat(pipeline): add resumable per-run Phase 2 orchestrator, aggre
      - Explicar como cada `seed` $\in \{0, 1, 2, 3, 4\}$ controla simultaneamente a partição de dados (`{dataset}_{split}_seed{seed}.json`) e a inicialização de pesos/DataLoader (`seed_everything(seed)`), e registrar que `global_add_pool`/`scatter_add` em CUDA possui determinismo aproximado devido a operações atômicas em ponto flutuante.
      - Documentar o impacto da censura em $pK_d = 5.0$ (69,64% do Davis) e do truncamento em 1000 resíduos (83 proteínas $> 1022$ aa).
 
-- [ ] **Step 2: Atualizar `docs/DECISOES.md` (ADRs #10, #11 e #12), `README.md` e `docs/PROXIMOS_PASSOS.md`**
+- [x] **Step 2: Atualizar `docs/DECISOES.md` (ADRs #10, #11 e #12), `README.md` e `docs/PROXIMOS_PASSOS.md`**
 
-- [ ] **Step 3: Commit da Task 6**
+- [x] **Step 3: Commit da Task 6**
 
 ```bash
 git add docs/FASE2_BASELINE.md docs/DECISOES.md README.md docs/PROXIMOS_PASSOS.md
