@@ -293,6 +293,7 @@ def train_model(
     save_last_every: int = 10,
     drive_checkpoint_dir: Path | str | None = None,
     delta: float = 1e-4,
+    resume: bool = True,
 ) -> dict[str, Any]:
     """Orquestra o treinamento com parada antecipada, atomicidade e isolamento estrito de teste.
 
@@ -365,11 +366,29 @@ def train_model(
     val_metrics_at_best: dict[str, float] = {}
     total_epochs_run = 0
 
+    start_epoch = 1
+    if resume and last_path.exists():
+        try:
+            last_ckpt = load_checkpoint(last_path, model=model, optimizer=optimizer, restore_rng=True)
+            saved_epoch = int(last_ckpt.get("epoch", 0))
+            if saved_epoch >= 1:
+                start_epoch = saved_epoch + 1
+                total_epochs_run = saved_epoch
+                print(f"[RESUME] Retomando treinamento a partir da época {start_epoch} (checkpoint: {last_path})")
+                if best_path.exists():
+                    best_ckpt = load_checkpoint(best_path)
+                    best_epoch = int(best_ckpt.get("epoch", 0))
+                    best_metric_val = float(best_ckpt.get("best_metric", best_metric_val))
+                    val_metrics_at_best = dict(best_ckpt.get("val_metrics", {}))
+        except Exception as exc:
+            print(f"[WARN] Falha ao retomar checkpoint {last_path}: {exc}. Reiniciando da época 1.")
+            start_epoch = 1
+
     # -------------------------------------------------------------------------
     # Loop de Treinamento com Isolamento Estrito do Teste (C1)
     # test_loader NUNCA é iterado aqui dentro!
     # -------------------------------------------------------------------------
-    for epoch in range(1, epochs + 1):
+    for epoch in range(start_epoch, epochs + 1):
         total_epochs_run = epoch
 
         train_loss = train_one_epoch(model, train_loader, optimizer, criterion, target_device)
