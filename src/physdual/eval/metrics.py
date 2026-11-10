@@ -133,7 +133,7 @@ def compute_pearson(y_true: Any, y_pred: Any) -> float:
     yp = _to_numpy(y_pred)
     if len(yt) < 2:
         return 0.0
-    if np.std(yt) == 0.0 or np.std(yp) == 0.0:
+    if np.std(yt) <= 1e-12 or np.std(yp) <= 1e-12 or np.all(yt == yt[0]) or np.all(yp == yp[0]):
         return 0.0
     res = stats.pearsonr(yt, yp)
     stat = getattr(res, "statistic", res[0])
@@ -151,7 +151,7 @@ def compute_spearman(y_true: Any, y_pred: Any) -> float:
     yp = _to_numpy(y_pred)
     if len(yt) < 2:
         return 0.0
-    if np.std(yt) == 0.0 or np.std(yp) == 0.0:
+    if np.std(yt) <= 1e-12 or np.std(yp) <= 1e-12 or np.all(yt == yt[0]) or np.all(yp == yp[0]):
         return 0.0
     res = stats.spearmanr(yt, yp)
     stat = getattr(res, "statistic", res[0])
