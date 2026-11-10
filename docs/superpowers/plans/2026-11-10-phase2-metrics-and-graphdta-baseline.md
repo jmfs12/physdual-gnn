@@ -247,7 +247,7 @@ git commit -m "feat(data): amend drug featurizer to 78d GraphDTA one-hot (v2) wi
       1. `mean_predictor`: prediz constantemente `float(np.mean(y_train))`.
       2. `ridge_aa_composition` (se `X_train_aa` e `X_test_aa` forem fornecidos): regressão `Ridge(alpha=1.0)` sobre frequências de aminoácidos (25d) concatenadas a descritores simples de comprimento/átomos.
 
-- [ ] **Step 1: Escrever testes unitários em `tests/test_metrics.py`**
+- [x] **Step 1: Escrever testes unitários em `tests/test_metrics.py`**
 
 ```python
 import numpy as np
@@ -329,19 +329,19 @@ def test_trivial_baselines():
     assert res["mean_predictor"]["mse"] == pytest.approx(np.mean((y_test - 6.0) ** 2))
 ```
 
-- [ ] **Step 2: Executar teste e verificar que falha**
+- [x] **Step 2: Executar teste e verificar que falha**
 
 Run: `pytest tests/test_metrics.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'physdual.eval.metrics'`
 
-- [ ] **Step 3: Implementar `src/physdual/eval/metrics.py` e `src/physdual/eval/__init__.py`**
+- [x] **Step 3: Implementar `src/physdual/eval/metrics.py` e `src/physdual/eval/__init__.py`**
 
-- [ ] **Step 4: Executar teste e verificar que passa**
+- [x] **Step 4: Executar teste e verificar que passa**
 
 Run: `pytest tests/test_metrics.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit da Task 1**
+- [x] **Step 5: Commit da Task 1**
 
 ```bash
 git add src/physdual/eval/metrics.py src/physdual/eval/__init__.py requirements-colab.txt tests/test_metrics.py
