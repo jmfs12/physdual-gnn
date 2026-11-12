@@ -21,9 +21,17 @@ try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, DataStructs
 
+    try:
+        from rdkit.Chem import rdFingerprintGenerator
+
+        _MORGAN_GEN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
+    except Exception:
+        _MORGAN_GEN = None
+
     _HAS_RDKIT = True
 except ImportError:
     _HAS_RDKIT = False
+    _MORGAN_GEN = None
 
 try:
     import lifelines.utils
@@ -443,7 +451,10 @@ def compute_knn_baselines(
         for smi in all_smiles:
             mol = Chem.MolFromSmiles(smi)
             if mol is not None:
-                fps[smi] = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+                if _MORGAN_GEN is not None:
+                    fps[smi] = _MORGAN_GEN.GetFingerprint(mol)
+                else:
+                    fps[smi] = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
 
         train_by_target: dict[str, list[tuple[str, float]]] = {}
         for _, row in train_df.iterrows():
