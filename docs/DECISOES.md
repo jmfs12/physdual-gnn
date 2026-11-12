@@ -141,4 +141,41 @@ Este documento registra as decisões técnicas tomadas na configuração do proj
   - *Negativas / Mitigações:*
     - As métricas obtidas pelo nosso baseline oficial no Davis `random` podem ser ligeiramente menores ou mais conservadoras do que o CI = 0.893 e MSE = 0.229 reportados na Tabela 2 de Nguyen et al. (2021). Esse desvio é esperado e documentado formalmente como reflexo do protocolo de isolamento estrito de teste.
 
+---
+
+## 13. Protocolo de Avaliação v2 para Davis Cold: GroupKFold de 5 Dobras, Baselines Marginais/kNN, Avaliação Out-of-Fold (OOF) e Bootstrap Agrupado
+- **Contexto:**
+  1. A auditoria forense dos resultados consolidados da Fase 2 revelou que, no Davis `cold_target`, o modelo oficial `graphdta_gin` convergiu em apenas ~5 épocas (`best_epoch = 4.6 ± 2.1`) e obteve desempenho inferior ao baseline trivial de promiscuidade marginal por fármaco (`drug_mean_predictor`: $\Delta\text{MSE} = +0.1076 \pm 0.0940$, $\Delta\text{CI} = -0.0295 \pm 0.0178$).
+  2. A causa-raiz identificada é estrutural: o codificador proteico oficial do GraphDTA (`Conv1d(1000, 32, 8) + Linear(3872, 128)`) trata posições absolutas da sequência como canais fixos sem invariância translacional, memorizando a composição das proteínas de treino e degenerando para um estimador de média por fármaco quando exposto a novos alvos.
+  3. Em contrapartida, o modelo secundário `graphdta_cnn3` (estilo DeepDTA com convoluções 1D e Global Max Pooling) possui invariância translacional intrínseca, convergiu na época ~81 e superou a média marginal por droga ($\Delta\text{MSE} = -0.0740 \pm 0.0420$, $\Delta\text{CI} = +0.0119 \pm 0.0101$).
+  4. O particionamento em 5 seeds pseudoaleatórias com 20% no teste gera alta variância e não garante que todas as entidades do Davis (apenas 68 fármacos e 379 proteínas) sejam avaliadas como entidades não vistas. Além disso, a comparação ingênua contra a média global mascara o efeito de promiscuidade/homologia.
+- **Decisões:**
+  1. **Adoção da "Opção C" (5-Fold GroupKFold no Davis Cold):**
+     - O protocolo oficial para avaliação nos regimes `cold_drug` e `cold_target` do Davis passa a ser o **GroupKFold de 5 dobras**, agrupado estritamente por conteúdo químico (`smiles` canônico) e biológico (`sequence`).
+     - Atribuição determinística fixa (`seed=42`) onde cada cluster/entidade pertence ao conjunto de teste de exatamente uma única dobra (100% de cobertura do dataset ao longo das 5 dobras, com zero vazamento entre treino/val e teste).
+     - Validação interna de cada dobra extraída dos grupos de treino (~10% dos grupos de treino) sob o mesmo critério de conteúdo; paciência de early stopping mantida em 80 épocas.
+  2. **Isolamento de Versões de Protocolo:**
+     - Os resultados anteriores baseados em seeds aleatórias são arquivados formalmente como *"Protocolo v1 (seeds)"*, não sendo misturados com os resultados das dobras K-Fold (*"Protocolo v2 (kfold)"*).
+  3. **Avaliação Out-Of-Fold (OOF) e Análise por Bootstrap Agrupado:**
+     - Todas as previsões de teste fora da dobra são salvas em CSV (`outputs/results/oof/{model}_{dataset}_{split}_oof.csv`) com os pares `(drug_id, target_id, smiles, sequence, y_true, y_pred, y_pred_drug_mean, y_pred_target_mean)`.
+     - Relatar tanto a média ± desvio amostral entre as 5 dobras quanto a métrica agrupada em todas as previsões OOF.
+     - Implementar bootstrap agrupado no nível de cluster (*cluster-level bootstrap* com 1.000 replicações e IC de 95%) para o $\Delta\text{MSE}$ e $\Delta\text{CI}$ pareados contra os baselines marginais de promiscuidade (`drug_mean_predictor` e `target_mean_predictor`).
+  4. **Baselines de Promiscuidade e Homologia (kNN):**
+     - Integração obrigatória de preditores marginais e kNN por CPU no pipeline de avaliação:
+       - `knn_tanimoto_drug`: similaridade de Tanimoto sobre Morgan Fingerprints (ECFP4, 1024 bits, raio 2).
+       - `knn_kmer_target`: similaridade de cosseno sobre frequências de 3-mers de aminoácidos.
+  5. **Métricas de Classificação Binária para Reposicionamento:**
+     - Computação de AUROC e AUPR em limiares clinicamente relevantes: $pK_d > 5.0$ (afinidade biologicamente detectável) e $pK_d \ge 7.0$ (potência farmacológica submicromolar, $K_d \le 100\text{ nM}$).
+  6. **Controle de Épocas no KIBA Random (Seeds 1 e 3):**
+     - Apenas as seeds 1 e 3 de KIBA `random` atingiram o teto de 500 épocas (479 e 494 épocas). O orquestrador permite retomar essas duas seeds a partir do `checkpoint_last.pt` (época 500) até 1000 épocas (`--extend-epochs`), preservando o estado do otimizador e restaurando `EarlyStopping.counter = max(0, saved_epoch - best_epoch)`.
+     - Regra de decisão: se o CI de teste variar menos que o desvio inter-seeds (~0.006), documenta-se e mantém-se 500; caso contrário, adota-se o resultado de 1000 épocas.
+- **Consequências Científicas e Técnicas:**
+  - *Positivas:*
+    - **Validade Estatística Inatacável:** Todo o dataset Davis é avaliado fora da dobra (OOF), com inferência em 100% dos pares em condição estritamente cold.
+    - **Definição de Baseline Realista para a Fase 3:** O alvo real a ser superado pelo PhysDual-GNN com ESM-2 no Davis `cold_target` deixa de ser a média global e passa a ser o `graphdta_cnn3` e os baselines marginais/kNN.
+    - **Interpretabilidade Farmacológica:** As métricas AUROC/AUPR em $pK_d \ge 7.0$ fornecem valor direto para triagem virtual e reposicionamento.
+  - *Negativas / Mitigações:*
+    - Custo computacional adicional de 5 dobras para GIN e CNN3 no Davis (~1 a 2 horas no Colab), plenamente comportado dentro da cota gratuita de GPU.
+
+
 

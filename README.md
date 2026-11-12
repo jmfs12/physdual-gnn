@@ -12,7 +12,7 @@ Predição de afinidade droga-alvo (**DTA** — $pK_d$, $pK_i$, KIBA) com **Grap
 | :---: | :--- | :---: | :--- |
 | **0** | Setup de Ambiente e Governança | **Concluída** | Bootstrap Colab + Drive, governança de dependências sem pin agressivo (ADRs #1-#7). |
 | **1** | Pipeline de Dados, Splits e Cache ESM-2 | **Concluída** | Ingestão autônoma DeepDTA, splits `random`/`cold_drug`/`cold_target` (5 seeds), grafos PyG e cache offline ESM-2 ([`docs/FASE1_DADOS.md`](docs/FASE1_DADOS.md), ADRs #8-#9). |
-| **2** | Baseline Oficial GraphDTA e Métricas | **Implementada** | Baseline oficial `GraphDTAGIN` e variante `GraphDTACNN3`, isolamento estrito de teste sem data leakage, métricas (CI, MSE, Pearson, Spearman, $r_m^2$), orquestrador idempotente e gate verificado com 100% dos testes passando ([`docs/FASE2_BASELINE.md`](docs/FASE2_BASELINE.md), ADRs #10-#12). |
+| **2** | Baseline Oficial GraphDTA e Métricas | **Auditada / v2 Pronto** | Baseline oficial `GraphDTAGIN` e variante `GraphDTACNN3`, protocolo v1 auditado (Davis random reproduz o paper), protocolo v2 implementado (GroupKFold 5-fold Davis, baselines marginais/kNN, OOF, bootstrap agrupado e extensão KIBA, ADRs #10-#13). |
 | **3** | Dual-Encoder PhysDual (GIN + ESM-2) | *Planejada* | Fusão multimodal do encoder molecular GIN com embeddings evolutivos contextuais do ESM-2. |
 | **4** | Cross-Attention e Interpretabilidade | *Planejada* | Mecanismo de atenção cruzada droga-resíduo para mapeamento de sítios catalíticos. |
 | **5** | Otimização de Hiperparâmetros e Eficiência | *Planejada* | Ajuste fino guiado e inferência acelerada em GPU. |

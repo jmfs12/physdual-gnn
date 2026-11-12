@@ -294,3 +294,48 @@ sequenceDiagram
     Dev->>CLI: python scripts/verify_phase2.py --full
     CLI-->>Dev: Relatório de Prontidão (Todos os 6 Gates [OK])
 ```
+
+---
+
+## 9. Auditoria Forense dos Resultados da Fase 2 e Protocolo v2 (GroupKFold de 5 Dobras - ADR #13)
+
+### 9.1 Síntese da Auditoria Forense do Protocolo v1 (Seeds)
+
+Após a conclusão das 9 combinações de baseline (18 runs agregadas com 5 seeds cada), a auditoria forense revelou achados cruciais para a fundamentação científica do projeto:
+
+| Dataset / Split | Modelo | CI (Test) | MSE (Test) | Pearson ($r$) | Baseline de Promiscuidade ($\Delta\text{MSE}$) | Veredito |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Davis random** | GIN (oficial) | 0.8845 ± 0.0076 | 0.2354 ± 0.0152 | 0.8351 ± 0.0102 | -71% vs média global | **Aprovado** (reproduz Nguyen et al., 2021) |
+| **Davis random** | CNN3 | 0.8895 ± 0.0079 | 0.2223 ± 0.0157 | 0.8465 ± 0.0116 | -73% vs média global | **Aprovado** (variante secundária forte) |
+| **Davis cold-drug** | GIN (oficial) | 0.6930 ± 0.0210 | 0.5222 ± 0.0381 | 0.5367 ± 0.0321 | -15% vs média global | **Aprovado** (queda esperada por generalização) |
+| **Davis cold-drug** | CNN3 | 0.6918 ± 0.0343 | 0.5173 ± 0.0634 | 0.5401 ± 0.0460 | -16% vs média global | **Aprovado** (comportamento idêntico ao GIN) |
+| **Davis cold-target** | GIN (oficial) | 0.7282 ± 0.0245 | 0.7490 ± 0.0768 | 0.5012 ± 0.0389 | **+0.1076 vs `drug_mean_predictor`** | **Falha estrutural da CNN 1D oficial** |
+| **Davis cold-target** | CNN3 | 0.7698 ± 0.0374 | 0.5684 ± 0.0792 | 0.5732 ± 0.0528 | **-0.0740 vs `drug_mean_predictor`** | **Supera baseline marginal de droga** |
+| **KIBA random** | GIN (oficial) | 0.8540 ± 0.0062 | 0.1812 ± 0.0075 | 0.8482 ± 0.0070 | -74% vs média global | Abaixo do paper (CI ~0.88); seeds 1 e 3 no teto |
+| **KIBA cold-drug** | GIN (oficial) | 0.7561 ± 0.0124 | 0.3814 ± 0.0195 | 0.7301 ± 0.0162 | -44% vs média global | Generalização consistente |
+| **KIBA cold-target** | GIN (oficial) | 0.6582 ± 0.0189 | 0.5140 ± 0.0210 | 0.6012 ± 0.0205 | -25% vs média global | Generalização consistente |
+
+### 9.2 Causa-Raiz no Davis Cold-Target e Papel do CNN3
+
+No Davis `cold_target`, o codificador proteico oficial do GraphDTA (`Conv1d(1000, 32, 8) + Linear(3872, 128)`) opera sobre canais posicionais absolutos sem pooling invariante, parando na época $4.6 \pm 2.1$. O modelo memoriza os alvos de treino e se degenera em um estimador ruidoso da afinidade média de cada fármaco.
+
+Em contrapartida, o `GraphDTACNN3` (estilo DeepDTA com 3 camadas convolucionais 1D e `AdaptiveMaxPool1d(1)`) possui invariância translacional ao longo da sequência proteica. Ele treinou até a época $81 \pm 17$ e superou o baseline marginal por fármaco, estabelecendo-se como o **baseline primário e mais rigoroso a ser batido na Fase 3 pelo PhysDual-GNN com ESM-2**.
+
+### 9.3 Especificação do Protocolo v2 (GroupKFold de 5 Dobras - Opção C)
+
+Conforme estabelecido no **ADR #13**, o Davis é reavaliado sob validação cruzada agrupada de 5 dobras:
+1. **Atribuição Determinística e Disjunta:**
+   - 5 dobras geradas com `random_state=42`.
+   - `cold_drug`: agrupado por `smiles` canônico.
+   - `cold_target`: agrupado por `sequence` do alvo.
+   - Cada grupo/entidade aparece no conjunto de teste de exatamente uma única dobra. O conjunto de teste consolidado (*Out-of-Fold* — OOF) cobre **100% dos pares do dataset**.
+2. **Validação Interna:**
+   - Em cada dobra, extrai-se um conjunto de validação interno de ~10% dos grupos de treino (mesmo critério de conteúdo) para controle de early stopping (`patience=80`).
+3. **Métricas Consolidadas:**
+   - Média $\pm$ desvio amostral ($ddof=1$) entre as 5 dobras.
+   - Métricas globais sobre todas as previsões fora da dobra (OOF pooled).
+   - Métricas de classificação binária (AUROC e AUPR em $pK_d > 5.0$ e $pK_d \ge 7.0$).
+   - Bootstrap agrupado no nível de cluster (*cluster-level bootstrap*, 1.000 replicações, IC 95%) para $\Delta\text{MSE}$ e $\Delta\text{CI}$ pareados contra os baselines marginais de promiscuidade (`drug_mean_predictor` e `target_mean_predictor`).
+4. **Controle de Épocas no KIBA Random (Seeds 1 e 3):**
+   - As seeds 1 e 3 de KIBA `random` são estendidas de 500 para 1000 épocas (`--extend-epochs`), preservando o histórico de loss e o estado do otimizador e early stopping a partir do `checkpoint_last.pt`.
+

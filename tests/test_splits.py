@@ -6,9 +6,11 @@ import pandas as pd
 import pytest
 
 from physdual.data.splits import (
+    create_group_kfold_splits,
     create_splits,
     load_splits,
     save_splits,
+    verify_group_kfold_coverage,
     verify_split_leakage,
 )
 
@@ -102,3 +104,51 @@ def test_splits_determinism_proportions_and_non_empty(synthetic_dta_df: pd.DataF
     out_file = save_splits(s1, tmp_path / "split_seed1.json")
     loaded = load_splits(out_file)
     assert loaded == s1
+
+
+def test_group_kfold_splits_coverage_and_disjunction(synthetic_dta_df: pd.DataFrame):
+    # Test cold_drug GroupKFold
+    drug_folds = create_group_kfold_splits(
+        synthetic_dta_df,
+        split_type="cold_drug",
+        n_splits=5,
+        val_ratio=0.1,
+        assignment_seed=42,
+    )
+    assert len(drug_folds) == 5
+    assert verify_group_kfold_coverage(synthetic_dta_df, drug_folds, split_type="cold_drug")
+
+    # Verify each drug group appears in test in exactly 1 fold
+    unique_smiles = set(synthetic_dta_df["smiles"])
+    test_groups_seen = []
+    for f in drug_folds:
+        test_smiles = set(synthetic_dta_df.iloc[f["test"]]["smiles"])
+        test_groups_seen.append(test_smiles)
+    # Disjoint test groups
+    for i in range(5):
+        for j in range(i + 1, 5):
+            assert test_groups_seen[i].isdisjoint(test_groups_seen[j])
+    # Union covers 100% of drugs
+    assert set().union(*test_groups_seen) == unique_smiles
+
+    # Test cold_target GroupKFold
+    target_folds = create_group_kfold_splits(
+        synthetic_dta_df,
+        split_type="cold_target",
+        n_splits=5,
+        val_ratio=0.1,
+        assignment_seed=42,
+    )
+    assert len(target_folds) == 5
+    assert verify_group_kfold_coverage(synthetic_dta_df, target_folds, split_type="cold_target")
+
+    # Determinism test
+    target_folds_repeat = create_group_kfold_splits(
+        synthetic_dta_df,
+        split_type="cold_target",
+        n_splits=5,
+        val_ratio=0.1,
+        assignment_seed=42,
+    )
+    assert target_folds == target_folds_repeat
+

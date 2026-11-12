@@ -417,3 +417,43 @@ def test_train_model_restores_best_checkpoint_on_test_eval(tmp_path: Path):
     assert "ci" in result["test_metrics_full"]
     assert "test_metrics_uncensored" in result
     assert "test_metrics_by_seq_len" in result
+    assert "history" in result
+    assert len(result["history"]) == 4
+    assert "oof_predictions" in result
+    assert len(result["oof_predictions"]) == 15
+
+
+def test_train_model_resume_restores_early_stopping_counter(tmp_path):
+    torch.manual_seed(42)
+    x = torch.randn(10, 4)
+    y = torch.randn(10)
+    train_loader = DataLoader(SimpleDictDataset(x, y, seq_len=500), batch_size=5)
+    val_loader = DataLoader(SimpleDictDataset(x, y, seq_len=500), batch_size=5)
+
+    model = SimpleDictModel(in_features=4)
+    ckpt_dir = tmp_path / "checkpoints_resume"
+
+    # Fase 1: treina 2 épocas
+    res1 = train_model(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        epochs=2,
+        checkpoint_dir=ckpt_dir,
+    )
+    assert res1["total_epochs_run"] == 2
+
+    # Fase 2: retoma para 5 épocas com patience 2
+    model2 = SimpleDictModel(in_features=4)
+    res2 = train_model(
+        model=model2,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        epochs=5,
+        patience=2,
+        checkpoint_dir=ckpt_dir,
+        resume=True,
+    )
+    assert res2["total_epochs_run"] >= 2
+    assert "history" in res2
+

@@ -197,22 +197,30 @@ def dta_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
 def get_dta_dataloaders(
     dataset_name: str,
     split_type: str,
-    seed: int,
-    config: dict[str, Any],
+    seed: int = 0,
+    config: dict[str, Any] | None = None,
     root: Path | None = None,
+    protocol: str = "seeds",
+    fold: int | None = None,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """Cria e retorna os DataLoaders `(train_loader, val_loader, test_loader)` para um dataset e split.
 
     Args:
         dataset_name: Nome do dataset (`"davis"` ou `"kiba"`).
         split_type: Tipo de partição (`"random"`, `"cold_drug"` ou `"cold_target"`).
-        seed: Semente do particionamento determinístico.
+        seed: Semente do particionamento determinístico (quando protocol="seeds").
         config: Dicionário global de configuração (`configs/base.yaml`).
         root: Raiz do projeto (opcional, resolvida via `get_project_root()` se `None`).
+        protocol: `"seeds"` (padrão) ou `"kfold"`.
+        fold: Índice da dobra quando protocol="kfold" (0 a K-1).
 
     Returns:
         Tupla `(train_loader, val_loader, test_loader)` configurada conforme `config["graphdta"]["training"]`.
     """
+    if config is None:
+        from physdual.utils.config import load_config
+        config = load_config()
+
     base_root = Path(root) if root is not None else get_project_root()
     clean_csv_path = base_root / "data" / "processed" / f"{dataset_name.lower()}_clean.csv"
     if not clean_csv_path.exists():
@@ -246,8 +254,13 @@ def get_dta_dataloaders(
         expected_normalize=expected_norm,
     )
 
-    # Carregamento do arquivo de splits
-    split_path = base_root / "data" / "processed" / "splits" / f"{dataset_name.lower()}_{split_type}_seed{seed}.json"
+    # Carregamento do arquivo de splits (suporta protocolo seeds e protocolo kfold)
+    if protocol == "kfold" or fold is not None:
+        target_fold = fold if fold is not None else seed
+        split_path = base_root / "data" / "processed" / "splits" / f"{dataset_name.lower()}_{split_type}_fold{target_fold}.json"
+    else:
+        split_path = base_root / "data" / "processed" / "splits" / f"{dataset_name.lower()}_{split_type}_seed{seed}.json"
+
     if not split_path.exists():
         raise FileNotFoundError(f"Arquivo de splits não encontrado: {split_path}")
 

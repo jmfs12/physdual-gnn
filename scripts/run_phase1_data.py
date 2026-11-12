@@ -24,8 +24,10 @@ from physdual.data.featurizer_drug import (  # noqa: E402
     get_drug_graph_cache_filename,
 )
 from physdual.data.splits import (  # noqa: E402
+    create_group_kfold_splits,
     create_splits,
     save_splits,
+    verify_group_kfold_coverage,
     verify_split_leakage,
 )
 from physdual.utils.config import load_config  # noqa: E402
@@ -253,6 +255,32 @@ def main(argv: list[str] | None = None) -> int:
                     "test_unique_targets": int(df.iloc[sp["test"]]["sequence"].nunique()),
                 }
         print(f"  -> {len(split_types) * len(seeds)} splits gerados e validados sem vazamento por conteúdo.")
+
+        # Geração de splits GroupKFold (5 dobras) para regimes cold
+        kfold_stats: dict[str, Any] = {}
+        for st in ["cold_drug", "cold_target"]:
+            folds = create_group_kfold_splits(
+                df,
+                split_type=st,
+                n_splits=5,
+                val_ratio=0.1,
+                assignment_seed=42,
+            )
+            if not verify_group_kfold_coverage(df, folds, split_type=st):
+                raise RuntimeError(f"Falha de cobertura ou disjunção no GroupKFold {ds} / {st}!")
+            kfold_stats[st] = {}
+            for fold in folds:
+                f_id = fold["fold_id"]
+                f_path = save_splits(fold, splits_dir / f"{ds}_{st}_fold{f_id}.json")
+                kfold_stats[st][f"fold{f_id}"] = {
+                    "path": str(f_path.relative_to(root)),
+                    "train_pairs": len(fold["train"]),
+                    "val_pairs": len(fold["val"]),
+                    "test_pairs": len(fold["test"]),
+                    "num_test_groups": fold["num_test_groups"],
+                }
+        summary_report["splits_kfold"] = kfold_stats
+        print(f"  -> 10 splits GroupKFold (5 dobras para cold_drug e cold_target) gerados e validados.")
 
         # Cache de grafos de fármacos (weights_only=True)
         unique_drugs_df = df[["drug_id", "smiles"]].drop_duplicates(subset=["smiles"])

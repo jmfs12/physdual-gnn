@@ -18,32 +18,43 @@ Este documento detalha o protocolo para execução dos baselines no ambiente de 
 
 ---
 
-## 2. Checklist de Execução da Fase 2 no Google Colab (Materialização dos Resultados)
+## 2. Checklist de Execução no Google Colab (Protocolo v2 - Opção C)
 
-Para treinar os modelos de baseline, gerar os checkpoints no Google Drive e tabular as métricas comparativas oficiais:
+Com os baselines do protocolo v1 concluídos e auditados forensicamente, a execução no Colab agora foca no **Protocolo v2 (GroupKFold de 5 Dobras no Davis e Extensão KIBA - ADR #13)**:
 
 ### 2.1 Preparação da Sessão
 1. No **Google Colab**, selecione ambiente com **GPU (L4 22.5 GB ou T4 16 GB)**.
-2. Abra o notebook [`notebooks/02_graphdta_baseline.ipynb`](file:///C:/Users/joao.francisco/Documents/dev/physdual-gnn/notebooks/02_graphdta_baseline.ipynb) ou conecte-se via terminal à raiz do repositório em `/content/drive/MyDrive/physdual-gnn`.
-3. Garanta que o tarball de embeddings do ESM-2 gerado na Fase 1 (`data/processed/esm2_t33_650M_UR50D_davis.tar`) esteja disponível no Drive para rápido desempacotamento em `/content/local_cache/`.
+2. Abra o notebook [`notebooks/02_graphdta_baseline.ipynb`](file:///C:/Users/joao.francisco/Documents/dev/physdual-gnn/notebooks/02_graphdta_baseline.ipynb) (Seção 11).
 
-### 2.2 Execução dos Baselines (CLI ou Células do Notebook)
-
-Execute a sequência operacional padrão:
+### 2.2 Comandos de Execução Direta (CLI)
 
 ```bash
-# 1. Medição preliminar de throughput e benchmark de GPU (deve reportar <= 15 s/época):
-python scripts/run_phase2_baseline.py --benchmark-only
+# 1. Gerar os 5 splits GroupKFold para Davis (cold_drug e cold_target):
+python -c "
+import pandas as pd
+from physdual.data.splits import create_group_kfold_splits, save_splits, verify_group_kfold_coverage
+df = pd.read_csv('data/processed/davis_clean.csv')
+for sp, col in [('cold_drug', 'smiles'), ('cold_target', 'sequence')]:
+    splits = create_group_kfold_splits(df, group_col=col, n_splits=5, val_ratio=0.10, random_state=42)
+    verify_group_kfold_coverage(df, splits, group_col=col)
+    for i, s in enumerate(splits):
+        save_splits(s, f'data/processed/splits/davis_{sp}_fold{i}.json')
+print('[OK] 5 dobras GroupKFold geradas para Davis!')
+"
 
-# 2. Executar o Baseline Oficial (GraphDTA GIN) no Davis (3 splits x 5 seeds = 15 runs):
-python scripts/run_phase2_baseline.py --dataset davis --model graphdta_gin --split all --seeds 0,1,2,3,4
+# 2. Treinar GraphDTA GIN no Davis (cold_drug e cold_target, 5 dobras):
+python scripts/run_phase2_baseline.py --protocol kfold --model graphdta_gin --dataset davis --split cold_drug --folds 0,1,2,3,4 --epochs 500 --davis-cold-patience 80 --batch-size 512 --lr 5e-4
+python scripts/run_phase2_baseline.py --protocol kfold --model graphdta_gin --dataset davis --split cold_target --folds 0,1,2,3,4 --epochs 500 --davis-cold-patience 80 --batch-size 512 --lr 5e-4
 
-# 3. Executar a Variante Secundária (GraphDTA CNN3) no Davis (3 splits x 5 seeds = 15 runs):
-python scripts/run_phase2_baseline.py --dataset davis --model graphdta_cnn3 --split all --seeds 0,1,2,3,4
+# 3. Treinar GraphDTA CNN3 no Davis (cold_drug e cold_target, 5 dobras):
+python scripts/run_phase2_baseline.py --protocol kfold --model graphdta_cnn3 --dataset davis --split cold_drug --folds 0,1,2,3,4 --epochs 500 --davis-cold-patience 80 --batch-size 512 --lr 5e-4
+python scripts/run_phase2_baseline.py --protocol kfold --model graphdta_cnn3 --dataset davis --split cold_target --folds 0,1,2,3,4 --epochs 500 --davis-cold-patience 80 --batch-size 512 --lr 5e-4
 
-# 4. Execução condicional no KIBA (conforme orçamento de cota GPU do ADR #12):
-# Se o benchmark preliminar confirmar tempo <= 15 s/época:
-python scripts/run_phase2_baseline.py --dataset kiba --model graphdta_gin --split random --seeds 0,1,2
+# 4. Estender KIBA random seeds 1 e 3 de 500 para 1000 épocas (em segundo plano):
+python scripts/run_phase2_baseline.py --model graphdta_gin --dataset kiba --split random --seeds 1,3 --epochs 1000 --extend-epochs --batch-size 512 --lr 5e-4
+
+# 5. Consolidar agregações e exibir métricas com bootstrap agrupado:
+python scripts/run_phase2_baseline.py --aggregate-only
 ```
 
 ### 2.3 Auditoria Formal do Gate de Pronto da Fase 2

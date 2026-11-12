@@ -52,6 +52,7 @@ def run_phase2_smoke_verification(
     # 1. Imports
     try:
         import physdual.data.datamodule as dm
+        import physdual.data.splits as sp
         import physdual.eval.metrics as met
         import physdual.models.graphdta as gdta
         import physdual.training.checkpoint as ckpt
@@ -59,10 +60,16 @@ def run_phase2_smoke_verification(
 
         assert hasattr(dm, "get_dta_dataloaders")
         assert hasattr(dm, "DTADataset")
+        assert hasattr(sp, "create_group_kfold_splits")
+        assert hasattr(sp, "verify_group_kfold_coverage")
         assert hasattr(gdta, "GraphDTAGIN")
         assert hasattr(gdta, "GraphDTACNN3")
         assert hasattr(gdta, "build_baseline_model")
         assert hasattr(met, "compute_all_metrics")
+        assert hasattr(met, "compute_marginal_baselines")
+        assert hasattr(met, "compute_knn_baselines")
+        assert hasattr(met, "compute_binary_classification_metrics")
+        assert hasattr(met, "bootstrap_grouped_comparison")
         assert hasattr(ckpt, "save_checkpoint")
         assert hasattr(ckpt, "load_checkpoint")
         assert hasattr(tr, "train_model")
@@ -153,6 +160,12 @@ def run_phase2_smoke_verification(
             if req_m not in res or np.isnan(res[req_m]):
                 checks["5_metrics_computation"]["passed"] = False
                 checks["5_metrics_computation"]["errors"].append(f"Métrica obrigatória ausente ou NaN: {req_m}")
+
+        from physdual.eval.metrics import compute_binary_classification_metrics
+        bin_res = compute_binary_classification_metrics(y_true, y_pred, thresholds=[5.0, 7.0])
+        if "threshold_5.0" not in bin_res or "threshold_7.0" not in bin_res:
+            checks["5_metrics_computation"]["passed"] = False
+            checks["5_metrics_computation"]["errors"].append("Falha no cálculo de métricas de classificação binária.")
     except Exception as e:
         checks["5_metrics_computation"]["passed"] = False
         checks["5_metrics_computation"]["errors"].append(f"Erro ao calcular métricas: {e}")

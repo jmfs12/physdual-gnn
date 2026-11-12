@@ -12,7 +12,18 @@ from typing import Any
 
 import numpy as np
 from scipy import stats
-from sklearn.linear_model import Ridge
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.linear_model import Ridge, RidgeCV
+from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.metrics.pairwise import cosine_similarity
+
+try:
+    from rdkit import Chem
+    from rdkit.Chem import AllChem, DataStructs
+
+    _HAS_RDKIT = True
+except ImportError:
+    _HAS_RDKIT = False
 
 try:
     import lifelines.utils
@@ -329,9 +340,261 @@ def compute_trivial_baselines(
     if X_train_aa is not None and X_test_aa is not None:
         X_tr = np.asarray(X_train_aa, dtype=np.float64)
         X_te = np.asarray(X_test_aa, dtype=np.float64)
-        clf = Ridge(alpha=1.0)
+        clf = RidgeCV(alphas=np.logspace(-2, 4, 13))
         clf.fit(X_tr, yt_train)
         y_pred_ridge = clf.predict(X_te)
         results["ridge_aa_composition"] = compute_all_metrics(yt_test, y_pred_ridge)
 
     return results
+
+
+def compute_binary_classification_metrics(
+    y_true: Any,
+    y_pred: Any,
+    thresholds: list[float] | tuple[float, ...] = (5.0, 7.0),
+) -> dict[str, dict[str, float | int]]:
+    """Calcula AUROC e AUPR (Average Precision) para limiares binários de afinidade."""
+    yt = _to_numpy(y_true)
+    yp = _to_numpy(y_pred)
+    results: dict[str, dict[str, float | int]] = {}
+
+    for t in thresholds:
+        t_float = float(t)
+        if t_float <= 5.0:
+            y_bin = (yt > t_float).astype(int)
+        else:
+            y_bin = (yt >= t_float).astype(int)
+
+        n_pos = int(np.sum(y_bin))
+        n_total = int(len(y_bin))
+
+        if n_pos == 0 or n_pos == n_total or len(np.unique(yp)) < 2:
+            results[f"threshold_{t_float}"] = {
+                "auroc": float("nan"),
+                "aupr": float("nan"),
+                "num_positives": n_pos,
+                "num_total": n_total,
+            }
+        else:
+            try:
+                auroc_val = float(roc_auc_score(y_bin, yp))
+            except Exception:
+                auroc_val = float("nan")
+            try:
+                aupr_val = float(average_precision_score(y_bin, yp))
+            except Exception:
+                aupr_val = float("nan")
+
+            results[f"threshold_{t_float}"] = {
+                "auroc": auroc_val,
+                "aupr": aupr_val,
+                "num_positives": n_pos,
+                "num_total": n_total,
+            }
+
+    return results
+
+
+def compute_marginal_baselines(
+    train_df: Any,
+    test_df: Any,
+) -> dict[str, dict[str, float]]:
+    """Calcula baselines marginais de promiscuidade (Média por Fármaco e Média por Alvo)."""
+    y_train = np.asarray(train_df["affinity"], dtype=np.float64)
+    y_test = np.asarray(test_df["affinity"], dtype=np.float64)
+    global_mean = float(np.mean(y_train)) if len(y_train) > 0 else 0.0
+
+    # Média por fármaco (SMILES)
+    drug_means = train_df.groupby("smiles")["affinity"].mean().to_dict()
+    pred_drug = np.array([drug_means.get(smi, global_mean) for smi in test_df["smiles"]], dtype=np.float64)
+
+    # Média por alvo (sequência)
+    target_means = train_df.groupby("sequence")["affinity"].mean().to_dict()
+    pred_target = np.array([target_means.get(seq, global_mean) for seq in test_df["sequence"]], dtype=np.float64)
+
+    return {
+        "drug_mean_predictor": compute_all_metrics(y_test, pred_drug),
+        "target_mean_predictor": compute_all_metrics(y_test, pred_target),
+    }
+
+
+def compute_knn_baselines(
+    train_df: Any,
+    test_df: Any,
+    k: int = 5,
+) -> dict[str, dict[str, float]]:
+    """Calcula baselines de homologia e similaridade molecular via kNN ponderado.
+
+    1. knn_tanimoto_drug: Para cada par (droga_teste, alvo_teste), calcula a média ponderada
+       dos k fármacos de treino mais similares (Tanimoto ECFP4) testados contra o mesmo alvo.
+    2. knn_kmer_target: Para cada par (droga_teste, alvo_teste), calcula a média ponderada
+       dos k alvos de treino mais similares (cosseno de 3-mers de aminoácidos) testados com a mesma droga.
+    """
+    y_test = np.asarray(test_df["affinity"], dtype=np.float64)
+    y_train = np.asarray(train_df["affinity"], dtype=np.float64)
+    global_mean = float(np.mean(y_train)) if len(y_train) > 0 else 0.0
+
+    # --- 1. kNN Drug Tanimoto ---
+    pred_knn_drug = np.full(len(test_df), fill_value=global_mean, dtype=np.float64)
+    drug_means = train_df.groupby("smiles")["affinity"].mean().to_dict()
+    if _HAS_RDKIT:
+        all_smiles = list(set(train_df["smiles"]).union(set(test_df["smiles"])))
+        fps: dict[str, Any] = {}
+        for smi in all_smiles:
+            mol = Chem.MolFromSmiles(smi)
+            if mol is not None:
+                fps[smi] = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+
+        train_by_target: dict[str, list[tuple[str, float]]] = {}
+        for _, row in train_df.iterrows():
+            train_by_target.setdefault(row["sequence"], []).append((row["smiles"], float(row["affinity"])))
+
+        for idx, (_, row) in enumerate(test_df.iterrows()):
+            t_seq = row["sequence"]
+            d_smi = row["smiles"]
+            d_fp = fps.get(d_smi)
+
+            candidates = train_by_target.get(t_seq, [])
+            if candidates and d_fp is not None:
+                sims_and_affs = []
+                for c_smi, c_aff in candidates:
+                    c_fp = fps.get(c_smi)
+                    sim = DataStructs.TanimotoSimilarity(d_fp, c_fp) if c_fp is not None else 0.0
+                    sims_and_affs.append((sim, c_aff))
+
+                sims_and_affs.sort(key=lambda x: x[0], reverse=True)
+                top_k = sims_and_affs[:k]
+                weights = [s for s, _ in top_k]
+                affs = [a for _, a in top_k]
+
+                w_sum = sum(weights)
+                if w_sum > 1e-6:
+                    pred_knn_drug[idx] = sum(w * a for w, a in zip(weights, affs)) / w_sum
+                else:
+                    pred_knn_drug[idx] = float(np.mean(affs)) if affs else drug_means.get(d_smi, global_mean)
+            else:
+                pred_knn_drug[idx] = drug_means.get(d_smi, global_mean)
+    else:
+        pred_knn_drug = np.array([drug_means.get(s, global_mean) for s in test_df["smiles"]], dtype=np.float64)
+
+    # --- 2. kNN Target 3-mer Cosine ---
+    pred_knn_target = np.full(len(test_df), fill_value=global_mean, dtype=np.float64)
+    target_means = train_df.groupby("sequence")["affinity"].mean().to_dict()
+    all_seqs = sorted(list(set(train_df["sequence"]).union(set(test_df["sequence"]))))
+    try:
+        vec = CountVectorizer(analyzer="char", ngram_range=(3, 3))
+        X_seqs = vec.fit_transform(all_seqs)
+        seq_to_idx = {s: i for i, s in enumerate(all_seqs)}
+
+        train_by_drug: dict[str, list[tuple[str, float]]] = {}
+        for _, row in train_df.iterrows():
+            train_by_drug.setdefault(row["smiles"], []).append((row["sequence"], float(row["affinity"])))
+
+        for idx, (_, row) in enumerate(test_df.iterrows()):
+            d_smi = row["smiles"]
+            t_seq = row["sequence"]
+            candidates = train_by_drug.get(d_smi, [])
+            if candidates:
+                cand_seqs = [c[0] for c in candidates]
+                cand_affs = [c[1] for c in candidates]
+                t_idx = seq_to_idx[t_seq]
+                c_indices = [seq_to_idx[s] for s in cand_seqs]
+
+                c_sims = cosine_similarity(X_seqs[t_idx], X_seqs[c_indices])[0]
+                sorted_idx = np.argsort(c_sims)[::-1][:k]
+                weights = c_sims[sorted_idx]
+                affs = [cand_affs[i] for i in sorted_idx]
+
+                w_sum = float(np.sum(weights))
+                if w_sum > 1e-6:
+                    pred_knn_target[idx] = float(np.sum(weights * np.array(affs)) / w_sum)
+                else:
+                    pred_knn_target[idx] = float(np.mean(affs)) if affs else target_means.get(t_seq, global_mean)
+            else:
+                pred_knn_target[idx] = target_means.get(t_seq, global_mean)
+    except Exception:
+        pred_knn_target = np.array([target_means.get(s, global_mean) for s in test_df["sequence"]], dtype=np.float64)
+
+    return {
+        "knn_tanimoto_drug": compute_all_metrics(y_test, pred_knn_drug),
+        "knn_kmer_target": compute_all_metrics(y_test, pred_knn_target),
+    }
+
+
+def bootstrap_grouped_comparison(
+    oof_df: Any,
+    group_col: str,
+    model_col: str = "y_pred_model",
+    baseline_col: str = "y_pred_baseline",
+    target_col: str = "y_true",
+    n_bootstraps: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 42,
+) -> dict[str, Any]:
+    """Calcula intervalo de confiança por bootstrap agrupado (cluster-level) para Delta MSE e Delta CI."""
+    unique_clusters = np.array(sorted(oof_df[group_col].unique()))
+    n_clusters = len(unique_clusters)
+    if n_clusters < 2:
+        return {
+            "delta_mse": {"mean": 0.0, "ci_95": [0.0, 0.0]},
+            "delta_ci": {"mean": 0.0, "ci_95": [0.0, 0.0]},
+            "p_superiority_mse": 0.5,
+            "p_superiority_ci": 0.5,
+        }
+
+    cluster_indices = oof_df.groupby(group_col).indices
+
+    y_t_all = np.asarray(oof_df[target_col], dtype=np.float64)
+    y_m_all = np.asarray(oof_df[model_col], dtype=np.float64)
+    y_b_all = np.asarray(oof_df[baseline_col], dtype=np.float64)
+
+    rng = np.random.RandomState(int(seed))
+    delta_mses: list[float] = []
+    delta_cis: list[float] = []
+
+    for _ in range(n_bootstraps):
+        sampled_c = rng.choice(unique_clusters, size=n_clusters, replace=True)
+        sample_row_indices = []
+        for c in sampled_c:
+            sample_row_indices.extend(cluster_indices[c])
+
+        sample_idx = np.array(sample_row_indices, dtype=np.int64)
+        yt_s = y_t_all[sample_idx]
+        ym_s = y_m_all[sample_idx]
+        yb_s = y_b_all[sample_idx]
+
+        mse_m = float(np.mean((yt_s - ym_s) ** 2))
+        mse_b = float(np.mean((yt_s - yb_s) ** 2))
+        delta_mses.append(mse_m - mse_b)
+
+        ci_m = compute_ci(yt_s, ym_s)
+        ci_b = compute_ci(yt_s, yb_s)
+        delta_cis.append(ci_m - ci_b)
+
+    arr_mse = np.array(delta_mses, dtype=np.float64)
+    arr_ci = np.array(delta_cis, dtype=np.float64)
+
+    low_p = (alpha / 2.0) * 100
+    high_p = (1.0 - alpha / 2.0) * 100
+
+    ci_mse = [float(np.percentile(arr_mse, low_p)), float(np.percentile(arr_mse, high_p))]
+    ci_ci = [float(np.percentile(arr_ci, low_p)), float(np.percentile(arr_ci, high_p))]
+
+    return {
+        "delta_mse": {
+            "mean": float(np.mean(arr_mse)),
+            "std": float(np.std(arr_mse, ddof=1)),
+            "ci_95": ci_mse,
+            "wins": int(np.sum(arr_mse < 0)),
+            "total_bootstraps": n_bootstraps,
+        },
+        "delta_ci": {
+            "mean": float(np.mean(arr_ci)),
+            "std": float(np.std(arr_ci, ddof=1)),
+            "ci_95": ci_ci,
+            "wins": int(np.sum(arr_ci > 0)),
+            "total_bootstraps": n_bootstraps,
+        },
+        "p_superiority_mse": float(np.mean(arr_mse < 0)),
+        "p_superiority_ci": float(np.mean(arr_ci > 0)),
+    }

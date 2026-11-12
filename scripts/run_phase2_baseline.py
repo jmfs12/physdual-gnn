@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Orquestrador resumível, idempotente e agregador de baselines da Fase 2 (`scripts/run_phase2_baseline.py`).
 
-Implementa as seguintes garantias de engenharia:
+Implementa as seguintes garantias de engenharia e protocolos:
 - C1: Isolamento estrito de teste (avaliação no teste realizada unicamente após o fim do treino).
 - C2: Persistência individual por run atômica e retomabilidade granular por checkpoint.
 - C3: Idempotência de execução (runs já concluídas são puladas sem reprocessamento, salvo com --force).
-- Agregação desacoplada com cálculo estatístico de média e desvio-padrão (ddof=1).
+- Protocolo Seeds (v1): 5 seeds pseudoaleatórias com agregação estatística (média e desvio-padrão ddof=1).
+- Protocolo GroupKFold (v2 - Opção C): 5 dobras agrupadas por conteúdo (smiles canônico ou sequência),
+  salvamento de previsões fora da dobra (OOF), métricas de classificação binária (AUROC/AUPR) e
+  bootstrap agrupado com intervalo de confiança de 95% para Delta MSE e Delta CI contra baselines marginais.
+- Suporte a extensão de épocas (--extend-epochs) com retomada correta do estado do EarlyStopping.
 - Benchmark de tempo de GPU/CPU para validação prévia de viabilidade de treinamento.
-- Avaliação automática de baselines de referência triviais (mean_predictor e ridge_aa_composition).
+- Avaliação automática de baselines: triviais, marginais (promiscuidade) e kNN (similaridade/homologia).
 """
 
 from __future__ import annotations
@@ -31,7 +35,14 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from physdual.data.datamodule import compute_aa_composition, get_dta_dataloaders  # noqa: E402
-from physdual.eval.metrics import compute_trivial_baselines  # noqa: E402
+from physdual.eval.metrics import (  # noqa: E402
+    bootstrap_grouped_comparison,
+    compute_all_metrics,
+    compute_binary_classification_metrics,
+    compute_knn_baselines,
+    compute_marginal_baselines,
+    compute_trivial_baselines,
+)
 from physdual.models.graphdta import build_baseline_model  # noqa: E402
 from physdual.training.trainer import train_model  # noqa: E402
 from physdual.utils.config import load_config  # noqa: E402
@@ -41,9 +52,20 @@ from physdual.utils.seed import set_seed  # noqa: E402
 seed_everything = set_seed
 
 
-def get_run_filename(model: str, dataset: str, split: str, seed: int) -> str:
+def get_run_filename(
+    model: str,
+    dataset: str,
+    split: str,
+    unit_id: int | None = None,
+    seed: int | None = None,
+    fold: int | None = None,
+    protocol: str = "seeds",
+) -> str:
     """Retorna o nome padronizado do arquivo JSON individual de uma run."""
-    return f"{model}_{dataset}_{split}_seed{seed}.json"
+    if unit_id is None:
+        unit_id = fold if fold is not None else (seed if seed is not None else 0)
+    unit_prefix = "fold" if protocol == "kfold" else "seed"
+    return f"{model}_{dataset}_{split}_{unit_prefix}{unit_id}.json"
 
 
 def save_json_atomic(data: dict[str, Any], path: Path | str) -> Path:
@@ -67,23 +89,38 @@ def is_run_completed(
     model: str,
     dataset: str,
     split: str,
-    seed: int,
+    unit_id: int | None = None,
+    seed: int | None = None,
+    fold: int | None = None,
     runs_dir: Path | str | None = None,
+    protocol: str = "seeds",
+    target_epochs: int | None = None,
+    extend_epochs: bool = False,
 ) -> bool:
     """Verifica se o JSON individual de uma run já existe e é válido."""
+    if unit_id is None:
+        unit_id = fold if fold is not None else (seed if seed is not None else 0)
+
     if runs_dir is None:
         cfg = load_config()
         runs_dir = Path(cfg["project_root"]) / cfg["paths"]["results_dir"] / "runs"
     else:
         runs_dir = Path(runs_dir)
 
-    run_file = runs_dir / get_run_filename(model, dataset, split, seed)
+    run_file = runs_dir / get_run_filename(model, dataset, split, unit_id, protocol=protocol)
     if not run_file.exists():
         return False
 
     try:
         data = json.loads(run_file.read_text(encoding="utf-8"))
-        return "test_metrics_full" in data and "model" in data
+        has_metrics = "test_metrics_full" in data and "model" in data
+        if not has_metrics:
+            return False
+        if extend_epochs and target_epochs is not None:
+            prev_epochs = data.get("effective_config", {}).get("epochs", 0)
+            if prev_epochs < target_epochs:
+                return False
+        return True
     except Exception:
         return False
 
@@ -91,8 +128,8 @@ def is_run_completed(
 def _compute_baselines_from_loaders(
     train_loader: Any,
     test_loader: Any,
-) -> dict[str, dict[str, float]]:
-    """Calcula baselines triviais (mean_predictor e ridge_aa_composition) a partir dos DataLoaders."""
+) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, float]], dict[str, dict[str, float]]]:
+    """Calcula baselines triviais, marginais e kNN a partir dos DataLoaders."""
     train_dataset = getattr(train_loader, "dataset", None)
     test_dataset = getattr(test_loader, "dataset", None)
 
@@ -100,10 +137,19 @@ def _compute_baselines_from_loaders(
     test_df = getattr(test_dataset, "df", None)
 
     if train_df is None or test_df is None:
-        return {
+        trivial = {
             "mean_predictor": {"ci": 0.5, "mse": 1.0},
             "ridge_aa_composition": {"ci": 0.5, "mse": 1.0},
         }
+        marginal = {
+            "drug_mean_predictor": {"ci": 0.5, "mse": 1.0},
+            "target_mean_predictor": {"ci": 0.5, "mse": 1.0},
+        }
+        knn = {
+            "knn_tanimoto_drug": {"ci": 0.5, "mse": 1.0},
+            "knn_kmer_target": {"ci": 0.5, "mse": 1.0},
+        }
+        return trivial, marginal, knn
 
     y_train = train_df["affinity"].values
     y_test = test_df["affinity"].values
@@ -111,14 +157,21 @@ def _compute_baselines_from_loaders(
     X_train_aa = np.stack([compute_aa_composition(seq) for seq in train_df["sequence"]])
     X_test_aa = np.stack([compute_aa_composition(seq) for seq in test_df["sequence"]])
 
-    return compute_trivial_baselines(y_train, y_test, X_train_aa, X_test_aa)
+    trivial = compute_trivial_baselines(y_train, y_test, X_train_aa, X_test_aa)
+    marginal = compute_marginal_baselines(train_df, test_df)
+    knn = compute_knn_baselines(train_df, test_df)
+
+    return trivial, marginal, knn
 
 
-def run_single_seed(
+def run_single_unit(
     model_name: str,
     dataset_name: str,
     split_type: str,
-    seed: int,
+    unit_id: int | None = None,
+    protocol: str = "seeds",
+    seed: int | None = None,
+    fold: int | None = None,
     config: dict[str, Any] | None = None,
     runs_dir: Path | str | None = None,
     checkpoints_base_dir: Path | str | None = None,
@@ -133,14 +186,18 @@ def run_single_seed(
     num_workers: int | None = None,
     drive_checkpoint_dir: Path | str | None = None,
     smoke: bool = False,
+    extend_epochs: bool = False,
 ) -> dict[str, Any]:
-    """Executa o treinamento de uma seed individual de forma idempotente e atômica.
+    """Executa o treinamento de uma unidade individual (seed ou fold) de forma idempotente e atômica.
 
     Args:
         model_name: Nome do modelo ('graphdta_gin', 'graphdta_cnn3').
         dataset_name: Nome do dataset ('davis', 'kiba').
         split_type: Partição ('random', 'cold_drug', 'cold_target').
-        seed: Número da semente pseudoaleatória (0 a 4).
+        unit_id: Número da semente (seeds) ou índice da dobra (kfold).
+        protocol: Protocolo de validação ('seeds' ou 'kfold').
+        seed: Argumento de compatibilidade (atribuído a unit_id se protocol='seeds').
+        fold: Argumento de compatibilidade (atribuído a unit_id se protocol='kfold').
         config: Dicionário base de configuração (opcional).
         runs_dir: Diretório de persistência dos JSONs individuais.
         checkpoints_base_dir: Diretório raiz de checkpoints locais.
@@ -155,10 +212,14 @@ def run_single_seed(
         num_workers: Quantidade de processos auxiliares no DataLoader.
         drive_checkpoint_dir: Espelhamento atômico opcional no Google Drive.
         smoke: Se True, executa versão mínima ultra-rápida (1 época, batch size reduzido).
+        extend_epochs: Se True, permite estender até `epochs` mesmo se run anterior existia.
 
     Returns:
         Dicionário com todos os metadados e métricas persistidos na run.
     """
+    if unit_id is None:
+        unit_id = fold if fold is not None else (seed if seed is not None else 0)
+
     cfg = copy.deepcopy(config) if config is not None else load_config()
     base_root = Path(cfg.get("project_root", get_project_root()))
     paths_cfg = cfg["paths"]
@@ -169,28 +230,9 @@ def run_single_seed(
         runs_dir = Path(runs_dir)
     runs_dir.mkdir(parents=True, exist_ok=True)
 
-    run_file = runs_dir / get_run_filename(model_name, dataset_name, split_type, seed)
-
-    # -------------------------------------------------------------------------
-    # Idempotência C3: Pula runs concluídas
-    # -------------------------------------------------------------------------
-    if not force and is_run_completed(model_name, dataset_name, split_type, seed, runs_dir=runs_dir):
-        print(f"[SKIP] Run já concluída: {run_file}")
-        try:
-            cached_data = json.loads(run_file.read_text(encoding="utf-8"))
-            cached_data["skipped"] = True
-            return cached_data
-        except Exception:
-            pass
-
-    # Fixação determinística de seeds
-    seed_everything(seed)
-
-    # Resolução de dispositivo
-    if device == "auto":
-        target_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    else:
-        target_device = torch.device(device)
+    run_file = runs_dir / get_run_filename(
+        model_name, dataset_name, split_type, unit_id, protocol=protocol
+    )
 
     # Configurações de hiperparâmetros
     gdta_cfg = cfg.get("graphdta", {})
@@ -198,7 +240,11 @@ def run_single_seed(
 
     eff_epochs = epochs if epochs is not None else int(train_cfg.get("epochs", 500))
     eff_patience = patience if patience is not None else int(train_cfg.get("patience", 50))
-    eff_davis_cold_pat = davis_cold_patience if davis_cold_patience is not None else int(train_cfg.get("davis_cold_patience", 80))
+    eff_davis_cold_pat = (
+        davis_cold_patience
+        if davis_cold_patience is not None
+        else int(train_cfg.get("davis_cold_patience", 80))
+    )
     eff_batch_size = batch_size if batch_size is not None else int(train_cfg.get("batch_size", 512))
     eff_lr = lr if lr is not None else float(train_cfg.get("lr", 5e-4))
     eff_wd = weight_decay if weight_decay is not None else float(train_cfg.get("weight_decay", 0.0))
@@ -211,6 +257,37 @@ def run_single_seed(
         eff_batch_size = min(eff_batch_size, 64)
         eff_workers = 0
 
+    # -------------------------------------------------------------------------
+    # Idempotência C3: Pula runs concluídas
+    # -------------------------------------------------------------------------
+    if not force and is_run_completed(
+        model_name,
+        dataset_name,
+        split_type,
+        unit_id,
+        runs_dir=runs_dir,
+        protocol=protocol,
+        target_epochs=eff_epochs,
+        extend_epochs=extend_epochs,
+    ):
+        print(f"[SKIP] Run já concluída: {run_file}")
+        try:
+            cached_data = json.loads(run_file.read_text(encoding="utf-8"))
+            cached_data["skipped"] = True
+            return cached_data
+        except Exception:
+            pass
+
+    # Fixação determinística de seeds
+    random_seed = unit_id if protocol == "seeds" else (42 + unit_id)
+    seed_everything(random_seed)
+
+    # Resolução de dispositivo
+    if device == "auto":
+        target_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        target_device = torch.device(device)
+
     cfg["graphdta"]["training"]["batch_size"] = eff_batch_size
     cfg["graphdta"]["training"]["num_workers"] = eff_workers
 
@@ -220,21 +297,38 @@ def run_single_seed(
     else:
         checkpoints_base_dir = Path(checkpoints_base_dir)
 
-    run_ckpt_dir = checkpoints_base_dir / f"{model_name}_{dataset_name}_{split_type}_seed{seed}"
+    unit_prefix = "fold" if protocol == "kfold" else "seed"
+    run_ckpt_dir = (
+        checkpoints_base_dir / f"{model_name}_{dataset_name}_{split_type}_{unit_prefix}{unit_id}"
+    )
     run_ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     run_drive_ckpt_dir: Path | None = None
     if drive_checkpoint_dir is not None:
-        run_drive_ckpt_dir = Path(drive_checkpoint_dir) / f"{model_name}_{dataset_name}_{split_type}_seed{seed}"
+        run_drive_ckpt_dir = (
+            Path(drive_checkpoint_dir)
+            / f"{model_name}_{dataset_name}_{split_type}_{unit_prefix}{unit_id}"
+        )
 
     # Carregamento de DataLoaders
-    train_loader, val_loader, test_loader = get_dta_dataloaders(
-        dataset_name=dataset_name,
-        split_type=split_type,
-        seed=seed,
-        config=cfg,
-        root=base_root,
-    )
+    if protocol == "kfold":
+        train_loader, val_loader, test_loader = get_dta_dataloaders(
+            dataset_name=dataset_name,
+            split_type=split_type,
+            protocol="kfold",
+            fold=unit_id,
+            config=cfg,
+            root=base_root,
+        )
+    else:
+        train_loader, val_loader, test_loader = get_dta_dataloaders(
+            dataset_name=dataset_name,
+            split_type=split_type,
+            protocol="seeds",
+            seed=unit_id,
+            config=cfg,
+            root=base_root,
+        )
 
     # Construção do modelo
     model = build_baseline_model(model_name, cfg)
@@ -265,19 +359,38 @@ def run_single_seed(
     total_epochs = int(train_result["total_epochs_run"])
     sec_per_epoch = float(elapsed_sec / max(1, total_epochs))
 
-    # Cálculo dos baselines triviais
-    trivial_baselines = _compute_baselines_from_loaders(train_loader, test_loader)
+    # Cálculo dos baselines triviais, marginais e kNN
+    trivial_baselines, marginal_baselines, knn_baselines = _compute_baselines_from_loaders(
+        train_loader, test_loader
+    )
 
     feat_cfg = cfg.get("featurizer", {})
     feat_version = str(feat_cfg.get("version", "v2_onehot78_l1norm"))
     norm_atoms = bool(feat_cfg.get("normalize_atom_features", True))
     drug_in_dim = int(gdta_cfg.get("drug_in_dim", 78))
 
+    # Enriquece predições OOF com preditores de média do treino
+    oof_predictions = train_result.get("oof_predictions", [])
+    train_dataset = getattr(train_loader, "dataset", None)
+    train_df = getattr(train_dataset, "df", None)
+    if train_df is not None and oof_predictions:
+        drug_means = train_df.groupby("smiles")["affinity"].mean().to_dict()
+        target_means = train_df.groupby("sequence")["affinity"].mean().to_dict()
+        global_mean = float(train_df["affinity"].mean())
+        for rec in oof_predictions:
+            rec["fold"] = unit_id if protocol == "kfold" else None
+            rec["seed"] = unit_id if protocol == "seeds" else None
+            rec["y_pred_drug_mean"] = float(drug_means.get(rec.get("smiles", ""), global_mean))
+            rec["y_pred_target_mean"] = float(target_means.get(rec.get("sequence", ""), global_mean))
+
     run_record: dict[str, Any] = {
         "model": model_name,
         "dataset": dataset_name,
         "split": split_type,
-        "seed": seed,
+        "protocol": protocol,
+        "unit_id": unit_id,
+        "seed": unit_id if protocol == "seeds" else None,
+        "fold": unit_id if protocol == "kfold" else None,
         "featurizer_version": feat_version,
         "normalize_atom_features": norm_atoms,
         "drug_in_dim": drug_in_dim,
@@ -300,11 +413,37 @@ def run_single_seed(
         "test_metrics_uncensored": train_result.get("test_metrics_uncensored"),
         "test_metrics_by_seq_len": train_result.get("test_metrics_by_seq_len"),
         "trivial_baselines": trivial_baselines,
+        "marginal_baselines": marginal_baselines,
+        "knn_baselines": knn_baselines,
+        "history": train_result.get("history", []),
+        "oof_predictions": oof_predictions,
     }
 
     save_json_atomic(run_record, run_file)
-    print(f"[SAVE] Run salva com sucesso: {run_file} (best_epoch={run_record['best_epoch']}, sec_per_epoch={sec_per_epoch:.2f}s)")
+    print(
+        f"[SAVE] Run salva com sucesso: {run_file} (best_epoch={run_record['best_epoch']}, "
+        f"sec_per_epoch={sec_per_epoch:.2f}s)"
+    )
     return run_record
+
+
+def run_single_seed(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Compatibilidade legada com a interface da Fase 2 v1."""
+    kwargs.setdefault("protocol", "seeds")
+    return run_single_unit(*args, **kwargs)
+
+
+def _calc_stats(values: list[float | int | None]) -> dict[str, float]:
+    """Calcula média e desvio-padrão amostral (ddof=1)."""
+    valid = [float(v) for v in values if v is not None and not np.isnan(float(v))]
+    if not valid:
+        return {"mean": float("nan"), "std": float("nan")}
+    arr = np.array(valid, dtype=np.float64)
+    std_val = float(np.std(arr, ddof=1)) if len(arr) > 1 else 0.0
+    return {
+        "mean": float(np.mean(arr)),
+        "std": std_val,
+    }
 
 
 def aggregate_runs(
@@ -335,7 +474,7 @@ def aggregate_runs(
     found_runs: list[dict[str, Any]] = []
 
     for s in target_seeds:
-        run_file = runs_path / get_run_filename(model, dataset, split, s)
+        run_file = runs_path / get_run_filename(model, dataset, split, s, protocol="seeds")
         if run_file.exists():
             try:
                 data = json.loads(run_file.read_text(encoding="utf-8"))
@@ -348,17 +487,6 @@ def aggregate_runs(
         raise FileNotFoundError(
             f"Nenhuma run encontrada em '{runs_path}' para o trio ({model}, {dataset}, {split})."
         )
-
-    def _calc_stats(values: list[float | int | None]) -> dict[str, float]:
-        valid = [float(v) for v in values if v is not None and not np.isnan(float(v))]
-        if not valid:
-            return {"mean": float("nan"), "std": float("nan")}
-        arr = np.array(valid, dtype=np.float64)
-        std_val = float(np.std(arr, ddof=1)) if len(arr) > 1 else 0.0
-        return {
-            "mean": float(np.mean(arr)),
-            "std": std_val,
-        }
 
     # Extração de métricas de teste completas
     full_keys = ["ci", "mse", "rmse", "pearson", "spearman", "rm2"]
@@ -412,6 +540,32 @@ def aggregate_runs(
             bl_stats[metric_name] = _calc_stats(vals)
         agg_trivial[bl_name] = bl_stats
 
+    # Extração de baselines marginais
+    agg_marginal: dict[str, Any] = {}
+    for m_name in ("drug_mean_predictor", "target_mean_predictor"):
+        m_stats: dict[str, dict[str, float]] = {}
+        for metric_name in ("ci", "mse", "rmse", "pearson", "spearman", "rm2"):
+            vals = [
+                r.get("marginal_baselines", {}).get(m_name, {}).get(metric_name)
+                for r in found_runs
+                if r.get("marginal_baselines") is not None
+            ]
+            m_stats[metric_name] = _calc_stats(vals)
+        agg_marginal[m_name] = m_stats
+
+    # Extração de baselines kNN
+    agg_knn: dict[str, Any] = {}
+    for knn_name in ("knn_tanimoto_drug", "knn_kmer_target"):
+        knn_stats: dict[str, dict[str, float]] = {}
+        for metric_name in ("ci", "mse", "rmse", "pearson", "spearman", "rm2"):
+            vals = [
+                r.get("knn_baselines", {}).get(knn_name, {}).get(metric_name)
+                for r in found_runs
+                if r.get("knn_baselines") is not None
+            ]
+            knn_stats[metric_name] = _calc_stats(vals)
+        agg_knn[knn_name] = knn_stats
+
     best_epochs = [r.get("best_epoch") for r in found_runs]
     sec_per_epochs = [r.get("sec_per_epoch") for r in found_runs]
     total_epochs = [r.get("total_epochs_run") for r in found_runs]
@@ -422,6 +576,8 @@ def aggregate_runs(
         "test_metrics_uncensored": agg_uncensored,
         "test_metrics_by_seq_len": agg_by_seq,
         "trivial_baselines": agg_trivial,
+        "marginal_baselines": agg_marginal,
+        "knn_baselines": agg_knn,
         "best_epoch": _calc_stats(best_epochs),
         "sec_per_epoch": _calc_stats(sec_per_epochs),
         "total_epochs_run": _calc_stats(total_epochs),
@@ -432,6 +588,7 @@ def aggregate_runs(
         "model": model,
         "dataset": dataset,
         "split": split,
+        "protocol": "seeds",
         "num_seeds": len(found_runs),
         "seeds": [int(s) for s in per_seed_results.keys()],
         "per_seed_results": per_seed_results,
@@ -446,7 +603,163 @@ def aggregate_runs(
         out_path = base_root / cfg["paths"]["results_dir"] / f"baseline_{model}_{dataset}_{split}.json"
 
     save_json_atomic(result, out_path)
-    print(f"[AGGREGATE] Resultados consolidados salvos em: {out_path} ({len(found_runs)}/{len(target_seeds)} seeds)")
+    print(
+        f"[AGGREGATE] Resultados consolidados salvos em: {out_path} "
+        f"({len(found_runs)}/{len(target_seeds)} seeds)"
+    )
+    return result
+
+
+def aggregate_kfold_runs(
+    model: str,
+    dataset: str,
+    split: str,
+    runs_dir: Path | str,
+    folds: list[int] | None = None,
+    oof_dir: Path | str | None = None,
+    output_file: Path | str | None = None,
+) -> dict[str, Any]:
+    """Agrega os JSONs individuais das 5 dobras K-Fold, consolida previsões OOF e computa bootstrap.
+
+    Args:
+        model: Identificador do modelo ('graphdta_gin', 'graphdta_cnn3').
+        dataset: Dataset ('davis', 'kiba').
+        split: Tipo de partição ('cold_drug', 'cold_target', 'random').
+        runs_dir: Diretório onde os JSONs individuais de cada dobra residem.
+        folds: Lista de dobras (padrão: [0, 1, 2, 3, 4]).
+        oof_dir: Diretório para gravação da tabela CSV consolidada com previsões OOF.
+        output_file: Caminho de saída opcional para o JSON consolidado.
+
+    Returns:
+        Dicionário com per_fold_results, per_fold_mean_std, global_oof_metrics,
+        binary_classification_metrics e bootstrap_analysis.
+    """
+    runs_path = Path(runs_dir)
+    target_folds = [0, 1, 2, 3, 4] if folds is None else folds
+
+    per_fold_results: dict[str, Any] = {}
+    found_runs: list[dict[str, Any]] = []
+    all_oof_records: list[dict[str, Any]] = []
+
+    for f in target_folds:
+        run_file = runs_path / get_run_filename(model, dataset, split, f, protocol="kfold")
+        if run_file.exists():
+            try:
+                data = json.loads(run_file.read_text(encoding="utf-8"))
+                per_fold_results[str(f)] = data
+                found_runs.append(data)
+                for rec in data.get("oof_predictions", []):
+                    rec_copy = dict(rec)
+                    if "fold" not in rec_copy or rec_copy["fold"] is None:
+                        rec_copy["fold"] = f
+                    all_oof_records.append(rec_copy)
+            except Exception as e:
+                print(f"[WARN] Erro ao carregar dobra {run_file}: {e}")
+
+    if not found_runs:
+        raise FileNotFoundError(
+            f"Nenhuma dobra K-Fold encontrada em '{runs_path}' para o trio ({model}, {dataset}, {split})."
+        )
+
+    # 1. Estatísticas por dobra (média e std ddof=1)
+    full_keys = ["ci", "mse", "rmse", "pearson", "spearman", "rm2"]
+    per_fold_mean_std: dict[str, dict[str, float]] = {}
+    for k in full_keys:
+        vals = [r.get("test_metrics_full", {}).get(k) for r in found_runs]
+        per_fold_mean_std[k] = _calc_stats(vals)
+
+    best_epochs = [r.get("best_epoch") for r in found_runs]
+    total_epochs = [r.get("total_epochs_run") for r in found_runs]
+    sec_per_epochs = [r.get("sec_per_epoch") for r in found_runs]
+    elapsed_secs = [r.get("elapsed_sec") for r in found_runs]
+
+    fold_timings = {
+        "best_epoch": _calc_stats(best_epochs),
+        "total_epochs_run": _calc_stats(total_epochs),
+        "sec_per_epoch": _calc_stats(sec_per_epochs),
+        "elapsed_sec": _calc_stats(elapsed_secs),
+    }
+
+    # 2. Consolidação OOF (Out-Of-Fold)
+    cfg = load_config()
+    base_root = Path(cfg.get("project_root", get_project_root()))
+    if oof_dir is None:
+        oof_path = base_root / cfg["paths"]["results_dir"] / "oof"
+    else:
+        oof_path = Path(oof_dir)
+    oof_path.mkdir(parents=True, exist_ok=True)
+    oof_csv_path = oof_path / f"{model}_{dataset}_{split}_oof.csv"
+
+    global_oof_metrics: dict[str, float] = {}
+    binary_classification_metrics: dict[str, Any] = {}
+    bootstrap_results: dict[str, Any] = {}
+
+    if all_oof_records:
+        oof_df = pd.DataFrame(all_oof_records)
+        oof_df.to_csv(oof_csv_path, index=False)
+        print(f"[OOF] Previsões fora da dobra salvas em: {oof_csv_path} ({len(oof_df)} pares)")
+
+        y_true = np.asarray(oof_df["y_true"], dtype=np.float64)
+        y_pred = np.asarray(oof_df["y_pred"], dtype=np.float64)
+        global_oof_metrics = compute_all_metrics(y_true, y_pred)
+        binary_classification_metrics = compute_binary_classification_metrics(
+            y_true, y_pred, thresholds=[5.0, 7.0]
+        )
+
+        # 3. Bootstrap agrupado (cluster-level) por droga ou por alvo
+        group_col = "sequence" if split == "cold_target" else "smiles"
+        if group_col not in oof_df.columns:
+            group_col = "target_id" if split == "cold_target" else "drug_id"
+
+        if group_col in oof_df.columns:
+            bootstrap_results["cluster_group_col"] = group_col
+            if "y_pred_drug_mean" in oof_df.columns:
+                bootstrap_results["vs_drug_mean"] = bootstrap_grouped_comparison(
+                    oof_df,
+                    group_col=group_col,
+                    model_col="y_pred",
+                    baseline_col="y_pred_drug_mean",
+                    target_col="y_true",
+                    n_bootstraps=1000,
+                    seed=42,
+                )
+            if "y_pred_target_mean" in oof_df.columns:
+                bootstrap_results["vs_target_mean"] = bootstrap_grouped_comparison(
+                    oof_df,
+                    group_col=group_col,
+                    model_col="y_pred",
+                    baseline_col="y_pred_target_mean",
+                    target_col="y_true",
+                    n_bootstraps=1000,
+                    seed=42,
+                )
+
+    if output_file is not None:
+        out_path = Path(output_file)
+    else:
+        out_path = base_root / cfg["paths"]["results_dir"] / f"baseline_{model}_{dataset}_{split}_kfold.json"
+
+    result: dict[str, Any] = {
+        "model": model,
+        "dataset": dataset,
+        "split": split,
+        "protocol": "kfold",
+        "num_folds": len(found_runs),
+        "folds": [int(f) for f in per_fold_results.keys()],
+        "per_fold_results": per_fold_results,
+        "per_fold_mean_std": per_fold_mean_std,
+        "fold_timings": fold_timings,
+        "global_oof_metrics": global_oof_metrics,
+        "binary_classification_metrics": binary_classification_metrics,
+        "bootstrap_analysis": bootstrap_results,
+        "oof_csv_path": str(oof_csv_path),
+    }
+
+    save_json_atomic(result, out_path)
+    print(
+        f"[AGGREGATE-KFOLD] Resultados consolidados salvos em: {out_path} "
+        f"({len(found_runs)}/{len(target_folds)} dobras)"
+    )
     return result
 
 
@@ -485,39 +798,36 @@ def run_timing_benchmark(
                 root=base_root,
             )
             model = build_baseline_model("graphdta_gin", cfg)
-            model.to(target_device)
-            optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
-            criterion = torch.nn.MSELoss()
 
-            times = []
-            for ep in range(1, benchmark_epochs + 1):
-                t0 = time.time()
-                model.train()
-                for batch in train_loader:
-                    drug_batch = batch["drug_batch"].to(target_device)
-                    target_tokens = batch["target_tokens"].to(target_device)
-                    targets = batch["affinity"].to(target_device)
-                    optimizer.zero_grad()
-                    out = model(drug_batch, target_tokens)
-                    loss = criterion(out.view(-1), targets.view(-1))
-                    loss.backward()
-                    optimizer.step()
-                ep_sec = time.time() - t0
-                times.append(ep_sec)
-                print(f"  Época {ep}/{benchmark_epochs}: {ep_sec:.2f}s")
+            t0 = time.time()
+            res = train_model(
+                model=model,
+                train_loader=train_loader,
+                val_loader=val_loader,
+                epochs=benchmark_epochs,
+                lr=5e-4,
+                patience=benchmark_epochs,
+                device=target_device,
+                dataset_name=ds,
+                split_type="random",
+                save_last_every=100,
+                resume=False,
+            )
+            total_sec = float(time.time() - t0)
+            sec_ep = total_sec / max(1, benchmark_epochs)
+            est_500_hours = (sec_ep * 500) / 3600.0
 
-            sec_per_epoch = float(np.mean(times))
-            est_hours_per_seed = (sec_per_epoch * 500) / 3600.0
-            est_hours_15_runs = est_hours_per_seed * 15.0  # 3 splits x 5 seeds
-            eligible_for_cnn3 = bool(sec_per_epoch <= 15.0)
+            print(f"  Duração {benchmark_epochs} épocas: {total_sec:.2f} s ({sec_ep:.2f} s/época)")
+            print(f"  Estimativa 500 épocas (1 run): {est_500_hours:.2f} h")
+            print(f"  Estimativa 5 seeds x 3 splits (15 runs): {est_500_hours * 15:.2f} h")
 
             benchmark_results["datasets"][ds] = {
-                "sec_per_epoch": round(sec_per_epoch, 3),
-                "est_hours_500_epochs_single_run": round(est_hours_per_seed, 2),
-                "est_hours_15_runs": round(est_hours_15_runs, 2),
-                "eligible_for_cnn3_secondary": eligible_for_cnn3,
+                "num_train_pairs": len(train_loader.dataset),
+                "num_val_pairs": len(val_loader.dataset),
+                "sec_per_epoch": round(sec_ep, 3),
+                "est_500_epochs_hours": round(est_500_hours, 2),
+                "est_15_runs_hours": round(est_500_hours * 15, 2),
             }
-            print(f"  Média: {sec_per_epoch:.2f}s/época | 15 runs: ~{est_hours_15_runs:.1f}h")
         except Exception as exc:
             print(f"  [WARN] Falha no benchmark de {ds}: {exc}")
             benchmark_results["datasets"][ds] = {"error": str(exc)}
@@ -536,6 +846,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Configura e analisa argumentos de linha de comando."""
     parser = argparse.ArgumentParser(
         description="Orquestrador resumível, idempotente e agregador de baselines da Fase 2."
+    )
+    parser.add_argument(
+        "--protocol",
+        type=str,
+        default="seeds",
+        choices=["seeds", "kfold"],
+        help="Protocolo de validação: 'seeds' (5 sementes, v1) ou 'kfold' (5-fold GroupKFold, v2).",
     )
     parser.add_argument(
         "--dataset",
@@ -562,9 +879,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--seeds",
         type=str,
         default="0,1,2,3,4",
-        help="Lista de seeds separadas por vírgula (padrão: '0,1,2,3,4').",
+        help="Lista de seeds separadas por vírgula para protocolo seeds (padrão: '0,1,2,3,4').",
+    )
+    parser.add_argument(
+        "--folds",
+        type=str,
+        default="0,1,2,3,4",
+        help="Lista de dobras separadas por vírgula para protocolo kfold (padrão: '0,1,2,3,4').",
     )
     parser.add_argument("--epochs", type=int, default=500, help="Número máximo de épocas.")
+    parser.add_argument(
+        "--extend-epochs",
+        action="store_true",
+        help="Permite estender o treinamento de runs existentes até o novo teto de épocas (ex: de 500 para 1000).",
+    )
     parser.add_argument("--patience", type=int, default=50, help="Paciência para early stopping.")
     parser.add_argument(
         "--davis-cold-patience",
@@ -622,54 +950,73 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.aggregate_only:
-        print(f"Varrendo '{runs_dir}' para agregação de todos os baselines existentes...")
-        # Localiza todos os trios únicos (model, dataset, split) em runs_dir
-        found_trios: set[tuple[str, str, str]] = set()
+        print(f"Varrendo '{runs_dir}' para agregação de baselines existentes...")
+        seed_trios: set[tuple[str, str, str]] = set()
+        fold_trios: set[tuple[str, str, str]] = set()
+
         for f in runs_dir.glob("*_*_*_seed*.json"):
-            name = f.stem
-            parts = name.split("_")
-            # modelo pode ser graphdta_gin ou graphdta_cnn3
+            parts = f.stem.split("_")
             if len(parts) >= 4:
                 split_val = parts[-2]
                 ds_val = parts[-3]
                 model_val = "_".join(parts[:-3])
-                found_trios.add((model_val, ds_val, split_val))
+                seed_trios.add((model_val, ds_val, split_val))
 
-        if not found_trios:
+        for f in runs_dir.glob("*_*_*_fold*.json"):
+            parts = f.stem.split("_")
+            if len(parts) >= 4:
+                split_val = parts[-2]
+                ds_val = parts[-3]
+                model_val = "_".join(parts[:-3])
+                fold_trios.add((model_val, ds_val, split_val))
+
+        if not seed_trios and not fold_trios:
             print(f"[INFO] Nenhum arquivo de run encontrado em {runs_dir}.")
             return 0
 
-        for model_val, ds_val, split_val in sorted(found_trios):
+        for model_val, ds_val, split_val in sorted(seed_trios):
             try:
-                aggregate_runs(
-                    model=model_val,
-                    dataset=ds_val,
-                    split=split_val,
-                    runs_dir=runs_dir,
-                )
+                aggregate_runs(model=model_val, dataset=ds_val, split=split_val, runs_dir=runs_dir)
             except Exception as e:
-                print(f"[WARN] Não foi possível agregar trio ({model_val}, {ds_val}, {split_val}): {e}")
+                print(f"[WARN] Não foi possível agregar trio seeds ({model_val}, {ds_val}, {split_val}): {e}")
+
+        for model_val, ds_val, split_val in sorted(fold_trios):
+            try:
+                aggregate_kfold_runs(model=model_val, dataset=ds_val, split=split_val, runs_dir=runs_dir)
+            except Exception as e:
+                print(f"[WARN] Não foi possível agregar trio kfold ({model_val}, {ds_val}, {split_val}): {e}")
+
         return 0
 
     # Resolução de combinações a executar
     models = ["graphdta_gin", "graphdta_cnn3"] if args.model == "all" else [args.model]
     datasets = ["davis", "kiba"] if args.dataset == "all" else [args.dataset]
     splits = ["random", "cold_drug", "cold_target"] if args.split == "all" else [args.split]
-    seeds = [int(s.strip()) for s in args.seeds.split(",") if s.strip()]
+
+    protocol = args.protocol
+    if protocol == "kfold":
+        units = [int(f.strip()) for f in args.folds.split(",") if f.strip()]
+    else:
+        units = [int(s.strip()) for s in args.seeds.split(",") if s.strip()]
 
     print(f"=== Orquestrador da Fase 2 (PhysDual-GNN) ===")
-    print(f"Modelos: {models} | Datasets: {datasets} | Splits: {splits} | Seeds: {seeds}")
+    print(
+        f"Protocolo: {protocol} | Modelos: {models} | Datasets: {datasets} | "
+        f"Splits: {splits} | Unidades ({'dobras' if protocol == 'kfold' else 'seeds'}): {units}"
+    )
 
     for m in models:
         for ds in datasets:
             for sp in splits:
-                for s in seeds:
-                    print(f"\n>>> Executando: Modelo={m} | Dataset={ds} | Split={sp} | Seed={s}")
-                    run_single_seed(
+                for u in units:
+                    unit_label = f"Dobra={u}" if protocol == "kfold" else f"Seed={u}"
+                    print(f"\n>>> Executando [{protocol.upper()}]: Modelo={m} | Dataset={ds} | Split={sp} | {unit_label}")
+                    run_single_unit(
                         model_name=m,
                         dataset_name=ds,
                         split_type=sp,
-                        seed=s,
+                        unit_id=u,
+                        protocol=protocol,
                         config=cfg,
                         runs_dir=runs_dir,
                         force=args.force,
@@ -683,16 +1030,27 @@ def main(argv: list[str] | None = None) -> int:
                         num_workers=args.num_workers,
                         drive_checkpoint_dir=args.drive_checkpoint_dir,
                         smoke=args.smoke,
+                        extend_epochs=args.extend_epochs,
                     )
-                # Agrega automaticamente o trio após iterar as seeds
+
+                # Agregação automática após completar todas as unidades do trio
                 try:
-                    aggregate_runs(
-                        model=m,
-                        dataset=ds,
-                        split=sp,
-                        runs_dir=runs_dir,
-                        seeds=seeds,
-                    )
+                    if protocol == "kfold":
+                        aggregate_kfold_runs(
+                            model=m,
+                            dataset=ds,
+                            split=sp,
+                            runs_dir=runs_dir,
+                            folds=units,
+                        )
+                    else:
+                        aggregate_runs(
+                            model=m,
+                            dataset=ds,
+                            split=sp,
+                            runs_dir=runs_dir,
+                            seeds=units,
+                        )
                 except Exception as exc:
                     print(f"[WARN] Agregação pendente para ({m}, {ds}, {sp}): {exc}")
 

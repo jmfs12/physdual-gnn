@@ -365,12 +365,15 @@ def train_model(
     best_metric_val = float("inf") if mode == "min" else float("-inf")
     val_metrics_at_best: dict[str, float] = {}
     total_epochs_run = 0
+    history: list[dict[str, float]] = []
 
     start_epoch = 1
     if resume and last_path.exists():
         try:
             last_ckpt = load_checkpoint(last_path, model=model, optimizer=optimizer, restore_rng=True)
             saved_epoch = int(last_ckpt.get("epoch", 0))
+            if "history" in last_ckpt and isinstance(last_ckpt["history"], list):
+                history = list(last_ckpt["history"])
             if saved_epoch >= 1:
                 start_epoch = saved_epoch + 1
                 total_epochs_run = saved_epoch
@@ -380,9 +383,12 @@ def train_model(
                     best_epoch = int(best_ckpt.get("epoch", 0))
                     best_metric_val = float(best_ckpt.get("best_metric", best_metric_val))
                     val_metrics_at_best = dict(best_ckpt.get("val_metrics", {}))
+                    early_stopping.best = best_metric_val
+                    early_stopping.counter = max(0, saved_epoch - best_epoch)
         except Exception as exc:
             print(f"[WARN] Falha ao retomar checkpoint {last_path}: {exc}. Reiniciando da época 1.")
             start_epoch = 1
+            history = []
 
     # -------------------------------------------------------------------------
     # Loop de Treinamento com Isolamento Estrito do Teste (C1)
@@ -395,6 +401,13 @@ def train_model(
         val_pred, val_true, _ = evaluate(model, val_loader, target_device)
         val_metrics = compute_all_metrics(val_true, val_pred)
         current_metric = float(val_metrics[monitor])
+
+        history.append({
+            "epoch": int(epoch),
+            "train_loss": float(train_loss),
+            "val_mse": float(val_metrics.get("mse", 0.0)),
+            "val_ci": float(val_metrics.get("ci", 0.0)),
+        })
 
         if scheduler is not None:
             scheduler.step(current_metric)
@@ -417,6 +430,7 @@ def train_model(
                 "val_metrics": val_metrics,
                 "best_metric": best_metric_val,
                 "monitor": monitor,
+                "history": history,
             }
             save_checkpoint(best_state, best_path)
             if drive_best_path is not None:
@@ -429,6 +443,7 @@ def train_model(
                 "optimizer_state_dict": optimizer.state_dict(),
                 "val_metrics": val_metrics,
                 "monitor": monitor,
+                "history": history,
             }
             save_checkpoint(last_state, last_path)
             if drive_last_path is not None:
@@ -454,6 +469,7 @@ def train_model(
     test_metrics_full: dict[str, float] | None = None
     test_metrics_uncensored: dict[str, float | int] | None = None
     test_metrics_by_seq_len: dict[str, dict[str, float | int]] | None = None
+    oof_predictions: list[dict[str, Any]] | None = None
 
     if test_loader is not None:
         test_pred, test_true, test_meta = evaluate(model, test_loader, target_device)
@@ -466,6 +482,18 @@ def train_model(
             seq_lens = [m["sequence_length"] for m in test_meta]
             test_metrics_by_seq_len = compute_metrics_by_seq_length(test_true, test_pred, seq_lens)
 
+        oof_predictions = []
+        for i in range(len(test_true)):
+            meta = test_meta[i] if (test_meta and i < len(test_meta)) else {}
+            oof_predictions.append({
+                "drug_id": meta.get("drug_id", ""),
+                "target_id": meta.get("target_id", ""),
+                "smiles": meta.get("smiles", ""),
+                "sequence": meta.get("sequence", ""),
+                "y_true": float(test_true[i]),
+                "y_pred": float(test_pred[i]),
+            })
+
     return {
         "best_epoch": best_epoch,
         "total_epochs_run": total_epochs_run,
@@ -476,4 +504,6 @@ def train_model(
         "test_metrics_by_seq_len": test_metrics_by_seq_len,
         "best_checkpoint_path": str(best_path),
         "last_checkpoint_path": str(last_path),
+        "history": history,
+        "oof_predictions": oof_predictions,
     }

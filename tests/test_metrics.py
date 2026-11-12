@@ -6,8 +6,12 @@ import pytest
 from physdual.eval.metrics import (
     _compute_ci_vectorized,
     _to_numpy,
+    bootstrap_grouped_comparison,
     compute_all_metrics,
+    compute_binary_classification_metrics,
     compute_ci,
+    compute_knn_baselines,
+    compute_marginal_baselines,
     compute_metrics_by_seq_length,
     compute_mse,
     compute_pearson,
@@ -164,3 +168,77 @@ def test_trivial_baselines():
     assert "ridge_aa_composition" in res_ridge
     assert "ci" in res_ridge["ridge_aa_composition"]
     assert "mse" in res_ridge["ridge_aa_composition"]
+
+
+def test_binary_classification_metrics_auroc_aupr():
+    y_true = np.array([5.0, 5.0, 6.0, 7.5, 8.2, 5.0, 9.0])
+    y_pred = np.array([5.1, 5.2, 6.2, 7.0, 8.0, 5.3, 8.8])
+    res = compute_binary_classification_metrics(y_true, y_pred, thresholds=[5.0, 7.0])
+    assert "threshold_5.0" in res
+    assert "threshold_7.0" in res
+    assert 0.5 <= res["threshold_5.0"]["auroc"] <= 1.0
+    assert 0.0 <= res["threshold_5.0"]["aupr"] <= 1.0
+    assert res["threshold_5.0"]["num_positives"] == 4
+
+
+def test_marginal_baselines_drug_and_target_mean():
+    import pandas as pd
+    train_df = pd.DataFrame([
+        {"smiles": "CCO", "sequence": "MKTVRQ", "affinity": 5.0},
+        {"smiles": "CCO", "sequence": "ACDEFG", "affinity": 7.0},
+        {"smiles": "CCN", "sequence": "MKTVRQ", "affinity": 9.0},
+        {"smiles": "CCN", "sequence": "ACDEFG", "affinity": 11.0},
+    ])
+    test_df = pd.DataFrame([
+        {"smiles": "CCO", "sequence": "WWWWWW", "affinity": 6.0},  # target novo -> usa drug_mean CCO = 6.0
+        {"smiles": "CCN", "sequence": "WWWWWW", "affinity": 10.0}, # target novo -> usa drug_mean CCN = 10.0
+    ])
+    res = compute_marginal_baselines(train_df, test_df)
+    assert "drug_mean_predictor" in res
+    assert "target_mean_predictor" in res
+    assert res["drug_mean_predictor"]["mse"] == pytest.approx(0.0)
+
+
+def test_knn_baselines_tanimoto_and_kmer():
+    import pandas as pd
+    train_df = pd.DataFrame([
+        {"smiles": "CCO", "sequence": "MKTVRQMKTVRQ", "affinity": 5.0},
+        {"smiles": "CCCO", "sequence": "MKTVRQMKTVRQ", "affinity": 6.0},
+        {"smiles": "CCCC", "sequence": "ACDEFGACDEFG", "affinity": 8.0},
+    ])
+    test_df = pd.DataFrame([
+        {"smiles": "CCO", "sequence": "MKTVRQMKTVRQ", "affinity": 5.5},
+        {"smiles": "CCCO", "sequence": "ACDEFGACDEFG", "affinity": 7.0},
+    ])
+    res = compute_knn_baselines(train_df, test_df, k=2)
+    assert "knn_tanimoto_drug" in res
+    assert "knn_kmer_target" in res
+    assert "mse" in res["knn_tanimoto_drug"]
+    assert "ci" in res["knn_kmer_target"]
+
+
+def test_bootstrap_grouped_comparison():
+    import pandas as pd
+    oof_df = pd.DataFrame([
+        {"group": "G1", "y_true": 5.0, "y_pred_model": 5.1, "y_pred_baseline": 6.0},
+        {"group": "G1", "y_true": 5.2, "y_pred_model": 5.3, "y_pred_baseline": 6.0},
+        {"group": "G2", "y_true": 7.0, "y_pred_model": 7.1, "y_pred_baseline": 6.0},
+        {"group": "G2", "y_true": 7.5, "y_pred_model": 7.4, "y_pred_baseline": 6.0},
+        {"group": "G3", "y_true": 9.0, "y_pred_model": 8.9, "y_pred_baseline": 6.0},
+        {"group": "G3", "y_true": 9.2, "y_pred_model": 9.1, "y_pred_baseline": 6.0},
+    ])
+    res = bootstrap_grouped_comparison(
+        oof_df,
+        group_col="group",
+        model_col="y_pred_model",
+        baseline_col="y_pred_baseline",
+        target_col="y_true",
+        n_bootstraps=50,
+        seed=42,
+    )
+    assert "delta_mse" in res
+    assert "delta_ci" in res
+    assert res["delta_mse"]["mean"] < 0  # model tem MSE menor que baseline
+    assert "ci_95" in res["delta_mse"]
+    assert len(res["delta_mse"]["ci_95"]) == 2
+
