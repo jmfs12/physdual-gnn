@@ -152,3 +152,14 @@ def test_group_kfold_splits_coverage_and_disjunction(synthetic_dta_df: pd.DataFr
     )
     assert target_folds == target_folds_repeat
 
+    # Test alternative keyword arguments (group_col, random_state)
+    drug_folds_kw = create_group_kfold_splits(
+        synthetic_dta_df,
+        group_col="smiles",
+        n_splits=5,
+        val_ratio=0.1,
+        random_state=42,
+    )
+    assert drug_folds == drug_folds_kw
+    assert verify_group_kfold_coverage(synthetic_dta_df, drug_folds_kw, group_col="smiles")
+

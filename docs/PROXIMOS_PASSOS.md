@@ -34,9 +34,9 @@ python -c "
 import pandas as pd
 from physdual.data.splits import create_group_kfold_splits, save_splits, verify_group_kfold_coverage
 df = pd.read_csv('data/processed/davis_clean.csv')
-for sp, col in [('cold_drug', 'smiles'), ('cold_target', 'sequence')]:
-    splits = create_group_kfold_splits(df, group_col=col, n_splits=5, val_ratio=0.10, random_state=42)
-    verify_group_kfold_coverage(df, splits, group_col=col)
+for sp in ['cold_drug', 'cold_target']:
+    splits = create_group_kfold_splits(df, split_type=sp, n_splits=5, val_ratio=0.10, assignment_seed=42)
+    verify_group_kfold_coverage(df, splits, split_type=sp)
     for i, s in enumerate(splits):
         save_splits(s, f'data/processed/splits/davis_{sp}_fold{i}.json')
 print('[OK] 5 dobras GroupKFold geradas para Davis!')

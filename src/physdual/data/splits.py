@@ -187,6 +187,8 @@ def create_group_kfold_splits(
     n_splits: int = 5,
     val_ratio: float = 0.1,
     assignment_seed: int = 42,
+    group_col: str | None = None,
+    random_state: int | None = None,
 ) -> list[dict[str, Any]]:
     """Cria GroupKFold determinístico de K dobras disjuntas agrupadas por conteúdo (smiles ou sequence).
 
@@ -196,15 +198,30 @@ def create_group_kfold_splits(
     - Validação de cada dobra é extraída dos grupos de treino restantes (~val_ratio),
       garantindo que train, val e test daquela dobra sejam mutuamente disjuntos por conteúdo.
     """
-    st = split_type.strip().lower()
-    if st not in ("cold_drug", "cold_target"):
-        raise ValueError(f"GroupKFold suportado para 'cold_drug' ou 'cold_target', recebido: '{split_type}'.")
+    if random_state is not None:
+        assignment_seed = random_state
 
-    group_col = "smiles" if st == "cold_drug" else "sequence"
-    if group_col not in df.columns:
-        raise ValueError(f"Coluna obrigatória '{group_col}' ausente no DataFrame.")
+    if group_col is not None:
+        gc = str(group_col).strip().lower()
+        if gc in ("smiles", "drug", "drug_id"):
+            st = "cold_drug"
+            resolved_col = "smiles"
+        elif gc in ("sequence", "target", "target_id"):
+            st = "cold_target"
+            resolved_col = "sequence"
+        else:
+            st = split_type.strip().lower() if split_type in ("cold_drug", "cold_target") else "cold_drug"
+            resolved_col = group_col
+    else:
+        st = split_type.strip().lower()
+        if st not in ("cold_drug", "cold_target"):
+            raise ValueError(f"GroupKFold suportado para 'cold_drug' ou 'cold_target', recebido: '{split_type}'.")
+        resolved_col = "smiles" if st == "cold_drug" else "sequence"
 
-    unique_groups = sorted(df[group_col].astype(str).unique().tolist())
+    if resolved_col not in df.columns:
+        raise ValueError(f"Coluna obrigatória '{resolved_col}' ausente no DataFrame.")
+
+    unique_groups = sorted(df[resolved_col].astype(str).unique().tolist())
     if len(unique_groups) < n_splits:
         raise ValueError(f"Quantidade de grupos únicos ({len(unique_groups)}) menor que n_splits ({n_splits}).")
 
@@ -214,7 +231,7 @@ def create_group_kfold_splits(
 
     fold_assignments = {g: (idx % n_splits) for idx, g in enumerate(shuffled_groups)}
 
-    col_values = df[group_col].astype(str).tolist()
+    col_values = df[resolved_col].astype(str).tolist()
 
     folds: list[dict[str, Any]] = []
     for k in range(n_splits):
@@ -245,7 +262,7 @@ def create_group_kfold_splits(
             "n_splits": n_splits,
             "assignment_seed": assignment_seed,
             "split_type": st,
-            "group_col": group_col,
+            "group_col": resolved_col,
             "num_test_groups": len(test_groups),
             "num_val_groups": len(val_groups),
             "num_train_groups": len(train_groups),
@@ -257,15 +274,29 @@ def create_group_kfold_splits(
 def verify_group_kfold_coverage(
     df: pd.DataFrame,
     folds: list[dict[str, Any]],
-    split_type: str,
+    split_type: str = "cold_drug",
+    group_col: str | None = None,
 ) -> bool:
     """Verifica disjunção, não-vazamento e cobertura de 100% de um esquema GroupKFold."""
     if len(folds) < 2:
         return False
 
-    st = split_type.strip().lower()
-    group_col = "smiles" if st == "cold_drug" else "sequence"
-    if group_col not in df.columns:
+    if group_col is not None:
+        gc = str(group_col).strip().lower()
+        if gc in ("smiles", "drug", "drug_id"):
+            st = "cold_drug"
+            resolved_col = "smiles"
+        elif gc in ("sequence", "target", "target_id"):
+            st = "cold_target"
+            resolved_col = "sequence"
+        else:
+            st = split_type.strip().lower()
+            resolved_col = group_col
+    else:
+        st = split_type.strip().lower()
+        resolved_col = "smiles" if st == "cold_drug" else "sequence"
+
+    if resolved_col not in df.columns:
         return False
 
     n_rows = len(df)
@@ -288,9 +319,10 @@ def verify_group_kfold_coverage(
         return False
 
     # União de todos os grupos de teste deve cobrir exatamente todos os grupos únicos
-    unique_groups = set(df[group_col].astype(str))
+    unique_groups = set(df[resolved_col].astype(str))
     all_tested_groups = set()
     for f in folds:
-        all_tested_groups.update(df.iloc[f["test"]][group_col].astype(str))
+        all_tested_groups.update(df.iloc[f["test"]][resolved_col].astype(str))
 
     return all_tested_groups == unique_groups
+
