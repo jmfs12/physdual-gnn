@@ -137,7 +137,7 @@ def build_inventory_and_repro() -> tuple[Path, Path]:
     esm_status = (
         "completo"
         if (esm_pt_count > 0 or esm_tar_count > 0)
-        else "ausente localmente (auditado no Google Drive: 429/429 .pt [len(seq), 1280] e 83/83 windowed íntegros; 1 resíduo smoke_test na raiz)"
+        else "ausente localmente (validado no Google Drive: 429/429 .pt fp16, 0 NaN/Inf, dim=1280, seq_len=len(seq), 83/83 windowed, all_checks_passed=true)"
     )
 
     # Tabela inventario principal
@@ -156,7 +156,7 @@ def build_inventory_and_repro() -> tuple[Path, Path]:
         ("`data/processed/{davis,kiba}_drug_graphs.pt`", "Fase 1", "legado / cópia padrão", "gitignored (local)", "completo"),
         (f"`data/processed/splits/*.json` ({len(split_files)} arquivos)", "Fase 1/2", "30 `v1_seeds` + 10 `v2_kfold`", "gitignored (local)", "completo (zero vazamento por conteúdo)"),
         ("`cache/esm_embeddings/`", "Fase 1", f"`{cfg['esm']['model_name']}`, `esm_dim={cfg['esm']['esm_dim']}`", "gitignored", esm_status),
-        ("`scripts/paper/audit_esm_cache_colab.py`", "Fase 1/2 (auditoria)", "Colab / Drive (`esm2_t33_650M_UR50D/*.pt`, `windowed=83` global / `112` por dataset, `[len(seq), 1280]`)", _latest_commit_for_path(repo_root, "scripts/paper/audit_esm_cache_colab.py"), "executado no Drive (429/429 válidos; script corrigido para isolar resíduo smoke_test)"),
+        ("`scripts/paper/audit_esm_cache_colab.py`", "Fase 1/2 (auditoria)", "Colab / Drive (`esm2_t33_650M_UR50D/*.pt`, `fp16`, `NaN/Inf=0`, `dim=1280`, `seq_len`, `windowed=83` global)", _latest_commit_for_path(repo_root, "scripts/paper/audit_esm_cache_colab.py"), "executado no Drive (`all_checks_passed: true`, 429/429 válidos, 0 resíduos)"),
         ("`scripts/paper/cpu_audits.py` + `docs/paper/cpu_audits.json`", "Fase 1/2 (auditoria CPU)", "Noise floor, `pKd>5`, marginais/kNN `v1`, timing limpo, seq-id Davis", _latest_commit_for_path(repo_root, "docs/paper/cpu_audits.json"), "completo (recomputado em CPU a partir de CSVs + splits)"),
         ("`outputs/logs/phase1_summary_report.json`", "Fase 1", f"datasets={list(p1_rep.get('datasets', {}).keys())}, `windowed_sequences={p1_rep.get('windowed_sequences', {}).get('count')}`", "gitignored (local)", f"completo ({', '.join(p1_rep.get('datasets', {}).keys())}; janelas={p1_rep.get('windowed_sequences', {}).get('count')})" if 'kiba' in p1_rep.get('datasets', {}) else "parcial"),
         ("`outputs/results/phase2_timing_benchmark.json`", "Fase 2", "NVIDIA L4, 3 épocas", "gitignored (local)", "completo"),
@@ -249,7 +249,7 @@ def build_inventory_and_repro() -> tuple[Path, Path]:
         f"   - As seeds `1` e `3` retomadas possuem `history` restrito às épocas pós-500 (`501..824` e `501..559`) e `sec_per_epoch` distorcido (`0.646 s` e `2.347 s`) por dividirem o tempo da retomada pelo total acumulado. Em `T8`, a velocidade limpa de `kiba_random` é recalculada exclusivamente nos 3 runs não retomados (`seeds 0, 2, 4`: **`22.338 ± 0.014 s/época`**).",
         f"6. **Recomputação determinística em CPU (`docs/paper/cpu_audits.json`):**",
         f"   - Os 43 runs `v1_seeds` originais não gravaram `marginal_baselines`, `knn_baselines` nem `history` em disco, e os JSONs originais não salvavam `mean_predictor` restrito ao subconjunto `pKd > 5.0`. Por via puramente determinística a partir dos CSVs limpos e arquivos de split (sem necessidade de checkpoints GPU), `scripts/paper/cpu_audits.py` recalculou todos os marginais, `kNN`, deltas pareados por seed para os 45 runs `v1_seeds`, baselines em `pKd > 5.0` (`T5`) e piso de ruído de duplicatas (`T1`).",
-        f"   - **Única lacuna não recomputável localmente:** curvas por época (`history`) dos 43 runs `v1_seeds` originais. Já a auditoria física dos `.pt` no Google Drive (`/content/drive/MyDrive/physdual-gnn/cache/esm_embeddings`) foi executada: encontrou `430` arquivos no total (`429` sequências únicas esperadas + `1` resíduo `4637bffbde58d549.pt` com shape `[65, 320]` e sem campo `windowed` gerado por `scripts/smoke_test.py` via `esm2_t6_8M_UR50D` na raiz do cache), `83/83` sequências únicas `> 1022 aa` com `windowed=True` (`70 + 42 - 29` compartilhadas = `83`, contra `112` por soma de dataset) e `0` erros entre os `429` tensores `[len(seq), 1280]` da Fase 1.",
+        f"   - **Única lacuna não recomputável localmente:** curvas por época (`history`) dos 43 runs `v1_seeds` originais. Já a auditoria física completa dos `.pt` no Google Drive (`/content/drive/MyDrive/physdual-gnn/cache/esm_embeddings/esm2_t33_650M_UR50D`) foi executada e aprovada (`all_checks_passed: true`): **`429/429`** arquivos presentes (`0` ausentes), **`83/83`** sequências únicas `> 1022 aa` com `windowed=True` (`0` sem campo), **`0` erros de `weights_only=True`**, **`0` erros de `dtype=fp16`**, **`0` ocorrências de `NaN`/`Inf`**, **`0` erros de shape/metadado `dim=1280`**, **`0` divergências de `seq_len` contra os CSVs** e `0` resíduos na raiz.",
         f"7. **Limpeza de inchaço em `baseline_graphdta_gin_kiba_random.json`:**",
         f"   - Removido `oof_predictions` de `per_seed_results` em `scripts/run_phase2_baseline.py` (`aggregate_seed_runs`) e no arquivo local (reduzido de `~10,1 MB` para `{kiba_agg_bytes:,} bytes`).",
         "",
