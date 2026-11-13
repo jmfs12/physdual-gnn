@@ -242,3 +242,53 @@ def test_bootstrap_grouped_comparison():
     assert "ci_95" in res["delta_mse"]
     assert len(res["delta_mse"]["ci_95"]) == 2
 
+
+def test_bootstrap_grouped_comparison_exact_match_with_naive():
+    """Garante equivalência numérica exata da versão matricial contra reamostragem ingênua."""
+    import numpy as np
+    import pandas as pd
+    from physdual.eval.metrics import compute_ci
+
+    rng = np.random.RandomState(7)
+    rows = []
+    for g in range(6):
+        for _ in range(8):
+            yt = float(rng.choice([5.0, 5.0, 6.5, 8.0]))  # com empates
+            ym = float(yt + rng.randn() * 0.4)
+            yb = float(5.5 + 0.1 * g)  # constante dentro de alguns grupos
+            rows.append({"group": f"G{g}", "y_true": yt, "y_pred": ym, "y_base": yb})
+    oof_df = pd.DataFrame(rows)
+
+    fast_res = bootstrap_grouped_comparison(
+        oof_df,
+        group_col="group",
+        model_col="y_pred",
+        baseline_col="y_base",
+        target_col="y_true",
+        n_bootstraps=30,
+        seed=123,
+    )
+
+    # Executa referência ingênua com mesma semente
+    unique_c = np.array(sorted(oof_df["group"].unique()))
+    cluster_indices = oof_df.groupby("group").indices
+    yt_all = oof_df["y_true"].values
+    ym_all = oof_df["y_pred"].values
+    yb_all = oof_df["y_base"].values
+
+    rng_ref = np.random.RandomState(123)
+    dmse_ref, dci_ref = [], []
+    for _ in range(30):
+        sampled = rng_ref.choice(unique_c, size=len(unique_c), replace=True)
+        idx = np.concatenate([cluster_indices[c] for c in sampled])
+        dmse_ref.append(
+            float(np.mean((yt_all[idx] - ym_all[idx]) ** 2) - np.mean((yt_all[idx] - yb_all[idx]) ** 2))
+        )
+        dci_ref.append(compute_ci(yt_all[idx], ym_all[idx]) - compute_ci(yt_all[idx], yb_all[idx]))
+
+    assert fast_res["delta_mse"]["mean"] == pytest.approx(float(np.mean(dmse_ref)), abs=1e-10)
+    assert fast_res["delta_mse"]["std"] == pytest.approx(float(np.std(dmse_ref, ddof=1)), abs=1e-10)
+    assert fast_res["delta_ci"]["mean"] == pytest.approx(float(np.mean(dci_ref)), abs=1e-10)
+    assert fast_res["delta_ci"]["std"] == pytest.approx(float(np.std(dci_ref, ddof=1)), abs=1e-10)
+
+
