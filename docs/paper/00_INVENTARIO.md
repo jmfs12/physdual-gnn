@@ -1,7 +1,7 @@
 # Passo 0 — Inventário e Auditoria de Proveniência (Fases 1 e 2)
 
 - **Gerado automaticamente por:** `scripts/paper/build_inventory_and_repro.py`
-- **Commit HEAD do repositório:** `c8ddd87`
+- **Commit HEAD do repositório:** `bd5feaf`
 - **Versões de pipeline identificadas:**
   - **Featurizador molecular:** `['v2_onehot78_l1norm']` (`configs/base.yaml`: `v2_onehot78_l1norm`)
   - **Cache ESM-2 configurado:** `esm2_t33_650M_UR50D` (`esm_dim=1280`, `max_len=1022`, `overlap=256`, `fp16_inference=True`)
@@ -26,7 +26,7 @@
 | `data/processed/{davis,kiba}_drug_graphs.pt` | Fase 1 | legado / cópia padrão | `gitignored (local)` | completo |
 | `data/processed/splits/*.json` (40 arquivos) | Fase 1/2 | 30 `v1_seeds` + 10 `v2_kfold` | `gitignored (local)` | completo (zero vazamento por conteúdo) |
 | `cache/esm_embeddings/` | Fase 1 | `esm2_t33_650M_UR50D`, `esm_dim=1280` | `gitignored` | ausente localmente (auditado no Google Drive: 429/429 .pt [len(seq), 1280] e 83/83 windowed íntegros; 1 resíduo smoke_test na raiz) |
-| `scripts/paper/audit_esm_cache_colab.py` | Fase 1/2 (auditoria) | Colab / Drive (`esm2_t33_650M_UR50D/*.pt`, `windowed=83` global / `112` por dataset, `[len(seq), 1280]`) | `c8ddd87` | executado no Drive (429/429 válidos; script corrigido para isolar resíduo smoke_test) |
+| `scripts/paper/audit_esm_cache_colab.py` | Fase 1/2 (auditoria) | Colab / Drive (`esm2_t33_650M_UR50D/*.pt`, `windowed=83` global / `112` por dataset, `[len(seq), 1280]`) | `bd5feaf` | executado no Drive (429/429 válidos; script corrigido para isolar resíduo smoke_test) |
 | `scripts/paper/cpu_audits.py` + `docs/paper/cpu_audits.json` | Fase 1/2 (auditoria CPU) | Noise floor, `pKd>5`, marginais/kNN `v1`, timing limpo, seq-id Davis | `64cae10` | completo (recomputado em CPU a partir de CSVs + splits) |
 | `outputs/logs/phase1_summary_report.json` | Fase 1 | datasets=['davis', 'kiba'], `windowed_sequences=112` | `gitignored (local)` | completo (davis, kiba; janelas=112) |
 | `outputs/results/phase2_timing_benchmark.json` | Fase 2 | NVIDIA L4, 3 épocas | `gitignored (local)` | completo |
@@ -97,6 +97,8 @@
 
 | Hash | Data e Mensagem |
 | :--- | :--- |
+| `bd5feaf` | 2026-11-13 — feat(paper): validar fp16, finitude NaN/Inf, dim 1280 e seq_len vs CSV no auditor ESM-2 |
+| `0db79f8` | 2026-11-13 — docs(paper): registrar auditoria do cache ESM-2 no Drive (429/429 validos, 83/83 windowed) |
 | `c8ddd87` | 2026-11-13 — fix(paper): corrigir auditor ESM-2 para subpasta do modelo e contagem global 83 |
 | `64cae10` | 2026-11-13 — docs(paper): consolidar pacote cientifico rastreavel das Fases 1 e 2 (T1-T8, F1-F6 e auditorias CPU) |
 | `f3c0b0e` | 2026-11-13 — feat(paper): adicionar auditorias em CPU, scripts do pacote cientifico e validacoes pytest |
@@ -110,5 +112,3 @@
 | `6e8f26f` | 2026-11-12 — fix(splits,notebook): aceitar group_col e random_state em create_group_kfold_splits e tornar setup de paths robusto |
 | `172b7a1` | 2026-11-12 — feat(phase2): implementar GroupKFold 5-fold Davis, baselines marginais/kNN, OOF e extensão KIBA (Opção C, ADR #13) |
 | `4743e01` | 2026-11-10 — fix(metrics): guard pearson and spearman against constant inputs within numerical tolerance |
-| `29f0977` | 2026-11-10 — docs(plan): mark Task 6 as completed in Phase 2 implementation plan |
-| `28cfedc` | 2026-11-10 — docs(phase2): document verified GraphDTA tables, ADR #10-#12, and duplicate/mutation analysis |
