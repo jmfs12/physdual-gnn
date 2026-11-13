@@ -1,7 +1,7 @@
 # Reprodutibilidade do Pacote do Artigo (Fases 1 e 2)
 
-- **Gerado em (UTC):** `2026-11-13T14:53:45Z`
-- **Commit HEAD:** `f3c0b0e`
+- **Gerado em (UTC):** `2026-11-13T15:09:15Z`
+- **Commit HEAD:** `c8ddd87`
 - **Variável de raiz de artefatos:** `PHYSDUAL_ROOT` (padrão local: raiz do repositório Git; no Colab: `/content/drive/MyDrive/physdual-gnn`).
 
 ## 1. Ordem Exata de Execução
@@ -23,7 +23,7 @@ python scripts/paper/build_all.py
 pytest tests/test_paper_pipeline.py
 
 # 5. (Executar no Google Colab com Drive montado) Auditoria física dos .pt do cache ESM-2
-python scripts/paper/audit_esm_cache_colab.py --cache-dir /content/drive/MyDrive/physdual-gnn/cache/esm_embeddings
+PHYSDUAL_ROOT=/content/drive/MyDrive/physdual-gnn python scripts/paper/audit_esm_cache_colab.py
 ```
 
 Ou invocando os módulos individuais do passo 3 na ordem exata:
