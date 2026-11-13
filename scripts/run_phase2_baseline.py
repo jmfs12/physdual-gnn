@@ -37,6 +37,7 @@ if str(SRC_DIR) not in sys.path:
 from physdual.data.datamodule import compute_aa_composition, get_dta_dataloaders  # noqa: E402
 from physdual.eval.metrics import (  # noqa: E402
     bootstrap_grouped_comparison,
+    bootstrap_grouped_comparisons,
     compute_all_metrics,
     compute_binary_classification_metrics,
     compute_knn_baselines,
@@ -655,13 +656,15 @@ def aggregate_kfold_runs(
         if run_file.exists():
             try:
                 data = json.loads(run_file.read_text(encoding="utf-8"))
-                per_fold_results[str(f)] = data
                 found_runs.append(data)
                 for rec in data.get("oof_predictions", []):
                     rec_copy = dict(rec)
                     if "fold" not in rec_copy or rec_copy["fold"] is None:
                         rec_copy["fold"] = f
                     all_oof_records.append(rec_copy)
+                # Omite oof_predictions duplicadas no JSON agregado (já consolidadas no CSV OOF)
+                summary_data = {k: v for k, v in data.items() if k != "oof_predictions"}
+                per_fold_results[str(f)] = summary_data
             except Exception as e:
                 print(f"[WARN] Erro ao carregar dobra {run_file}: {e}")
 
@@ -774,26 +777,21 @@ def aggregate_kfold_runs(
 
         if group_col in oof_df.columns:
             bootstrap_results["cluster_group_col"] = group_col
-            if "y_pred_drug_mean" in oof_df.columns:
-                bootstrap_results["vs_drug_mean"] = bootstrap_grouped_comparison(
+            baseline_cols = [c for c in ("y_pred_drug_mean", "y_pred_target_mean") if c in oof_df.columns]
+            if baseline_cols:
+                bs_map = bootstrap_grouped_comparisons(
                     oof_df,
                     group_col=group_col,
                     model_col="y_pred",
-                    baseline_col="y_pred_drug_mean",
+                    baseline_cols=baseline_cols,
                     target_col="y_true",
                     n_bootstraps=1000,
                     seed=42,
                 )
-            if "y_pred_target_mean" in oof_df.columns:
-                bootstrap_results["vs_target_mean"] = bootstrap_grouped_comparison(
-                    oof_df,
-                    group_col=group_col,
-                    model_col="y_pred",
-                    baseline_col="y_pred_target_mean",
-                    target_col="y_true",
-                    n_bootstraps=1000,
-                    seed=42,
-                )
+                if "y_pred_drug_mean" in bs_map:
+                    bootstrap_results["vs_drug_mean"] = bs_map["y_pred_drug_mean"]
+                if "y_pred_target_mean" in bs_map:
+                    bootstrap_results["vs_target_mean"] = bs_map["y_pred_target_mean"]
 
     if output_file is not None:
         out_path = Path(output_file)
@@ -1015,21 +1013,16 @@ def main(argv: list[str] | None = None) -> int:
         seed_trios: set[tuple[str, str, str]] = set()
         fold_trios: set[tuple[str, str, str]] = set()
 
+        import re
         for f in runs_dir.glob("*_*_*_seed*.json"):
-            parts = f.stem.split("_")
-            if len(parts) >= 4:
-                split_val = parts[-2]
-                ds_val = parts[-3]
-                model_val = "_".join(parts[:-3])
-                seed_trios.add((model_val, ds_val, split_val))
+            m = re.match(r"^(.+)_(davis|kiba)_(random|cold_drug|cold_target)_seed\d+$", f.stem)
+            if m:
+                seed_trios.add((m.group(1), m.group(2), m.group(3)))
 
         for f in runs_dir.glob("*_*_*_fold*.json"):
-            parts = f.stem.split("_")
-            if len(parts) >= 4:
-                split_val = parts[-2]
-                ds_val = parts[-3]
-                model_val = "_".join(parts[:-3])
-                fold_trios.add((model_val, ds_val, split_val))
+            m = re.match(r"^(.+)_(davis|kiba)_(random|cold_drug|cold_target)_fold\d+$", f.stem)
+            if m:
+                fold_trios.add((m.group(1), m.group(2), m.group(3)))
 
         if not seed_trios and not fold_trios:
             print(f"[INFO] Nenhum arquivo de run encontrado em {runs_dir}.")

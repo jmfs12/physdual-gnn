@@ -532,6 +532,129 @@ def compute_knn_baselines(
     }
 
 
+def bootstrap_grouped_comparisons(
+    oof_df: Any,
+    group_col: str,
+    model_col: str = "y_pred_model",
+    baseline_cols: list[str] | tuple[str, ...] = ("y_pred_baseline",),
+    target_col: str = "y_true",
+    n_bootstraps: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 42,
+) -> dict[str, dict[str, Any]]:
+    """Calcula intervalos de confiança por bootstrap agrupado para múltiplos baselines compartilhando T e C_modelo.
+
+    Otimizado em relação à chamada individual porque pré-computa T e C_modelo uma única vez
+    e ignora linhas cujo rótulo real é igual ao mínimo global (`yt == yt_min`), onde
+    nenhum par `yt_row > yt_col` pode ser positivo (reduzindo ~70% do custo no Davis).
+    """
+    b_cols = [c for c in baseline_cols if c in oof_df.columns]
+    if not b_cols:
+        return {}
+
+    raw_groups = np.asarray(oof_df[group_col])
+    unique_clusters, inv = np.unique(raw_groups, return_inverse=True)
+    n_clusters = len(unique_clusters)
+    if n_clusters < 2:
+        empty_res = {
+            "delta_mse": {"mean": 0.0, "ci_95": [0.0, 0.0]},
+            "delta_ci": {"mean": 0.0, "ci_95": [0.0, 0.0]},
+            "p_superiority_mse": 0.5,
+            "p_superiority_ci": 0.5,
+        }
+        return {col: dict(empty_res) for col in b_cols}
+
+    order = np.argsort(inv, kind="stable")
+    inv_sorted = inv[order]
+    yt = np.asarray(oof_df[target_col], dtype=np.float64)[order]
+    ym = np.asarray(oof_df[model_col], dtype=np.float64)[order]
+    yb_map = {col: np.asarray(oof_df[col], dtype=np.float64)[order] for col in b_cols}
+
+    counts = np.bincount(inv_sorted, minlength=n_clusters)
+    starts = np.zeros(n_clusters, dtype=np.int64)
+    starts[1:] = np.cumsum(counts)[:-1]
+
+    sse_m = np.add.reduceat((yt - ym) ** 2, starts)
+    sse_b_map = {col: np.add.reduceat((yt - yb) ** 2, starts) for col, yb in yb_map.items()}
+
+    T = np.zeros((n_clusters, n_clusters), dtype=np.float64)
+    Cm = np.zeros((n_clusters, n_clusters), dtype=np.float64)
+    Cb_map = {col: np.zeros((n_clusters, n_clusters), dtype=np.float64) for col in b_cols}
+
+    yt_min = float(np.min(yt))
+    chunk_size = 500
+    for i in range(n_clusters):
+        c_start = int(starts[i])
+        c_end = c_start + int(counts[i])
+        # Filtra previamente linhas do cluster acima do piso mínimo global (ex.: > 5.0 em Davis)
+        cluster_gt_mask = yt[c_start:c_end] > yt_min
+        if not np.any(cluster_gt_mask):
+            continue
+        idx_gt = np.nonzero(cluster_gt_mask)[0] + c_start
+        for pos in range(0, len(idx_gt), chunk_size):
+            sub_idx = idx_gt[pos : pos + chunk_size]
+            dt = yt[sub_idx, None] > yt[None, :]
+            ym_r = ym[sub_idx, None]
+
+            T[i] += np.add.reduceat(dt.sum(axis=0), starts)
+            Cm[i] += np.add.reduceat(
+                (dt & (ym_r > ym[None, :])).sum(axis=0) + 0.5 * (dt & (ym_r == ym[None, :])).sum(axis=0),
+                starts,
+            )
+            for col, yb in yb_map.items():
+                yb_r = yb[sub_idx, None]
+                Cb_map[col][i] += np.add.reduceat(
+                    (dt & (yb_r > yb[None, :])).sum(axis=0) + 0.5 * (dt & (yb_r == yb[None, :])).sum(axis=0),
+                    starts,
+                )
+
+    rng = np.random.RandomState(int(seed))
+    W = np.zeros((n_bootstraps, n_clusters), dtype=np.float64)
+    for b in range(n_bootstraps):
+        sampled = rng.choice(n_clusters, size=n_clusters, replace=True)
+        W[b] = np.bincount(sampled, minlength=n_clusters)
+
+    n_bs = np.maximum(W @ counts.astype(np.float64), 1.0)
+    mse_m_bs = (W @ sse_m) / n_bs
+
+    T_bs = np.sum((W @ T) * W, axis=1)
+    Cm_bs = np.sum((W @ Cm) * W, axis=1)
+    ci_m_bs = np.where(T_bs > 0, Cm_bs / T_bs, 0.5)
+
+    low_p = (alpha / 2.0) * 100
+    high_p = (1.0 - alpha / 2.0) * 100
+
+    results: dict[str, dict[str, Any]] = {}
+    for col in b_cols:
+        arr_mse = mse_m_bs - (W @ sse_b_map[col]) / n_bs
+        Cb_bs = np.sum((W @ Cb_map[col]) * W, axis=1)
+        ci_b_bs = np.where(T_bs > 0, Cb_bs / T_bs, 0.5)
+        arr_ci = ci_m_bs - ci_b_bs
+
+        ci_mse = [float(np.percentile(arr_mse, low_p)), float(np.percentile(arr_mse, high_p))]
+        ci_ci = [float(np.percentile(arr_ci, low_p)), float(np.percentile(arr_ci, high_p))]
+
+        results[col] = {
+            "delta_mse": {
+                "mean": float(np.mean(arr_mse)),
+                "std": float(np.std(arr_mse, ddof=1)) if n_bootstraps > 1 else 0.0,
+                "ci_95": ci_mse,
+                "wins": int(np.sum(arr_mse < 0)),
+                "total_bootstraps": n_bootstraps,
+            },
+            "delta_ci": {
+                "mean": float(np.mean(arr_ci)),
+                "std": float(np.std(arr_ci, ddof=1)) if n_bootstraps > 1 else 0.0,
+                "ci_95": ci_ci,
+                "wins": int(np.sum(arr_ci > 0)),
+                "total_bootstraps": n_bootstraps,
+            },
+            "p_superiority_mse": float(np.mean(arr_mse < 0)),
+            "p_superiority_ci": float(np.mean(arr_ci > 0)),
+        }
+    return results
+
+
 def bootstrap_grouped_comparison(
     oof_df: Any,
     group_col: str,
@@ -542,98 +665,15 @@ def bootstrap_grouped_comparison(
     alpha: float = 0.05,
     seed: int = 42,
 ) -> dict[str, Any]:
-    """Calcula intervalo de confiança por bootstrap agrupado (cluster-level) para Delta MSE e Delta CI.
-
-    Utiliza pré-computação matricial exata no nível de cluster (w^T C w / w^T T w),
-    produzindo resultado idêntico à reamostragem ingênua em O(N^2) por iteração,
-    porém reduzindo 1000 reamostragens de ~15-50 minutos para poucos segundos.
-    """
-    raw_groups = np.asarray(oof_df[group_col])
-    unique_clusters, inv = np.unique(raw_groups, return_inverse=True)
-    n_clusters = len(unique_clusters)
-    if n_clusters < 2:
-        return {
-            "delta_mse": {"mean": 0.0, "ci_95": [0.0, 0.0]},
-            "delta_ci": {"mean": 0.0, "ci_95": [0.0, 0.0]},
-            "p_superiority_mse": 0.5,
-            "p_superiority_ci": 0.5,
-        }
-
-    # Ordena amostras por cluster para reduzir blocos contíguos via np.add.reduceat
-    order = np.argsort(inv, kind="stable")
-    inv_sorted = inv[order]
-    yt = np.asarray(oof_df[target_col], dtype=np.float64)[order]
-    ym = np.asarray(oof_df[model_col], dtype=np.float64)[order]
-    yb = np.asarray(oof_df[baseline_col], dtype=np.float64)[order]
-
-    counts = np.bincount(inv_sorted, minlength=n_clusters)
-    starts = np.zeros(n_clusters, dtype=np.int64)
-    starts[1:] = np.cumsum(counts)[:-1]
-
-    sse_m = np.add.reduceat((yt - ym) ** 2, starts)
-    sse_b = np.add.reduceat((yt - yb) ** 2, starts)
-
-    T = np.zeros((n_clusters, n_clusters), dtype=np.float64)
-    Cm = np.zeros((n_clusters, n_clusters), dtype=np.float64)
-    Cb = np.zeros((n_clusters, n_clusters), dtype=np.float64)
-
-    chunk_size = 500
-    for i in range(n_clusters):
-        c_start = int(starts[i])
-        c_end = c_start + int(counts[i])
-        for s in range(c_start, c_end, chunk_size):
-            e = min(s + chunk_size, c_end)
-            dt = yt[s:e, None] > yt[None, :]
-            ym_r = ym[s:e, None]
-            yb_r = yb[s:e, None]
-
-            T[i] += np.add.reduceat(dt.sum(axis=0), starts)
-            Cm[i] += np.add.reduceat(
-                (dt & (ym_r > ym[None, :])).sum(axis=0) + 0.5 * (dt & (ym_r == ym[None, :])).sum(axis=0),
-                starts,
-            )
-            Cb[i] += np.add.reduceat(
-                (dt & (yb_r > yb[None, :])).sum(axis=0) + 0.5 * (dt & (yb_r == yb[None, :])).sum(axis=0),
-                starts,
-            )
-
-    rng = np.random.RandomState(int(seed))
-    W = np.zeros((n_bootstraps, n_clusters), dtype=np.float64)
-    for b in range(n_bootstraps):
-        sampled = rng.choice(n_clusters, size=n_clusters, replace=True)
-        W[b] = np.bincount(sampled, minlength=n_clusters)
-
-    n_bs = np.maximum(W @ counts.astype(np.float64), 1.0)
-    arr_mse = (W @ sse_m) / n_bs - (W @ sse_b) / n_bs
-
-    T_bs = np.sum((W @ T) * W, axis=1)
-    Cm_bs = np.sum((W @ Cm) * W, axis=1)
-    Cb_bs = np.sum((W @ Cb) * W, axis=1)
-    ci_m_bs = np.where(T_bs > 0, Cm_bs / T_bs, 0.5)
-    ci_b_bs = np.where(T_bs > 0, Cb_bs / T_bs, 0.5)
-    arr_ci = ci_m_bs - ci_b_bs
-
-    low_p = (alpha / 2.0) * 100
-    high_p = (1.0 - alpha / 2.0) * 100
-
-    ci_mse = [float(np.percentile(arr_mse, low_p)), float(np.percentile(arr_mse, high_p))]
-    ci_ci = [float(np.percentile(arr_ci, low_p)), float(np.percentile(arr_ci, high_p))]
-
-    return {
-        "delta_mse": {
-            "mean": float(np.mean(arr_mse)),
-            "std": float(np.std(arr_mse, ddof=1)) if n_bootstraps > 1 else 0.0,
-            "ci_95": ci_mse,
-            "wins": int(np.sum(arr_mse < 0)),
-            "total_bootstraps": n_bootstraps,
-        },
-        "delta_ci": {
-            "mean": float(np.mean(arr_ci)),
-            "std": float(np.std(arr_ci, ddof=1)) if n_bootstraps > 1 else 0.0,
-            "ci_95": ci_ci,
-            "wins": int(np.sum(arr_ci > 0)),
-            "total_bootstraps": n_bootstraps,
-        },
-        "p_superiority_mse": float(np.mean(arr_mse < 0)),
-        "p_superiority_ci": float(np.mean(arr_ci > 0)),
-    }
+    """Calcula intervalo de confiança por bootstrap agrupado (cluster-level) para Delta MSE e Delta CI."""
+    res = bootstrap_grouped_comparisons(
+        oof_df=oof_df,
+        group_col=group_col,
+        model_col=model_col,
+        baseline_cols=[baseline_col],
+        target_col=target_col,
+        n_bootstraps=n_bootstraps,
+        alpha=alpha,
+        seed=seed,
+    )
+    return res[baseline_col]
