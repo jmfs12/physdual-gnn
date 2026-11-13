@@ -621,7 +621,7 @@ def aggregate_kfold_runs(
     model: str,
     dataset: str,
     split: str,
-    runs_dir: Path | str,
+    runs_dir: Path | str | None = None,
     folds: list[int] | None = None,
     oof_dir: Path | str | None = None,
     output_file: Path | str | None = None,
@@ -632,7 +632,7 @@ def aggregate_kfold_runs(
         model: Identificador do modelo ('graphdta_gin', 'graphdta_cnn3').
         dataset: Dataset ('davis', 'kiba').
         split: Tipo de partição ('cold_drug', 'cold_target', 'random').
-        runs_dir: Diretório onde os JSONs individuais de cada dobra residem.
+        runs_dir: Diretório onde os JSONs individuais de cada dobra residem (padrão via config).
         folds: Lista de dobras (padrão: [0, 1, 2, 3, 4]).
         oof_dir: Diretório para gravação da tabela CSV consolidada com previsões OOF.
         output_file: Caminho de saída opcional para o JSON consolidado.
@@ -641,7 +641,9 @@ def aggregate_kfold_runs(
         Dicionário com per_fold_results, per_fold_mean_std, global_oof_metrics,
         binary_classification_metrics e bootstrap_analysis.
     """
-    runs_path = Path(runs_dir)
+    cfg = load_config()
+    base_root = Path(cfg.get("project_root", get_project_root()))
+    runs_path = Path(runs_dir) if runs_dir is not None else (base_root / cfg["paths"]["results_dir"] / "runs")
     target_folds = [0, 1, 2, 3, 4] if folds is None else folds
 
     per_fold_results: dict[str, Any] = {}
@@ -688,8 +690,6 @@ def aggregate_kfold_runs(
     }
 
     # 2. Consolidação OOF (Out-Of-Fold)
-    cfg = load_config()
-    base_root = Path(cfg.get("project_root", get_project_root()))
     if oof_dir is None:
         oof_path = base_root / cfg["paths"]["results_dir"] / "oof"
     else:
@@ -712,21 +712,34 @@ def aggregate_kfold_runs(
                 clean_df = pd.read_csv(clean_csv)
                 t_to_seq = dict(zip(clean_df["target_id"].astype(str), clean_df["sequence"]))
                 d_to_smi = dict(zip(clean_df["drug_id"].astype(str), clean_df["smiles"]))
-                if "sequence" not in oof_df.columns or oof_df["sequence"].nunique() < 2:
+                if (
+                    "sequence" not in oof_df.columns
+                    or oof_df["sequence"].nunique() < 2
+                    or (oof_df["sequence"].fillna("").astype(str).str.len() == 0).any()
+                ):
                     if "target_id" in oof_df.columns:
                         oof_df["sequence"] = oof_df["target_id"].astype(str).map(t_to_seq).fillna("")
-                if "smiles" not in oof_df.columns or oof_df["smiles"].nunique() < 2:
+                if (
+                    "smiles" not in oof_df.columns
+                    or oof_df["smiles"].nunique() < 2
+                    or (oof_df["smiles"].fillna("").astype(str).str.len() == 0).any()
+                ):
                     if "drug_id" in oof_df.columns:
                         oof_df["smiles"] = oof_df["drug_id"].astype(str).map(d_to_smi).fillna("")
 
-                # Se y_pred_drug_mean ou y_pred_target_mean faltam ou são constantes, recalcula por dobra
+                # Checa unicidade por dobra para detectar baselines que caíram no fallback da média global
                 recalc_marginals = False
-                if "y_pred_drug_mean" not in oof_df.columns or oof_df["y_pred_drug_mean"].nunique() < 2:
-                    recalc_marginals = True
-                if "y_pred_target_mean" not in oof_df.columns or oof_df["y_pred_target_mean"].nunique() < 2:
-                    recalc_marginals = True
+                for col in ("y_pred_drug_mean", "y_pred_target_mean"):
+                    if col not in oof_df.columns or oof_df[col].nunique() < 2:
+                        recalc_marginals = True
+                    elif "fold" in oof_df.columns and oof_df.groupby("fold")[col].nunique().min() < 2:
+                        recalc_marginals = True
 
-                if recalc_marginals and splits_dir.exists():
+                ids_match = (
+                    "target_id" in oof_df.columns
+                    and bool(set(oof_df["target_id"].astype(str)).intersection(t_to_seq.keys()))
+                )
+                if recalc_marginals and splits_dir.exists() and ids_match:
                     for f in oof_df["fold"].unique():
                         sp_file = splits_dir / f"{dataset.lower()}_{split}_fold{int(f)}.json"
                         if sp_file.exists():

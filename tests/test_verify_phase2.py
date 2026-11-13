@@ -298,3 +298,99 @@ def test_run_phase2_baseline_extend_epochs_and_kfold_idempotence(tmp_path: Path)
         "graphdta_cnn3", "davis", "cold_drug", 0, runs_dir=runs_dir, protocol="kfold"
     )
 
+
+def test_kfold_aggregate_self_healing_missing_sequence_and_marginals(tmp_path: Path, monkeypatch):
+    """Valida a auto-recuperação de sequência e recálculo de médias marginais no K-Fold."""
+    import pandas as pd
+    from run_phase2_baseline import aggregate_kfold_runs
+
+    # Configura estrutura simulada de PHYSDUAL_ROOT
+    data_proc = tmp_path / "data" / "processed"
+    splits_dir = data_proc / "splits"
+    results_dir = tmp_path / "outputs" / "results"
+    runs_dir = results_dir / "runs"
+    splits_dir.mkdir(parents=True, exist_ok=True)
+    runs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Dataset sintético com 4 drogas e 4 alvos (16 pares) dividido em 2 dobras cold_drug
+    rows = []
+    for d in range(4):
+        for t in range(4):
+            rows.append({
+                "drug_id": f"D{d}",
+                "smiles": f"C{'C'*d}O",
+                "target_id": f"T{t}",
+                "sequence": f"M{'A'*t}K",
+                "affinity": 5.0 + 0.5 * d + 0.8 * t,
+            })
+    clean_df = pd.DataFrame(rows)
+    clean_df.to_csv(data_proc / "davis_clean.csv", index=False)
+
+    # Fold 0: drugs 0,1 em teste; drugs 2,3 em treino
+    # Fold 1: drugs 2,3 em teste; drugs 0,1 em treino
+    fold0_train = [i for i, r in enumerate(rows) if r["drug_id"] in ("D2", "D3")]
+    fold0_test = [i for i, r in enumerate(rows) if r["drug_id"] in ("D0", "D1")]
+    fold1_train = [i for i, r in enumerate(rows) if r["drug_id"] in ("D0", "D1")]
+    fold1_test = [i for i, r in enumerate(rows) if r["drug_id"] in ("D2", "D3")]
+
+    (splits_dir / "davis_cold_drug_fold0.json").write_text(
+        json.dumps({"train": fold0_train, "val": [], "test": fold0_test}), encoding="utf-8"
+    )
+    (splits_dir / "davis_cold_drug_fold1.json").write_text(
+        json.dumps({"train": fold1_train, "val": [], "test": fold1_test}), encoding="utf-8"
+    )
+
+    # Cria runs corrompidas: sequence="", y_pred_target_mean == y_pred_drug_mean == média global da dobra
+    for f, test_idx, gmean in [(0, fold0_test, 6.95), (1, fold1_test, 5.95)]:
+        oof = []
+        for idx in test_idx:
+            r = rows[idx]
+            oof.append({
+                "drug_id": r["drug_id"],
+                "target_id": r["target_id"],
+                "smiles": r["smiles"],
+                "sequence": "",  # ausente!
+                "y_true": r["affinity"],
+                "y_pred": r["affinity"] - 0.1,
+                "fold": f,
+                "y_pred_drug_mean": gmean,
+                "y_pred_target_mean": gmean,  # igual à média global da dobra (2 valores globais distintos!)
+            })
+        run_data = {
+            "model": "graphdta_cnn3",
+            "dataset": "davis",
+            "split": "cold_drug",
+            "fold": f,
+            "best_epoch": 10,
+            "total_epochs_run": 60,
+            "sec_per_epoch": 1.0,
+            "elapsed_sec": 60.0,
+            "test_metrics_full": {"ci": 0.9, "mse": 0.01, "rmse": 0.1, "pearson": 0.9, "spearman": 0.9, "rm2": 0.8},
+            "oof_predictions": oof,
+        }
+        (runs_dir / f"graphdta_cnn3_davis_cold_drug_fold{f}.json").write_text(
+            json.dumps(run_data), encoding="utf-8"
+        )
+
+    monkeypatch.setenv("PHYSDUAL_ROOT", str(tmp_path))
+
+    # Chamada SEM passar runs_dir explicitamente (testa padrão via config)
+    agg = aggregate_kfold_runs(
+        model="graphdta_cnn3",
+        dataset="davis",
+        split="cold_drug",
+        folds=[0, 1],
+    )
+
+    oof_df = pd.read_csv(agg["oof_csv_path"])
+    # Sequência recuperada e diferentes médias por alvo
+    assert oof_df["sequence"].nunique() == 4
+    assert oof_df["y_pred_target_mean"].nunique() > 2
+    assert not (oof_df["y_pred_drug_mean"] == oof_df["y_pred_target_mean"]).all()
+
+    # Bootstrap vs_target_mean deve diferir de vs_drug_mean
+    bs_drug = agg["bootstrap_analysis"]["vs_drug_mean"]
+    bs_target = agg["bootstrap_analysis"]["vs_target_mean"]
+    assert bs_drug["delta_mse"]["mean"] != bs_target["delta_mse"]["mean"]
+
+
