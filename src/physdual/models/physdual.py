@@ -2,9 +2,8 @@
 
 Implementa:
 - `ESMTargetEncoder`: Projeção regularizada de embeddings pré-computados do ESM-2
-  (`LayerNorm -> Dropout -> Linear -> GELU/ReLU -> LayerNorm -> Dropout`), com suporte
-  tanto a vetores já agregados `[B, esm_dim]` quanto a tensores por resíduo `[B, L, esm_dim]`
-  com máscara de padding opcional.
+  (`LayerNorm -> Dropout -> Linear -> GELU/ReLU -> LayerNorm -> Dropout`) sobre vetores
+  mean-pooled `[B, esm_dim]`.
 - `PhysDualPhase3`: Dual-encoder enxuto combinando `GINEncoder` (78d L1-norm) +
   `LayerNorm`, `ESMTargetEncoder` congelado e cabeça regressiva MLP.
 - `build_physdual_phase3_model`: Factory a partir do dicionário `configs/base.yaml`.
@@ -45,22 +44,11 @@ class ESMTargetEncoder(nn.Module):
         self.out_norm = nn.LayerNorm(self.output_dim)
         self.out_drop = nn.Dropout(self.dropout_out)
 
-    def forward(
-        self,
-        esm_emb: torch.Tensor,
-        esm_mask: torch.Tensor | None = None,
-    ) -> torch.Tensor:
-        """Projeta embeddings ESM-2 `[B, esm_dim]` ou `[B, L, esm_dim]` para `[B, output_dim]`."""
+    def forward(self, esm_emb: torch.Tensor) -> torch.Tensor:
+        """Projeta embeddings mean-pooled ESM-2 `[B, esm_dim]` para `[B, output_dim]`."""
         x = esm_emb.float()
-        if x.ndim == 3:
-            if esm_mask is not None:
-                mask = esm_mask.to(device=x.device, dtype=x.dtype).unsqueeze(-1)
-                denom = mask.sum(dim=1).clamp(min=1.0)
-                x = (x * mask).sum(dim=1) / denom
-            else:
-                x = x.mean(dim=1)
-        elif x.ndim != 2:
-            raise ValueError(f"esm_emb deve ter 2 ou 3 dimensões, recebido shape {tuple(x.shape)}")
+        if x.ndim != 2:
+            raise ValueError(f"esm_emb deve ter 2 dimensões [B, esm_dim], recebido shape {tuple(x.shape)}")
 
         x = self.in_norm(x)
         x = self.in_drop(x)
@@ -126,11 +114,10 @@ class PhysDualPhase3(nn.Module):
         self,
         drug_batch: Batch | Data | torch.Tensor,
         target_esm: torch.Tensor,
-        target_esm_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Executa forward pass retornando afinidade predita com shape `[B]`."""
         z_drug = self.drug_norm(self.drug_encoder(drug_batch))
-        z_prot = self.target_encoder(target_esm, esm_mask=target_esm_mask)
+        z_prot = self.target_encoder(target_esm)
         fused = torch.cat([z_drug, z_prot], dim=1)
         return self.fusion_mlp(fused).squeeze(-1)
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import sys
 import tempfile
@@ -42,7 +43,7 @@ def run_phase3_smoke_verification(
     checks: dict[str, dict[str, Any]] = {
         "1_imports_and_symbols": {"passed": True, "errors": []},
         "2_config_phase3_contract": {"passed": True, "errors": []},
-        "3_model_forward_2d_and_3d": {"passed": True, "errors": []},
+        "3_model_forward_2d": {"passed": True, "errors": []},
         "4_checkpoint_roundtrip_weights_only": {"passed": True, "errors": []},
     }
 
@@ -84,16 +85,13 @@ def run_phase3_smoke_verification(
         g2 = Data(x=torch.randn(3, 78), edge_index=torch.tensor([[0, 1], [1, 2]], dtype=torch.long))
         drug_batch = Batch.from_data_list([g1, g2])
         esm_2d = torch.randn(2, 1280)
-        esm_3d = torch.randn(2, 5, 1280)
-        mask_3d = torch.tensor([[1, 1, 1, 0, 0], [1, 1, 1, 1, 1]], dtype=torch.bool)
         with torch.no_grad():
             o1 = model(drug_batch, esm_2d)
-            o2 = model(drug_batch, esm_3d, target_esm_mask=mask_3d)
-        if o1.shape != (2,) or o2.shape != (2,) or not torch.isfinite(o1).all() or not torch.isfinite(o2).all():
-            raise ValueError(f"Shapes ou finitude inválidos no forward: {o1.shape}, {o2.shape}")
+        if o1.shape != (2,) or not torch.isfinite(o1).all():
+            raise ValueError(f"Shape ou finitude inválidos no forward: {o1.shape}")
     except Exception as exc:
-        checks["3_model_forward_2d_and_3d"]["passed"] = False
-        checks["3_model_forward_2d_and_3d"]["errors"].append(str(exc))
+        checks["3_model_forward_2d"]["passed"] = False
+        checks["3_model_forward_2d"]["errors"].append(str(exc))
 
     try:
         from physdual.training.checkpoint import load_checkpoint, save_checkpoint
@@ -112,10 +110,27 @@ def run_phase3_smoke_verification(
     return {"mode": "smoke", "all_checks_passed": all_passed, "checks": checks}
 
 
+def _find_non_finite_fields(obj: Any, prefix: str = "") -> list[str]:
+    """Retorna caminhos de valores float não finitos (`NaN`/`Inf`)."""
+    bad: list[str] = []
+    if isinstance(obj, float):
+        if not math.isfinite(obj):
+            bad.append(prefix or "root")
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            sub = f"{prefix}.{k}" if prefix else str(k)
+            bad.extend(_find_non_finite_fields(v, sub))
+    elif isinstance(obj, list):
+        for idx, item in enumerate(obj):
+            bad.extend(_find_non_finite_fields(item, f"{prefix}[{idx}]"))
+    return bad
+
+
 def run_phase3_full_verification(
     config_path: str | Path | None = None,
     root: str | Path | None = None,
     require_paired_win: bool = True,
+    expected_units: int = 5,
 ) -> dict[str, Any]:
     """Audita todos os gates da Fase 3 contra os artefatos em disco."""
     cfg = load_config(config_path=config_path, root=root)
@@ -144,6 +159,13 @@ def run_phase3_full_verification(
             if req not in data or not data[req]:
                 gates["gate1_runs_integrity"]["passed"] = False
                 gates["gate1_runs_integrity"]["errors"].append(f"{rf.name}: campo '{req}' ausente ou vazio.")
+        for num_field in ("test_metrics_full", "val_metrics_at_best", "history"):
+            bad_vals = _find_non_finite_fields(data.get(num_field), num_field)
+            if bad_vals:
+                gates["gate1_runs_integrity"]["passed"] = False
+                gates["gate1_runs_integrity"]["errors"].append(
+                    f"{rf.name}: valores NaN/Inf encontrados em {bad_vals[:5]}"
+                )
         if not bool(data.get("test_isolation_verified", False)):
             gates["gate4_strict_test_isolation"]["passed"] = False
             gates["gate4_strict_test_isolation"]["errors"].append(f"{rf.name}: test_isolation_verified != True")
@@ -168,6 +190,13 @@ def run_phase3_full_verification(
     req_baselines = ("drug_mean_predictor", "knn_kmer_target", "knn_esm_target", "ridge_esm", "graphdta_cnn3")
     for af in agg_files:
         agg = json.loads(af.read_text(encoding="utf-8"))
+        proto = str(agg.get("protocol", "kfold"))
+        unit_count = int(agg.get("num_folds" if proto == "kfold" else "num_seeds", 0))
+        if unit_count < int(expected_units):
+            gates["gate2_aggregates_present"]["passed"] = False
+            gates["gate2_aggregates_present"]["errors"].append(
+                f"{af.name}: apenas {unit_count}/{expected_units} unidades consolidadas ({proto})."
+            )
         if not bool(agg.get("test_isolation_verified", False)):
             gates["gate4_strict_test_isolation"]["passed"] = False
             gates["gate4_strict_test_isolation"]["errors"].append(f"{af.name}: test_isolation_verified != True")
@@ -175,6 +204,12 @@ def run_phase3_full_verification(
         if "cold_target" in str(agg.get("split", "")).lower():
             for b in req_baselines:
                 if b not in paired:
+                    msg = f"{af.name}: baseline obrigatório '{b}' ausente em paired_vs_baselines."
+                    if require_paired_win:
+                        gates["gate6_paired_superiority"]["passed"] = False
+                        gates["gate6_paired_superiority"]["errors"].append(msg)
+                    else:
+                        gates["gate6_paired_superiority"]["warnings"].append(msg)
                     continue
                 d_mse = float(paired[b]["delta_mse_mean"])
                 d_ci = float(paired[b]["delta_ci_mean"])
@@ -196,6 +231,7 @@ def main() -> None:
     mode_grp.add_argument("--smoke", action="store_true")
     mode_grp.add_argument("--full", action="store_true")
     parser.add_argument("--no-require-paired-win", action="store_true")
+    parser.add_argument("--expected-units", type=int, default=5)
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--root", type=str, default=None)
     args = parser.parse_args()
@@ -209,6 +245,7 @@ def main() -> None:
         config_path=args.config,
         root=args.root,
         require_paired_win=not args.no_require_paired_win,
+        expected_units=args.expected_units,
     )
     print(json.dumps(report, indent=2, ensure_ascii=False))
     sys.exit(0 if report["all_gates_passed"] else 1)

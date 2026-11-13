@@ -286,6 +286,7 @@ def get_dta_dataloaders(
     fold: int | None = None,
     use_esm: bool = False,
     esm_cache_dir: Path | str | None = None,
+    esm_cache: dict[str, torch.Tensor] | None = None,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """Cria e retorna os DataLoaders `(train_loader, val_loader, test_loader)` para um dataset e split.
 
@@ -362,17 +363,35 @@ def get_dta_dataloaders(
     esm_model_name = str(config.get("esm", {}).get("model_name", "esm2_t33_650M_UR50D"))
     esm_dim = int(config.get("esm", {}).get("esm_dim", 1280))
     if use_esm:
-        resolved_esm_dir = resolve_esm_cache_dir(config=config, root=base_root, esm_cache_dir=esm_cache_dir)
         all_unique_seqs = pd.concat(
             [train_df["sequence"], val_df["sequence"], test_df["sequence"]],
             ignore_index=True,
         ).astype(str).unique()
-        shared_esm_cache = load_esm_mean_pool_dict(
-            all_unique_seqs,
-            model_name=esm_model_name,
-            cache_dir=resolved_esm_dir,
-            expected_dim=esm_dim,
-        )
+        if esm_cache is not None:
+            missing_seqs = [str(s) for s in all_unique_seqs if str(s) not in esm_cache]
+            if missing_seqs:
+                resolved_esm_dir = resolve_esm_cache_dir(
+                    config=config, root=base_root, esm_cache_dir=esm_cache_dir
+                )
+                esm_cache.update(
+                    load_esm_mean_pool_dict(
+                        missing_seqs,
+                        model_name=esm_model_name,
+                        cache_dir=resolved_esm_dir,
+                        expected_dim=esm_dim,
+                    )
+                )
+            shared_esm_cache = esm_cache
+        else:
+            resolved_esm_dir = resolve_esm_cache_dir(
+                config=config, root=base_root, esm_cache_dir=esm_cache_dir
+            )
+            shared_esm_cache = load_esm_mean_pool_dict(
+                all_unique_seqs,
+                model_name=esm_model_name,
+                cache_dir=resolved_esm_dir,
+                expected_dim=esm_dim,
+            )
 
     train_ds = DTADataset(
         train_df,

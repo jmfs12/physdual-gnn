@@ -187,5 +187,141 @@ def test_verify_phase3_smoke_and_full_gates(tmp_path: Path, monkeypatch):
         root=tmp_path,
     )
 
-    full_report = run_phase3_full_verification(root=tmp_path, require_paired_win=False)
+    full_report = run_phase3_full_verification(root=tmp_path, require_paired_win=False, expected_units=2)
     assert full_report["all_gates_passed"] is True
+
+
+def test_run_phase3_seeds_cli_yaml_overrides_root_and_shared_esm_cache(tmp_path: Path, monkeypatch):
+    """Valida `protocol='seeds'`, reutilização de `esm_cache`, `root=` em `run_single_unit` e CLI `--config`."""
+    import copy
+    import yaml
+    from run_phase3_physdual import aggregate_phase3_seed_runs, main as phase3_main, run_single_unit
+
+    monkeypatch.setenv("PHYSDUAL_ROOT", str(tmp_path))
+    cfg, esm_dir = _create_synthetic_phase3_workspace(tmp_path)
+    splits_dir = tmp_path / "data" / "processed" / "splits"
+    split_payload = json.loads((splits_dir / "davis_cold_target_seqid30_fold0.json").read_text(encoding="utf-8"))
+    (splits_dir / "davis_random_seed0.json").write_text(json.dumps(split_payload), encoding="utf-8")
+    (splits_dir / "davis_random_seed1.json").write_text(json.dumps(split_payload), encoding="utf-8")
+
+    # 1. Config customizado passado via CLI --config não deve ser sobrescrito por defaults do argparse
+    custom_cfg = copy.deepcopy(cfg)
+    custom_cfg["paths"] = {
+        "data_dir": "data",
+        "raw_data_dir": "data/raw",
+        "processed_data_dir": "data/processed",
+        "cache_dir": "cache",
+        "esm_cache_dir": "cache/esm_embeddings",
+        "outputs_dir": "outputs",
+        "checkpoints_dir": "outputs/checkpoints",
+        "results_dir": "outputs/results",
+        "logs_dir": "outputs/logs",
+    }
+    custom_cfg["physdual_phase3"]["training"]["lr"] = 0.00025
+    custom_cfg["physdual_phase3"]["training"]["weight_decay"] = 0.02
+    custom_cfg_path = tmp_path / "custom_phase3.yaml"
+    custom_cfg_path.write_text(yaml.safe_dump(custom_cfg), encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_phase3_physdual.py",
+            "--protocol",
+            "seeds",
+            "--dataset",
+            "davis",
+            "--split",
+            "random",
+            "--seeds",
+            "0,1",
+            "--config",
+            str(custom_cfg_path),
+            "--root",
+            str(tmp_path),
+            "--esm-cache-dir",
+            str(esm_dir),
+            "--device",
+            "cpu",
+            "--smoke",
+        ],
+    )
+    phase3_main()
+
+    seed0_path = tmp_path / "outputs" / "results" / "runs" / "physdual_gin_esm_mlp_davis_random_seed0.json"
+    agg_path = tmp_path / "outputs" / "results" / "phase3_physdual_gin_esm_mlp_davis_random.json"
+    assert seed0_path.exists()
+    assert agg_path.exists()
+    seed0_data = json.loads(seed0_path.read_text(encoding="utf-8"))
+    assert seed0_data["effective_config"]["lr"] == pytest.approx(0.00025)
+    assert seed0_data["effective_config"]["weight_decay"] == pytest.approx(0.02)
+
+    agg_data = aggregate_phase3_seed_runs(dataset="davis", split="random", seeds=[0, 1], config=cfg, root=tmp_path)
+    assert agg_data["protocol"] == "seeds"
+    assert agg_data["num_seeds"] == 2
+    assert "ci" in agg_data["aggregated"]
+
+    # 2. run_single_unit com root= explicitamente diferente de cfg['project_root'] + shared_cache
+    alt_root = tmp_path / "alt_ws"
+    _create_synthetic_phase3_workspace(alt_root)
+    (alt_root / "data" / "processed" / "splits" / "davis_random_seed0.json").write_text(
+        json.dumps(split_payload), encoding="utf-8"
+    )
+    shared_cache: dict = {}
+    run_single_unit(
+        dataset_name="davis",
+        split_type="random",
+        protocol="seeds",
+        seed=0,
+        config=cfg,  # project_root ainda aponta para tmp_path
+        root=alt_root,
+        esm_cache_dir=alt_root / "cache" / "esm_embeddings",
+        esm_cache=shared_cache,
+        device="cpu",
+        smoke=True,
+    )
+    assert len(shared_cache) == 4
+    assert (alt_root / "outputs" / "results" / "runs" / "physdual_gin_esm_mlp_davis_random_seed0.json").exists()
+
+
+def test_verify_phase3_full_rejects_nan_incomplete_and_missing_baselines(tmp_path: Path, monkeypatch):
+    """Garante que Gate 1 (NaN), Gate 2 (incompleto) e Gate 6 (baseline ausente) falham quando violados."""
+    from run_phase3_physdual import aggregate_phase3_kfold_runs, run_single_unit
+    from verify_phase3 import run_phase3_full_verification
+
+    monkeypatch.setenv("PHYSDUAL_ROOT", str(tmp_path))
+    cfg, esm_dir = _create_synthetic_phase3_workspace(tmp_path)
+    for fold in (0, 1):
+        run_single_unit(
+            dataset_name="davis",
+            split_type="cold_target_seqid30",
+            protocol="kfold",
+            fold=fold,
+            config=cfg,
+            root=tmp_path,
+            esm_cache_dir=esm_dir,
+            device="cpu",
+            smoke=True,
+        )
+    aggregate_phase3_kfold_runs(dataset="davis", split="cold_target_seqid30", folds=[0, 1], config=cfg, root=tmp_path)
+
+    # Gate 2 falha se esperar 5 dobras quando só existem 2
+    rep_incomplete = run_phase3_full_verification(root=tmp_path, require_paired_win=False, expected_units=5)
+    assert rep_incomplete["gates"]["gate2_aggregates_present"]["passed"] is False
+
+    # Gate 6 falha quando baseline obrigatório é removido e require_paired_win=True
+    agg_file = tmp_path / "outputs" / "results" / "phase3_physdual_gin_esm_mlp_davis_cold_target_seqid30_kfold.json"
+    agg_payload = json.loads(agg_file.read_text(encoding="utf-8"))
+    agg_payload["paired_vs_baselines"].pop("ridge_esm", None)
+    agg_file.write_text(json.dumps(agg_payload), encoding="utf-8")
+    rep_missing_b = run_phase3_full_verification(root=tmp_path, require_paired_win=True, expected_units=2)
+    assert rep_missing_b["gates"]["gate6_paired_superiority"]["passed"] is False
+    assert any("ridge_esm" in e for e in rep_missing_b["gates"]["gate6_paired_superiority"]["errors"])
+
+    # Gate 1 falha se test_metrics_full contiver NaN
+    run0_file = tmp_path / "outputs" / "results" / "runs" / "physdual_gin_esm_mlp_davis_cold_target_seqid30_fold0.json"
+    run0_payload = json.loads(run0_file.read_text(encoding="utf-8"))
+    run0_payload["test_metrics_full"]["mse"] = float("nan")
+    run0_file.write_text(json.dumps(run0_payload), encoding="utf-8")
+    rep_nan = run_phase3_full_verification(root=tmp_path, require_paired_win=False, expected_units=2)
+    assert rep_nan["gates"]["gate1_runs_integrity"]["passed"] is False

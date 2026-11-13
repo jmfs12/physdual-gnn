@@ -43,8 +43,8 @@ def test_physdual_phase3_requires_explicit_dims():
     assert sig_mod.parameters["esm_dim"].default is inspect.Parameter.empty
 
 
-def test_esm_target_encoder_2d_and_masked_3d():
-    """Valida projeção sobre vetor 2D [B, 1280] e pooling mascarado sobre 3D [B, L, 1280]."""
+def test_esm_target_encoder_2d_and_rejects_invalid_ndim():
+    """Valida projeção sobre vetor 2D [B, 1280] e rejeição de shapes != 2D."""
     torch.manual_seed(7)
     enc = ESMTargetEncoder(esm_dim=16, output_dim=8, dropout_in=0.0, dropout_out=0.0)
     enc.eval()
@@ -54,16 +54,8 @@ def test_esm_target_encoder_2d_and_masked_3d():
     assert out_2d.shape == (3, 8)
     assert torch.isfinite(out_2d).all()
 
-    # 3D com padding mascarado: posição mascarada extrema não deve contaminar a saída
-    seq_a = torch.ones(1, 3, 16)
-    seq_b = torch.cat([torch.ones(1, 3, 16), torch.full((1, 2, 16), 1e4)], dim=1)
-    mask_a = torch.tensor([[1, 1, 1]], dtype=torch.bool)
-    mask_b = torch.tensor([[1, 1, 1, 0, 0]], dtype=torch.bool)
-
-    out_a = enc(seq_a, esm_mask=mask_a)
-    out_b = enc(seq_b, esm_mask=mask_b)
-    assert out_a.shape == (1, 8)
-    assert torch.allclose(out_a, out_b, atol=1e-5)
+    with pytest.raises(ValueError, match="2 dimensões"):
+        enc(torch.ones(1, 3, 16))
 
 
 def test_physdual_phase3_forward_backward_and_small_batch_overfit():

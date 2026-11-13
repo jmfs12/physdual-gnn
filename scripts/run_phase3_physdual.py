@@ -109,9 +109,11 @@ def run_single_unit(
     seed: int | None = None,
     fold: int | None = None,
     config: dict[str, Any] | None = None,
+    root: Path | str | None = None,
     runs_dir: Path | str | None = None,
     checkpoints_base_dir: Path | str | None = None,
     esm_cache_dir: Path | str | None = None,
+    esm_cache: dict[str, torch.Tensor] | None = None,
     force: bool = False,
     device: str | torch.device = "auto",
     epochs: int | None = None,
@@ -134,16 +136,16 @@ def run_single_unit(
         unit_id = fold if fold is not None else (seed if seed is not None else 0)
 
     cfg = _apply_phase3_overrides(
-        config if config is not None else load_config(),
+        config if config is not None else load_config(root=root),
         esm_dropout_in=esm_dropout_in,
         prot_dropout=prot_dropout,
         mlp_dropout=mlp_dropout,
         prot_output_dim=prot_output_dim,
     )
-    base_root = Path(cfg.get("project_root", get_project_root()))
+    base_root = Path(root) if root is not None else Path(cfg.get("project_root", get_project_root()))
 
     if runs_dir is None:
-        runs_path = base_root / cfg["paths"]["results_dir"] / "runs"
+        runs_path = _resolve_output_dir(cfg, "results_dir", root=root) / "runs"
     else:
         runs_path = Path(runs_dir)
     runs_path.mkdir(parents=True, exist_ok=True)
@@ -195,7 +197,7 @@ def run_single_unit(
     )
 
     if checkpoints_base_dir is None:
-        ckpt_base = base_root / cfg["paths"]["checkpoints_dir"]
+        ckpt_base = _resolve_output_dir(cfg, "checkpoints_dir", root=root)
     else:
         ckpt_base = Path(checkpoints_base_dir)
 
@@ -221,6 +223,7 @@ def run_single_unit(
         fold=unit_id if protocol == "kfold" else None,
         use_esm=True,
         esm_cache_dir=esm_cache_dir,
+        esm_cache=esm_cache,
     )
 
     model = build_physdual_phase3_model(cfg)
@@ -617,12 +620,12 @@ def main() -> None:
     )
     parser.add_argument("--seeds", type=str, default="0,1,2,3,4")
     parser.add_argument("--folds", type=str, default="0,1,2,3,4")
-    parser.add_argument("--epochs", type=int, default=500)
-    parser.add_argument("--patience", type=int, default=50)
-    parser.add_argument("--davis-cold-patience", type=int, default=80)
-    parser.add_argument("--batch-size", type=int, default=512)
-    parser.add_argument("--lr", type=float, default=5e-4)
-    parser.add_argument("--weight-decay", type=float, default=1e-3)
+    parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--patience", type=int, default=None)
+    parser.add_argument("--davis-cold-patience", type=int, default=None)
+    parser.add_argument("--batch-size", type=int, default=None)
+    parser.add_argument("--lr", type=float, default=None)
+    parser.add_argument("--weight-decay", type=float, default=None)
     parser.add_argument("--esm-dropout-in", type=float, default=None)
     parser.add_argument("--prot-dropout", type=float, default=None)
     parser.add_argument("--mlp-dropout", type=float, default=None)
@@ -630,7 +633,7 @@ def main() -> None:
     parser.add_argument("--esm-cache-dir", type=str, default=None)
     parser.add_argument("--drive-checkpoint-dir", type=str, default=None)
     parser.add_argument("--device", type=str, default="auto")
-    parser.add_argument("--num-workers", type=int, default=2)
+    parser.add_argument("--num-workers", type=int, default=None)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--aggregate-only", action="store_true")
     parser.add_argument("--smoke", action="store_true")
@@ -675,6 +678,7 @@ def main() -> None:
         raise ValueError("Splits `cold_target_seqid30/40` requerem `--protocol kfold`.")
 
     units = _parse_int_list(args.folds if args.protocol == "kfold" else args.seeds)
+    shared_esm_cache: dict[str, torch.Tensor] = {}
     for sp in splits:
         for u in units:
             run_single_unit(
@@ -683,7 +687,9 @@ def main() -> None:
                 protocol=args.protocol,
                 unit_id=u,
                 config=cfg,
+                root=base_root,
                 esm_cache_dir=args.esm_cache_dir,
+                esm_cache=shared_esm_cache,
                 force=args.force,
                 device=args.device,
                 epochs=args.epochs,
