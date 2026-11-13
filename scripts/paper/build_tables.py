@@ -124,7 +124,10 @@ def build_t2(data_root: Path, tables_dir: Path) -> dict[str, Path]:
         "kiba": pd.read_csv(data_root / "data" / "processed" / "kiba_clean.csv"),
     }
     rows = []
-    for sp_file in sorted((data_root / "data" / "processed" / "splits").glob("*.json")):
+    for sp_file in sorted(
+        p for p in (data_root / "data" / "processed" / "splits").glob("*.json")
+        if "seqid" not in p.stem
+    ):
         sp = load_json_strict(sp_file)
         name = sp_file.stem
         ds = sp.get("dataset") or ("davis" if name.startswith("davis") else "kiba")

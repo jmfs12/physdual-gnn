@@ -13,11 +13,11 @@ Predição de afinidade droga-alvo (**DTA** — $pK_d$, $pK_i$, KIBA) com **Grap
 | **0** | Setup de Ambiente e Governança | **Concluída** | Bootstrap Colab + Drive, governança de dependências sem pin agressivo (ADRs #1-#7). |
 | **1** | Pipeline de Dados, Splits e Cache ESM-2 | **Concluída** | Ingestão autônoma DeepDTA, splits `random`/`cold_drug`/`cold_target` (5 seeds), grafos PyG e cache offline ESM-2 ([`docs/FASE1_DADOS.md`](docs/FASE1_DADOS.md), ADRs #8-#9). |
 | **2** | Baseline Oficial GraphDTA e Métricas | **Auditada / v2 Pronto** | Baseline oficial `GraphDTAGIN` e variante `GraphDTACNN3`, protocolo v1 auditado (Davis random reproduz o paper), protocolo v2 implementado (GroupKFold 5-fold Davis, baselines marginais/kNN, OOF, bootstrap agrupado e extensão KIBA, ADRs #10-#13). |
-| **3** | Dual-Encoder PhysDual (GIN + ESM-2) | *Planejada* | Fusão multimodal do encoder molecular GIN com embeddings evolutivos contextuais do ESM-2. |
+| **3** | Dual-Encoder Enxuto (`GIN + ESM-2 + MLP`) | *Em Revisão / Etapa 3.0* | Controles em CPU (`Ridge`/`kNN` sobre ESM-2), splits por identidade (`seqid30`/`seqid40`) e fusão multimodal com regularização forte. |
 | **4** | Cross-Attention e Interpretabilidade | *Planejada* | Mecanismo de atenção cruzada droga-resíduo para mapeamento de sítios catalíticos. |
 | **5** | Otimização de Hiperparâmetros e Eficiência | *Planejada* | Ajuste fino guiado e inferência acelerada em GPU. |
 | **6** | Restrições Físicas Covalentes (Opcional) | *Planejada* | Módulo indutivo analítico baseado em potenciais LJ e Coulomb. |
-| **7** | Resiliência a Mutações e Generalização | *Planejada* | Testes em mutantes pontuais de resistência clínica com sequências explícitas. |
+| **7** | Trabalho Futuro: Mutantes Curados (Fora do Artigo Atual) | *Adiada (Fora de Escopo Atual)* | Reconstrução externa com sequências selvagens/mutadas verificáveis (o Davis bruto colapsa `81 target_id`s em `18` sequências). |
 | **8** | Triagem Virtual em Larga Escala | *Planejada* | Triagem virtual para reposicionamento contra alvos selecionados. |
 | **9** | Relatório Científico e Apresentação | *Planejada* | Consolidação de resultados, benchmarks e documentação final. |
 

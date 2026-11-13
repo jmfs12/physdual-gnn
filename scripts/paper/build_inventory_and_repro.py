@@ -89,7 +89,7 @@ def build_inventory_and_repro() -> tuple[Path, Path]:
     run_files = sorted(runs_dir.glob("*.json"))
     agg_files = sorted(res_dir.glob("baseline_*.json"))
     oof_files = sorted(oof_dir.glob("*.csv")) if oof_dir.exists() else []
-    split_files = sorted(splits_dir.glob("*.json"))
+    split_files = sorted(p for p in splits_dir.glob("*.json") if "seqid" not in p.stem)
 
     if len(run_files) == 0:
         raise FileNotFoundError(f"Nenhum JSON de run encontrado em {runs_dir}")

@@ -41,6 +41,6 @@ Desenvolver o **PhysDual-GNN**, uma arquitetura baseada em Graph Neural Networks
 | **Fase 4** | **Representação Multiescala do Fármaco** | Codificadores GIN paralelos nos níveis atômico e de fragmentos funcionais (BRICS/RECAP via RDKit). |
 | **Fase 5** | **Grafo de Resíduos e Fusão Droga-Alvo** | Construção do grafo de resíduos proteicos (contatos ESM-2 vs. estruturas AlphaFold DB) e mecanismo de interação mútua (Cross-Attention / Bitransport). |
 | **Fase 6** | **Módulo de Física Opcional (Ablação)** | Implementação de termos analíticos regularizadores de Lennard-Jones e Coulomb no espaço latente de interação; estudo de ablação formal. |
-| **Fase 7** | **Consolidação Experimental e Mutações** | Avaliação completa em 5 seeds nos 3 splits (Davis e KIBA) e análise de sensibilidade a mutações pontuais de alvos. |
+| **Fase 7** | **Trabalho Futuro: Mutações Curadas (Fora do Artigo Atual)** | Avaliações com mutantes pontuais foram **retiradas do escopo do artigo atual** (exigiriam dataset externo/curado com sequências explícitas, pois no Davis `81 target_id`s colapsam em `18` sequências). |
 | **Fase 8** | **Triagem Virtual Exploratória** | Pipeline de inferência em lote com filtros físico-químicos/ADMET básicos e avaliação exploratória de hipóteses (incluindo avaliação crítica de pares como Donepezil/Brexpiprazole contra DYRK2). |
 | **Fase 9** | **Interpretabilidade (Grad-AAM) e Demonstração** | Mapeamento de ativação por gradiente sobre átomos/resíduos e interface opcional em Gradio. |

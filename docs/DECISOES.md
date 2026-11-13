@@ -180,5 +180,31 @@ Este documento registra as decisões técnicas tomadas na configuração do proj
   - *Negativas / Mitigações:*
     - Custo computacional adicional de 5 dobras para GIN e CNN3 no Davis (~1 a 2 horas no Colab), plenamente comportado dentro da cota gratuita de GPU.
 
+---
+
+## 14. Escopo Revisado da Fase 3 (`GIN + ESM-2 Congelado + MLP`), Partições por Identidade (`seqid30`/`seqid40`) e Limites de Generalização
+- **Contexto:**
+  1. As Fases 1 e 2 foram encerradas com auditoria completa (tag `phase2-closed`), comprovando que o cache `esm2_t33_650M_UR50D` (`429` sequências únicas, `fp16`, `dim = 1280`, `83` sequências com janela deslizante) está íntegro e que `GraphDTACNN3` superou `GraphDTAGIN` em Davis `cold_target`, mas permaneceu abaixo de `knn_kmer_target` (`CI = 0.8128`), sugerindo favorecimento por homologia intra-família nos splits frios sem filtro de identidade.
+  2. A auditoria da Fase 1/2 também identificou duas restrições estruturais nos dados: (i) `81 target_id`s do Davis colapsam em `18` sequências idênticas em `proteins.txt` (incluindo mutantes e variantes fosforiladas); e (ii) `179` sequências únicas são compartilhadas exatamente entre Davis e KIBA (`78,2%` do KIBA).
+- **Decisões:**
+  1. **Arquitetura Enxuta da Fase 3 (`GIN + ESM-2 + MLP`):**
+     - O modelo da Fase 3 utiliza exclusivamente `GINEncoder` (`78d L1-norm`) para o fármaco, embeddings congelados `esm2_t33_650M_UR50D` (`1280d`) com **regularização forte** (normalização, dropout elevado e `AdamW` com `weight_decay`) para a proteína, e `MLP` de interação.
+     - O módulo físico (Lennard-Jones/Coulomb) fica isolado para a **Fase 6 (ablação)** e atenção cruzada/contatos para as **Fases 4–5**.
+     - `best_epoch` e o gap treino-validação são monitorados como diagnóstico obrigatório de memorização proteica.
+  2. **Partições por Identidade de Sequência em Davis `cold_target` (`seqid30` e `seqid40`):**
+     - Identidade global calculada com `biopython==1.88` (`PairwiseAligner`, `mode="global"`, `BLOSUM62`, `open=-10.0`, `extend=-0.5`) usando `exact_matches / max(len_a, len_b)` e agrupamento por **ligação simples (*single-linkage* / componentes conexos)** com balanceamento guloso *LPT* em 5 dobras (`train=3`, `val=1`, `test=1`, todos mutuamente disjuntos abaixo do limiar).
+     - Adota-se **`seqid30`** (`120` clusters, `60` singletons; documentando que o *single-linkage* gera Dobra 0 monolítica com `1` cluster = `92` sequências / `6.664` pares por *chaining*) como split mais exigente e **`seqid40`** (`199` clusters, `109` singletons, maior cluster `11` sequências; `39–40` clusters e `72–83` sequências por dobra) como análise de sensibilidade balanceada.
+  3. **Controles Baratos em CPU Antes de Treinar Rede Neural:**
+     - Avaliação prévia de **`knn_esm_target`** (kNN $k=5$ por cosseno sobre pooling médio `1280d`) e **`ridge_esm`** / **`ridge_esm_target_only`** (seleção de $\alpha$ estritamente na validação) em `v2_kfold`, `seqid30`, `seqid40` e `KIBA v1_seeds`.
+  4. **Critério Objetivo de Sucesso da Fase 3:**
+     - Superar pareado por dobra/seed (`ΔMSE < 0` e `ΔCI > 0`) no Protocolo v2 e em `seqid30`/`seqid40`: marginais (`drug_mean`, `target_mean`), `knn_kmer` / `knn_tanimoto`, `knn_esm_target` / `ridge_esm`, e os baselines neurais `graphdta_gin` e `graphdta_cnn3`.
+  5. **Exclusão de Mutantes no Artigo Atual e Separação Estrita Davis vs. KIBA:**
+     - O artigo atual **não** realizará testes de predição de mutantes pontuais; quaisquer promessas sobre mutações são removidas do resumo/escopo vigente e o colapso `81 -> 18` permanece documentado como diagnóstico do benchmark Davis (`ADR #11`).
+     - Por compartilharem `179` sequências únicas e possuírem unidades/censura incompatíveis ($pK_d$ censurado em `5,0` vs. KIBA score), Davis e KIBA são mantidos estritamente separados (sem validação cruzada treino-em-um/teste-no-outro).
+- **Consequências Científicas e Técnicas:**
+  - *Positivas:* Elimina viés de homologia intra-família, separa o valor puro do pré-treino ESM-2 (`Ridge`/`kNN`) do ganho real da fusão multimodal neural (`GIN + ESM-2 + MLP`), e mantém o escopo do manuscrito enxuto e falsificável.
+  - *Negativas / Mitigações:* Em `seqid30`, o *chaining* concentra `92` quinases homólogas em uma única dobra (`Dobra 0`), exigindo leitura conjunta com `seqid40` para dissociar dificuldade por corte de identidade de eventual desequilíbrio de subfamília.
+
+
 
 
