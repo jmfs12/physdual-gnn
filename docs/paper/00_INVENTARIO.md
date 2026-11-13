@@ -1,7 +1,7 @@
 # Passo 0 — Inventário e Auditoria de Proveniência (Fases 1 e 2)
 
 - **Gerado automaticamente por:** `scripts/paper/build_inventory_and_repro.py`
-- **Commit HEAD do repositório:** `bd5feaf`
+- **Commit HEAD do repositório:** `1b82cfb`
 - **Versões de pipeline identificadas:**
   - **Featurizador molecular:** `['v2_onehot78_l1norm']` (`configs/base.yaml`: `v2_onehot78_l1norm`)
   - **Cache ESM-2 configurado:** `esm2_t33_650M_UR50D` (`esm_dim=1280`, `max_len=1022`, `overlap=256`, `fp16_inference=True`)
@@ -25,8 +25,8 @@
 | `data/processed/{davis,kiba}_drug_graphs_v2_onehot78_l1norm.pt` | Fase 1/2 | `v2_onehot78_l1norm` | `gitignored (local)` | completo (arquivos `.pt` presentes; sem `torch` no `.venv` local) |
 | `data/processed/{davis,kiba}_drug_graphs.pt` | Fase 1 | legado / cópia padrão | `gitignored (local)` | completo |
 | `data/processed/splits/*.json` (40 arquivos) | Fase 1/2 | 30 `v1_seeds` + 10 `v2_kfold` | `gitignored (local)` | completo (zero vazamento por conteúdo) |
-| `cache/esm_embeddings/` | Fase 1 | `esm2_t33_650M_UR50D`, `esm_dim=1280` | `gitignored` | ausente localmente (auditado no Google Drive: 429/429 .pt [len(seq), 1280] e 83/83 windowed íntegros; 1 resíduo smoke_test na raiz) |
-| `scripts/paper/audit_esm_cache_colab.py` | Fase 1/2 (auditoria) | Colab / Drive (`esm2_t33_650M_UR50D/*.pt`, `windowed=83` global / `112` por dataset, `[len(seq), 1280]`) | `bd5feaf` | executado no Drive (429/429 válidos; script corrigido para isolar resíduo smoke_test) |
+| `cache/esm_embeddings/` | Fase 1 | `esm2_t33_650M_UR50D`, `esm_dim=1280` | `gitignored` | ausente localmente (validado no Google Drive: 429/429 .pt fp16, 0 NaN/Inf, dim=1280, seq_len=len(seq), 83/83 windowed, all_checks_passed=true) |
+| `scripts/paper/audit_esm_cache_colab.py` | Fase 1/2 (auditoria) | Colab / Drive (`esm2_t33_650M_UR50D/*.pt`, `fp16`, `NaN/Inf=0`, `dim=1280`, `seq_len`, `windowed=83` global) | `bd5feaf` | executado no Drive (`all_checks_passed: true`, 429/429 válidos, 0 resíduos) |
 | `scripts/paper/cpu_audits.py` + `docs/paper/cpu_audits.json` | Fase 1/2 (auditoria CPU) | Noise floor, `pKd>5`, marginais/kNN `v1`, timing limpo, seq-id Davis | `64cae10` | completo (recomputado em CPU a partir de CSVs + splits) |
 | `outputs/logs/phase1_summary_report.json` | Fase 1 | datasets=['davis', 'kiba'], `windowed_sequences=112` | `gitignored (local)` | completo (davis, kiba; janelas=112) |
 | `outputs/results/phase2_timing_benchmark.json` | Fase 2 | NVIDIA L4, 3 épocas | `gitignored (local)` | completo |
@@ -89,7 +89,7 @@
    - As seeds `1` e `3` retomadas possuem `history` restrito às épocas pós-500 (`501..824` e `501..559`) e `sec_per_epoch` distorcido (`0.646 s` e `2.347 s`) por dividirem o tempo da retomada pelo total acumulado. Em `T8`, a velocidade limpa de `kiba_random` é recalculada exclusivamente nos 3 runs não retomados (`seeds 0, 2, 4`: **`22.338 ± 0.014 s/época`**).
 6. **Recomputação determinística em CPU (`docs/paper/cpu_audits.json`):**
    - Os 43 runs `v1_seeds` originais não gravaram `marginal_baselines`, `knn_baselines` nem `history` em disco, e os JSONs originais não salvavam `mean_predictor` restrito ao subconjunto `pKd > 5.0`. Por via puramente determinística a partir dos CSVs limpos e arquivos de split (sem necessidade de checkpoints GPU), `scripts/paper/cpu_audits.py` recalculou todos os marginais, `kNN`, deltas pareados por seed para os 45 runs `v1_seeds`, baselines em `pKd > 5.0` (`T5`) e piso de ruído de duplicatas (`T1`).
-   - **Única lacuna não recomputável localmente:** curvas por época (`history`) dos 43 runs `v1_seeds` originais. Já a auditoria física dos `.pt` no Google Drive (`/content/drive/MyDrive/physdual-gnn/cache/esm_embeddings`) foi executada: encontrou `430` arquivos no total (`429` sequências únicas esperadas + `1` resíduo `4637bffbde58d549.pt` com shape `[65, 320]` e sem campo `windowed` gerado por `scripts/smoke_test.py` via `esm2_t6_8M_UR50D` na raiz do cache), `83/83` sequências únicas `> 1022 aa` com `windowed=True` (`70 + 42 - 29` compartilhadas = `83`, contra `112` por soma de dataset) e `0` erros entre os `429` tensores `[len(seq), 1280]` da Fase 1.
+   - **Única lacuna não recomputável localmente:** curvas por época (`history`) dos 43 runs `v1_seeds` originais. Já a auditoria física completa dos `.pt` no Google Drive (`/content/drive/MyDrive/physdual-gnn/cache/esm_embeddings/esm2_t33_650M_UR50D`) foi executada e aprovada (`all_checks_passed: true`): **`429/429`** arquivos presentes (`0` ausentes), **`83/83`** sequências únicas `> 1022 aa` com `windowed=True` (`0` sem campo), **`0` erros de `weights_only=True`**, **`0` erros de `dtype=fp16`**, **`0` ocorrências de `NaN`/`Inf`**, **`0` erros de shape/metadado `dim=1280`**, **`0` divergências de `seq_len` contra os CSVs** e `0` resíduos na raiz.
 7. **Limpeza de inchaço em `baseline_graphdta_gin_kiba_random.json`:**
    - Removido `oof_predictions` de `per_seed_results` em `scripts/run_phase2_baseline.py` (`aggregate_seed_runs`) e no arquivo local (reduzido de `~10,1 MB` para `87,448 bytes`).
 
@@ -97,6 +97,8 @@
 
 | Hash | Data e Mensagem |
 | :--- | :--- |
+| `1b82cfb` | 2026-11-13 — docs(paper): registrar aprovacao completa da auditoria ESM-2 no inventário |
+| `4a12e48` | 2026-11-13 — docs(paper): atualizar inventario e reproducao apos endurecimento do auditor ESM-2 |
 | `bd5feaf` | 2026-11-13 — feat(paper): validar fp16, finitude NaN/Inf, dim 1280 e seq_len vs CSV no auditor ESM-2 |
 | `0db79f8` | 2026-11-13 — docs(paper): registrar auditoria do cache ESM-2 no Drive (429/429 validos, 83/83 windowed) |
 | `c8ddd87` | 2026-11-13 — fix(paper): corrigir auditor ESM-2 para subpasta do modelo e contagem global 83 |
@@ -110,5 +112,3 @@
 | `ffea4c5` | 2026-11-13 — fix(phase2): auto-recuperar sequencia/smiles em OOF e reparar bootstrap cluster-level |
 | `b8fffcf` | 2026-11-12 — refactor(metrics): migrar AllChem.GetMorganFingerprintAsBitVect para rdFingerprintGenerator.GetMorganGenerator |
 | `6e8f26f` | 2026-11-12 — fix(splits,notebook): aceitar group_col e random_state em create_group_kfold_splits e tornar setup de paths robusto |
-| `172b7a1` | 2026-11-12 — feat(phase2): implementar GroupKFold 5-fold Davis, baselines marginais/kNN, OOF e extensão KIBA (Opção C, ADR #13) |
-| `4743e01` | 2026-11-10 — fix(metrics): guard pearson and spearman against constant inputs within numerical tolerance |
