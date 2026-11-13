@@ -1,0 +1,41 @@
+\begin{table}[htbp]
+\centering
+\small
+\caption{T6 — Desempenho Estratificado por Comprimento da Sequência Proteica (<=1000 vs. >1000 aa). Política numérica padronizada: métricas contínuas (CI, MSE, RMSE, Pearson, Spearman, rm2, AUROC, AUPR, deltas) com 4 casas decimais (0.0000); percentuais com 2 casas decimais (0.00\%); médias de épocas com 1 casa (0.0) e épocas individuais como inteiros; tempo por época com 3 casas (0.000 s) e horas totais com 2 casas (0.00 h). Dispersão expressa como média $\pm$ desvio-padrão amostral (ddof=1).}
+\label{tab:t6_seq_length}
+\begin{tabular}{lllllllll}
+\toprule
+\textbf{protocolo} & \textbf{modelo} & \textbf{dataset} & \textbf{split} & \textbf{faixa\_comprimento} & \textbf{n\_pares\_medio\_teste} & \textbf{ci} & \textbf{mse} & \textbf{fonte} \\
+\midrule
+v1\_seeds & graphdta\_cnn3 & davis & cold\_drug & <= 1000 aa & 2289.0 $\pm$ 0.0 & 0.6831 $\pm$ 0.0346 & 0.4734 $\pm$ 0.1723 & outputs/results/baseline\_graphdta\_cnn3\_davis\_cold\_drug.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_drug & > 1000 aa & 805.0 $\pm$ 0.0 & 0.7018 $\pm$ 0.0540 & 0.6404 $\pm$ 0.2083 & outputs/results/baseline\_graphdta\_cnn3\_davis\_cold\_drug.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_target & <= 1000 aa & 2216.8 $\pm$ 156.5 & 0.7671 $\pm$ 0.0585 & 0.5030 $\pm$ 0.2496 & outputs/results/baseline\_graphdta\_cnn3\_davis\_cold\_target.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_target & > 1000 aa & 938.4 $\pm$ 587.7 & 0.7660 $\pm$ 0.0600 & 0.7262 $\pm$ 0.3169 & outputs/results/baseline\_graphdta\_cnn3\_davis\_cold\_target.json \\
+v1\_seeds & graphdta\_cnn3 & davis & random & <= 1000 aa & 2243.6 $\pm$ 28.2 & 0.8825 $\pm$ 0.0019 & 0.2189 $\pm$ 0.0174 & outputs/results/baseline\_graphdta\_cnn3\_davis\_random.json \\
+v1\_seeds & graphdta\_cnn3 & davis & random & > 1000 aa & 762.4 $\pm$ 28.2 & 0.9064 $\pm$ 0.0118 & 0.2299 $\pm$ 0.0286 & outputs/results/baseline\_graphdta\_cnn3\_davis\_random.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_drug & <= 1000 aa & 2289.0 $\pm$ 0.0 & 0.6795 $\pm$ 0.0387 & 0.4820 $\pm$ 0.1835 & outputs/results/baseline\_graphdta\_gin\_davis\_cold\_drug.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_drug & > 1000 aa & 805.0 $\pm$ 0.0 & 0.7168 $\pm$ 0.0477 & 0.6361 $\pm$ 0.1513 & outputs/results/baseline\_graphdta\_gin\_davis\_cold\_drug.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_target & <= 1000 aa & 2216.8 $\pm$ 156.5 & 0.7413 $\pm$ 0.0355 & 0.6466 $\pm$ 0.3087 & outputs/results/baseline\_graphdta\_gin\_davis\_cold\_target.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_target & > 1000 aa & 938.4 $\pm$ 587.7 & 0.7233 $\pm$ 0.0521 & 1.0049 $\pm$ 0.5239 & outputs/results/baseline\_graphdta\_gin\_davis\_cold\_target.json \\
+v1\_seeds & graphdta\_gin & davis & random & <= 1000 aa & 2243.6 $\pm$ 28.2 & 0.8793 $\pm$ 0.0058 & 0.2317 $\pm$ 0.0201 & outputs/results/baseline\_graphdta\_gin\_davis\_random.json \\
+v1\_seeds & graphdta\_gin & davis & random & > 1000 aa & 762.4 $\pm$ 28.2 & 0.8983 $\pm$ 0.0084 & 0.2442 $\pm$ 0.0235 & outputs/results/baseline\_graphdta\_gin\_davis\_random.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_drug & <= 1000 aa & 10040.8 $\pm$ 731.7 & 0.7641 $\pm$ 0.0108 & 0.3528 $\pm$ 0.0515 & outputs/results/baseline\_graphdta\_gin\_kiba\_cold\_drug.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_drug & > 1000 aa & 2545.4 $\pm$ 179.4 & 0.7165 $\pm$ 0.0128 & 0.4909 $\pm$ 0.0630 & outputs/results/baseline\_graphdta\_gin\_kiba\_cold\_drug.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_target & <= 1000 aa & 9806.0 $\pm$ 2279.0 & 0.6589 $\pm$ 0.0468 & 0.4948 $\pm$ 0.0482 & outputs/results/baseline\_graphdta\_gin\_kiba\_cold\_target.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_target & > 1000 aa & 1794.8 $\pm$ 1146.8 & 0.6887 $\pm$ 0.0554 & 0.7113 $\pm$ 0.3516 & outputs/results/baseline\_graphdta\_gin\_kiba\_cold\_target.json \\
+v1\_seeds & graphdta\_gin & kiba & random & <= 1000 aa & 9411.0 $\pm$ 53.6 & 0.8624 $\pm$ 0.0134 & 0.1642 $\pm$ 0.0184 & outputs/results/baseline\_graphdta\_gin\_kiba\_random.json \\
+v1\_seeds & graphdta\_gin & kiba & random & > 1000 aa & 2414.0 $\pm$ 53.6 & 0.8362 $\pm$ 0.0155 & 0.2189 $\pm$ 0.0264 & outputs/results/baseline\_graphdta\_gin\_kiba\_random.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_drug & <= 1000 aa & 4447.2 $\pm$ 179.1 (total=22236) & 0.6510 $\pm$ 0.0877 & 0.6740 $\pm$ 0.1902 & outputs/results/baseline\_graphdta\_cnn3\_davis\_cold\_drug\_kfold.json (per\_fold\_results[*].test\_metrics\_by\_seq\_len) \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_drug & > 1000 aa & 1564.0 $\pm$ 63.0 (total=7820) & 0.6605 $\pm$ 0.0617 & 1.0083 $\pm$ 0.0811 & outputs/results/baseline\_graphdta\_cnn3\_davis\_cold\_drug\_kfold.json (per\_fold\_results[*].test\_metrics\_by\_seq\_len) \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_target & <= 1000 aa & 4447.2 $\pm$ 294.8 (total=22236) & 0.7798 $\pm$ 0.0162 & 0.4472 $\pm$ 0.0847 & outputs/results/baseline\_graphdta\_cnn3\_davis\_cold\_target\_kfold.json (per\_fold\_results[*].test\_metrics\_by\_seq\_len) \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_target & > 1000 aa & 1564.0 $\pm$ 393.6 (total=7820) & 0.7496 $\pm$ 0.0646 & 0.7710 $\pm$ 0.2431 & outputs/results/baseline\_graphdta\_cnn3\_davis\_cold\_target\_kfold.json (per\_fold\_results[*].test\_metrics\_by\_seq\_len) \\
+v2\_kfold & graphdta\_gin & davis & cold\_drug & <= 1000 aa & 4447.2 $\pm$ 179.1 (total=22236) & 0.6541 $\pm$ 0.0672 & 0.6957 $\pm$ 0.2436 & outputs/results/baseline\_graphdta\_gin\_davis\_cold\_drug\_kfold.json (per\_fold\_results[*].test\_metrics\_by\_seq\_len) \\
+v2\_kfold & graphdta\_gin & davis & cold\_drug & > 1000 aa & 1564.0 $\pm$ 63.0 (total=7820) & 0.6694 $\pm$ 0.0462 & 0.9963 $\pm$ 0.1588 & outputs/results/baseline\_graphdta\_gin\_davis\_cold\_drug\_kfold.json (per\_fold\_results[*].test\_metrics\_by\_seq\_len) \\
+v2\_kfold & graphdta\_gin & davis & cold\_target & <= 1000 aa & 4447.2 $\pm$ 294.8 (total=22236) & 0.7317 $\pm$ 0.0108 & 0.6208 $\pm$ 0.1859 & outputs/results/baseline\_graphdta\_gin\_davis\_cold\_target\_kfold.json (per\_fold\_results[*].test\_metrics\_by\_seq\_len) \\
+v2\_kfold & graphdta\_gin & davis & cold\_target & > 1000 aa & 1564.0 $\pm$ 393.6 (total=7820) & 0.6946 $\pm$ 0.0417 & 1.0974 $\pm$ 0.6145 & outputs/results/baseline\_graphdta\_gin\_davis\_cold\_target\_kfold.json (per\_fold\_results[*].test\_metrics\_by\_seq\_len) \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\footnotesize \textit{Fonte:} outputs/results/baseline\_*.json Total de sequências únicas no dataset completo (T1): Davis = `303` (`<=1000` aa) vs. `76` (`>1000` aa); KIBA = `185` (`<=1000` aa) vs. `44` (`>1000` aa).
+\end{flushleft}
+\end{table}

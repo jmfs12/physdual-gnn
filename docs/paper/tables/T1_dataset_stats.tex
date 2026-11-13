@@ -1,0 +1,17 @@
+\begin{table}[htbp]
+\centering
+\small
+\caption{T1 — Estatísticas, Duplicatas e Piso de Ruído dos Datasets (Davis e KIBA). Política numérica padronizada: métricas contínuas (CI, MSE, RMSE, Pearson, Spearman, rm2, AUROC, AUPR, deltas) com 4 casas decimais (0.0000); percentuais com 2 casas decimais (0.00\%); médias de épocas com 1 casa (0.0) e épocas individuais como inteiros; tempo por época com 3 casas (0.000 s) e horas totais com 2 casas (0.00 h). Dispersão expressa como média $\pm$ desvio-padrão amostral (ddof=1).}
+\label{tab:t1_dataset_stats}
+\begin{tabular}{llllllllllllllllllll}
+\toprule
+\textbf{dataset} & \textbf{pares\_brutos} & \textbf{pares\_limpos} & \textbf{farmacos\_id} & \textbf{farmacos\_smiles\_canonico} & \textbf{alvos\_id} & \textbf{alvos\_sequencia\_unica} & \textbf{alvos\_seq\_compartilhadas} & \textbf{seqs\_gt\_1000aa\_unicas\_e\_pares} & \textbf{seqs\_janela\_gt\_1022aa\_unicas\_e\_pares} & \textbf{smiles\_alterados\_rdkit} & \textbf{smiles\_falhos} & \textbf{aa\_estendidos\_seqs} & \textbf{aa\_estendidos\_contagem} & \textbf{grupos\_duplicados\_conteudo} & \textbf{duplicatas\_afinidade\_distinta} & \textbf{piso\_ruido\_mse\_global} & \textbf{piso\_ruido\_mse\_linhas\_distintas} & \textbf{pares\_censurados\_pkd\_5\_0} & \textbf{pct\_censurados} \\
+\midrule
+DAVIS & 30056 & 30056 & 68 & 68 & 442 & 379 & 18 seqs -> 81 target\_ids & 76 (7820 pares) & 70 (7412 pares) & 68 & 0 & 1 & X:1, B:0, U:0, Z:0, O:0 & 1224 & 546 & 0.0322 & 0.3347 & 20931 & 69.64\% \\
+KIBA & 118254 & 118254 & 2111 & 2065 & 229 & 229 & 0 & 44 (24103 pares) & 42 (22848 pares) & 2066 & 0 & 0 & X:0, B:0, U:0, Z:0, O:0 & 524 & 310 & 0.0011 & 0.1780 & 0 & 0.00\% (N/A) \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\footnotesize \textit{Fonte:} data/processed/\{davis,kiba\}\_ingestion\_report.json, data/processed/\{davis,kiba\}\_clean.csv e docs/paper/cpu\_audits.json Sequências com janela deslizante ESM-2 (>1022 aa): `70` únicas (`109` `target\_id`s) no Davis + `42` únicas no KIBA = `112` por soma de dataset (`83` sequências únicas globalmente deduplicadas), sincronizadas em `outputs/logs/phase1\_summary\_report.json`. No Davis, `81` `target\_id`s colapsam em apenas `18` sequências únicas idênticas em `proteins.txt` (`shared\_sequences\_count=18`), gerando `1.224` grupos duplicados (`5.508` linhas) e `546` grupos com afinidades distintas (`2.894` linhas); o piso irreduzível de ruído (MSE da média do grupo) é `0.0322` global (`RMSE=0.1795`) e `0.3347` nas linhas divergentes — e indica que o Davis atual não testa resiliência a mutações. No KIBA, `524` grupos duplicados (`1.172` linhas; `310` grupos/744 linhas divergentes) resultam de `2.111` `drug\_id`s que colapsam em `2.065` SMILES canônicos; piso global `MSE = 0.0011` (`0.1780` nas linhas divergentes). No Davis, `smiles\_modified\_count = 68` decorre de recanonização sintática RDKit; `num\_modified\_fragments = 0` em `phase1\_summary\_report.json` (0 sais multifragmento removidos).
+\end{flushleft}
+\end{table}

@@ -1,0 +1,80 @@
+\begin{table}[htbp]
+\centering
+\small
+\caption{T7 — Diagnóstico de Treinamento por Run (65 Execuções). Política numérica padronizada: métricas contínuas (CI, MSE, RMSE, Pearson, Spearman, rm2, AUROC, AUPR, deltas) com 4 casas decimais (0.0000); percentuais com 2 casas decimais (0.00\%); médias de épocas com 1 casa (0.0) e épocas individuais como inteiros; tempo por época com 3 casas (0.000 s) e horas totais com 2 casas (0.00 h). Dispersão expressa como média $\pm$ desvio-padrão amostral (ddof=1).}
+\label{tab:t7_training_diagnostics}
+\begin{tabular}{llllllllllllll}
+\toprule
+\textbf{protocolo} & \textbf{modelo} & \textbf{dataset} & \textbf{split} & \textbf{unidade} & \textbf{best\_epoch} & \textbf{total\_epochs\_run} & \textbf{epochs\_cfg} & \textbf{sec\_per\_epoch} & \textbf{elapsed\_sec} & \textbf{flag\_gt\_0\_8\_epochs} & \textbf{near\_epoch\_ceiling\_warn\_json} & \textbf{observacao} & \textbf{fonte} \\
+\midrule
+v1\_seeds & graphdta\_cnn3 & davis & cold\_drug & seed\_0 & 70 & 150 & 500 & 4.212 & 631.83 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_seed0.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_drug & seed\_1 & 132 & 212 & 500 & 4.196 & 889.62 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_seed1.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_drug & seed\_2 & 114 & 194 & 500 & 4.195 & 813.83 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_seed2.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_drug & seed\_3 & 129 & 209 & 500 & 4.199 & 877.59 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_seed3.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_drug & seed\_4 & 177 & 257 & 500 & 4.199 & 1079.08 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_seed4.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_target & seed\_0 & 47 & 127 & 500 & 4.273 & 542.65 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_seed0.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_target & seed\_1 & 94 & 174 & 500 & 4.109 & 714.98 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_seed1.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_target & seed\_2 & 85 & 165 & 500 & 4.098 & 676.19 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_seed2.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_target & seed\_3 & 90 & 170 & 500 & 4.165 & 708.10 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_seed3.json \\
+v1\_seeds & graphdta\_cnn3 & davis & cold\_target & seed\_4 & 89 & 169 & 500 & 4.274 & 722.24 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_seed4.json \\
+v1\_seeds & graphdta\_cnn3 & davis & random & seed\_0 & 223 & 273 & 500 & 4.235 & 1156.24 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_random\_seed0.json \\
+v1\_seeds & graphdta\_cnn3 & davis & random & seed\_1 & 256 & 306 & 500 & 4.226 & 1293.20 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_random\_seed1.json \\
+v1\_seeds & graphdta\_cnn3 & davis & random & seed\_2 & 227 & 277 & 500 & 4.226 & 1170.59 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_random\_seed2.json \\
+v1\_seeds & graphdta\_cnn3 & davis & random & seed\_3 & 181 & 231 & 500 & 4.223 & 975.58 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_random\_seed3.json \\
+v1\_seeds & graphdta\_cnn3 & davis & random & seed\_4 & 290 & 340 & 500 & 4.214 & 1432.88 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_random\_seed4.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_drug & seed\_0 & 250 & 330 & 500 & 5.730 & 1890.89 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_seed0.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_drug & seed\_1 & 242 & 322 & 500 & 5.718 & 1841.04 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_seed1.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_drug & seed\_2 & 60 & 140 & 500 & 5.726 & 801.57 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_seed2.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_drug & seed\_3 & 58 & 138 & 500 & 5.739 & 791.93 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_seed3.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_drug & seed\_4 & 48 & 128 & 500 & 5.736 & 734.19 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_seed4.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_target & seed\_0 & 3 & 83 & 500 & 5.865 & 486.83 & false & false & colapso precoce (best\_epoch <= 13) & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_seed0.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_target & seed\_1 & 2 & 82 & 500 & 5.653 & 463.56 & false & false & colapso precoce (best\_epoch <= 13) & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_seed1.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_target & seed\_2 & 5 & 85 & 500 & 5.624 & 478.02 & false & false & colapso precoce (best\_epoch <= 13) & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_seed2.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_target & seed\_3 & 7 & 87 & 500 & 5.636 & 490.30 & false & false & colapso precoce (best\_epoch <= 13) & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_seed3.json \\
+v1\_seeds & graphdta\_gin & davis & cold\_target & seed\_4 & 6 & 86 & 500 & 5.891 & 506.65 & false & false & colapso precoce (best\_epoch <= 13) & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_seed4.json \\
+v1\_seeds & graphdta\_gin & davis & random & seed\_0 & 266 & 316 & 500 & 5.745 & 1815.31 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_random\_seed0.json \\
+v1\_seeds & graphdta\_gin & davis & random & seed\_1 & 149 & 199 & 500 & 5.745 & 1143.31 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_random\_seed1.json \\
+v1\_seeds & graphdta\_gin & davis & random & seed\_2 & 304 & 354 & 500 & 5.740 & 2032.05 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_random\_seed2.json \\
+v1\_seeds & graphdta\_gin & davis & random & seed\_3 & 223 & 273 & 500 & 5.741 & 1567.30 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_random\_seed3.json \\
+v1\_seeds & graphdta\_gin & davis & random & seed\_4 & 362 & 412 & 500 & 5.746 & 2367.53 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_random\_seed4.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_drug & seed\_0 & 145 & 195 & 500 & 21.917 & 4273.90 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_drug\_seed0.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_drug & seed\_1 & 148 & 198 & 500 & 22.469 & 4448.89 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_drug\_seed1.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_drug & seed\_2 & 72 & 122 & 500 & 22.364 & 2728.39 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_drug\_seed2.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_drug & seed\_3 & 66 & 116 & 500 & 22.471 & 2606.63 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_drug\_seed3.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_drug & seed\_4 & 153 & 203 & 500 & 16.648 & 3379.59 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_drug\_seed4.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_target & seed\_0 & 59 & 141 & 500 & 9.995 & 1409.36 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_target\_seed0.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_target & seed\_1 & 66 & 116 & 500 & 22.130 & 2567.10 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_target\_seed1.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_target & seed\_2 & 78 & 128 & 500 & 22.224 & 2844.71 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_target\_seed2.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_target & seed\_3 & 99 & 149 & 500 & 21.787 & 3246.20 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_target\_seed3.json \\
+v1\_seeds & graphdta\_gin & kiba & cold\_target & seed\_4 & 93 & 143 & 500 & 22.202 & 3174.92 & false & false & normal & outputs/results/runs/graphdta\_gin\_kiba\_cold\_target\_seed4.json \\
+v1\_seeds & graphdta\_gin & kiba & random & seed\_0 & 294 & 344 & 500 & 22.341 & 7685.33 & false & false & ES <500 ep. (equiv. teto efetivo 1000) & outputs/results/runs/graphdta\_gin\_kiba\_random\_seed0.json \\
+v1\_seeds & graphdta\_gin & kiba & random & seed\_1 & 774 & 824 & 1000 & 0.646 & 532.43 & false & false & retomado 500->1000 ep.; sec/ep distorcido (só retomada) & outputs/results/runs/graphdta\_gin\_kiba\_random\_seed1.json \\
+v1\_seeds & graphdta\_gin & kiba & random & seed\_2 & 286 & 336 & 500 & 22.351 & 7509.92 & false & false & ES <500 ep. (equiv. teto efetivo 1000) & outputs/results/runs/graphdta\_gin\_kiba\_random\_seed2.json \\
+v1\_seeds & graphdta\_gin & kiba & random & seed\_3 & 509 & 559 & 1000 & 2.347 & 1311.70 & false & false & retomado 500->1000 ep.; sec/ep distorcido (só retomada) & outputs/results/runs/graphdta\_gin\_kiba\_random\_seed3.json \\
+v1\_seeds & graphdta\_gin & kiba & random & seed\_4 & 343 & 393 & 500 & 22.323 & 8773.09 & false & false & ES <500 ep. (equiv. teto efetivo 1000) & outputs/results/runs/graphdta\_gin\_kiba\_random\_seed4.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_drug & fold\_0 & 30 & 110 & 500 & 3.790 & 416.89 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_fold0.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_drug & fold\_1 & 29 & 109 & 500 & 3.778 & 411.80 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_fold1.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_drug & fold\_2 & 118 & 198 & 500 & 3.780 & 748.53 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_fold2.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_drug & fold\_3 & 109 & 189 & 500 & 3.821 & 722.16 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_fold3.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_drug & fold\_4 & 29 & 109 & 500 & 3.822 & 416.59 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_drug\_fold4.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_target & fold\_0 & 77 & 157 & 500 & 3.822 & 599.99 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_fold0.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_target & fold\_1 & 79 & 159 & 500 & 3.913 & 622.09 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_fold1.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_target & fold\_2 & 59 & 139 & 500 & 3.716 & 516.59 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_fold2.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_target & fold\_3 & 47 & 127 & 500 & 3.839 & 487.52 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_fold3.json \\
+v2\_kfold & graphdta\_cnn3 & davis & cold\_target & fold\_4 & 49 & 129 & 500 & 3.755 & 484.40 & false & false & normal & outputs/results/runs/graphdta\_cnn3\_davis\_cold\_target\_fold4.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_drug & fold\_0 & 190 & 270 & 500 & 5.075 & 1370.33 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_fold0.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_drug & fold\_1 & 199 & 279 & 500 & 5.119 & 1428.13 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_fold1.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_drug & fold\_2 & 294 & 374 & 500 & 5.113 & 1912.23 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_fold2.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_drug & fold\_3 & 57 & 137 & 500 & 5.145 & 704.87 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_fold3.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_drug & fold\_4 & 2 & 82 & 500 & 5.148 & 422.12 & false & false & normal & outputs/results/runs/graphdta\_gin\_davis\_cold\_drug\_fold4.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_target & fold\_0 & 236 & 316 & 500 & 5.180 & 1636.89 & false & false & outlier tardio no cold\_target & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_fold0.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_target & fold\_1 & 13 & 93 & 500 & 5.322 & 494.97 & false & false & colapso precoce (best\_epoch <= 13) & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_fold1.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_target & fold\_2 & 3 & 83 & 500 & 5.034 & 417.84 & false & false & colapso precoce (best\_epoch <= 13) & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_fold2.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_target & fold\_3 & 6 & 86 & 500 & 5.205 & 447.63 & false & false & colapso precoce (best\_epoch <= 13) & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_fold3.json \\
+v2\_kfold & graphdta\_gin & davis & cold\_target & fold\_4 & 9 & 89 & 500 & 5.107 & 454.49 & false & false & colapso precoce (best\_epoch <= 13) & outputs/results/runs/graphdta\_gin\_davis\_cold\_target\_fold4.json \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\footnotesize \textit{Fonte:} outputs/results/runs/*.json Em Davis `cold\_target`, `graphdta\_gin` apresentou `best\_epoch` entre `2` e `7` em todas as 5 seeds de `v1\_seeds`, e `[236, 13, 3, 6, 9]` nas 5 dobras de `v2\_kfold`. Em `kiba\_random`, o teto efetivo do protocolo é `1000` épocas para todas as 5 seeds: `seeds 0, 2, 4` encerraram por early stopping (`patience=50`) em `344`, `336` e `393` épocas (muito antes de 500, não requerendo re-execução), enquanto `seeds 1` e `3` foram retomadas até 1000 (`best\_epoch = 774` e `509`). Nas seeds `1` e `3`, `elapsed\_sec` (`532.43 s` e `1311.70 s`) e `sec\_per\_epoch` (`0.646 s` e `2.347 s`) refletem apenas o trecho retomado pós-500 dividido pelo total acumulado.
+\end{flushleft}
+\end{table}

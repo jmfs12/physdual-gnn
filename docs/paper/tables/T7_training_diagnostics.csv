@@ -1,0 +1,66 @@
+protocolo,modelo,dataset,split,unidade,best_epoch,total_epochs_run,epochs_cfg,sec_per_epoch,elapsed_sec,flag_gt_0_8_epochs,near_epoch_ceiling_warn_json,observacao,fonte
+v1_seeds,graphdta_cnn3,davis,cold_drug,seed_0,70,150,500,4.212,631.83,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_seed0.json
+v1_seeds,graphdta_cnn3,davis,cold_drug,seed_1,132,212,500,4.196,889.62,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_seed1.json
+v1_seeds,graphdta_cnn3,davis,cold_drug,seed_2,114,194,500,4.195,813.83,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_seed2.json
+v1_seeds,graphdta_cnn3,davis,cold_drug,seed_3,129,209,500,4.199,877.59,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_seed3.json
+v1_seeds,graphdta_cnn3,davis,cold_drug,seed_4,177,257,500,4.199,1079.08,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_seed4.json
+v1_seeds,graphdta_cnn3,davis,cold_target,seed_0,47,127,500,4.273,542.65,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_seed0.json
+v1_seeds,graphdta_cnn3,davis,cold_target,seed_1,94,174,500,4.109,714.98,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_seed1.json
+v1_seeds,graphdta_cnn3,davis,cold_target,seed_2,85,165,500,4.098,676.19,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_seed2.json
+v1_seeds,graphdta_cnn3,davis,cold_target,seed_3,90,170,500,4.165,708.10,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_seed3.json
+v1_seeds,graphdta_cnn3,davis,cold_target,seed_4,89,169,500,4.274,722.24,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_seed4.json
+v1_seeds,graphdta_cnn3,davis,random,seed_0,223,273,500,4.235,1156.24,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_random_seed0.json
+v1_seeds,graphdta_cnn3,davis,random,seed_1,256,306,500,4.226,1293.20,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_random_seed1.json
+v1_seeds,graphdta_cnn3,davis,random,seed_2,227,277,500,4.226,1170.59,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_random_seed2.json
+v1_seeds,graphdta_cnn3,davis,random,seed_3,181,231,500,4.223,975.58,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_random_seed3.json
+v1_seeds,graphdta_cnn3,davis,random,seed_4,290,340,500,4.214,1432.88,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_random_seed4.json
+v1_seeds,graphdta_gin,davis,cold_drug,seed_0,250,330,500,5.730,1890.89,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_seed0.json
+v1_seeds,graphdta_gin,davis,cold_drug,seed_1,242,322,500,5.718,1841.04,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_seed1.json
+v1_seeds,graphdta_gin,davis,cold_drug,seed_2,60,140,500,5.726,801.57,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_seed2.json
+v1_seeds,graphdta_gin,davis,cold_drug,seed_3,58,138,500,5.739,791.93,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_seed3.json
+v1_seeds,graphdta_gin,davis,cold_drug,seed_4,48,128,500,5.736,734.19,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_seed4.json
+v1_seeds,graphdta_gin,davis,cold_target,seed_0,3,83,500,5.865,486.83,false,false,colapso precoce (best_epoch <= 13),outputs/results/runs/graphdta_gin_davis_cold_target_seed0.json
+v1_seeds,graphdta_gin,davis,cold_target,seed_1,2,82,500,5.653,463.56,false,false,colapso precoce (best_epoch <= 13),outputs/results/runs/graphdta_gin_davis_cold_target_seed1.json
+v1_seeds,graphdta_gin,davis,cold_target,seed_2,5,85,500,5.624,478.02,false,false,colapso precoce (best_epoch <= 13),outputs/results/runs/graphdta_gin_davis_cold_target_seed2.json
+v1_seeds,graphdta_gin,davis,cold_target,seed_3,7,87,500,5.636,490.30,false,false,colapso precoce (best_epoch <= 13),outputs/results/runs/graphdta_gin_davis_cold_target_seed3.json
+v1_seeds,graphdta_gin,davis,cold_target,seed_4,6,86,500,5.891,506.65,false,false,colapso precoce (best_epoch <= 13),outputs/results/runs/graphdta_gin_davis_cold_target_seed4.json
+v1_seeds,graphdta_gin,davis,random,seed_0,266,316,500,5.745,1815.31,false,false,normal,outputs/results/runs/graphdta_gin_davis_random_seed0.json
+v1_seeds,graphdta_gin,davis,random,seed_1,149,199,500,5.745,1143.31,false,false,normal,outputs/results/runs/graphdta_gin_davis_random_seed1.json
+v1_seeds,graphdta_gin,davis,random,seed_2,304,354,500,5.740,2032.05,false,false,normal,outputs/results/runs/graphdta_gin_davis_random_seed2.json
+v1_seeds,graphdta_gin,davis,random,seed_3,223,273,500,5.741,1567.30,false,false,normal,outputs/results/runs/graphdta_gin_davis_random_seed3.json
+v1_seeds,graphdta_gin,davis,random,seed_4,362,412,500,5.746,2367.53,false,false,normal,outputs/results/runs/graphdta_gin_davis_random_seed4.json
+v1_seeds,graphdta_gin,kiba,cold_drug,seed_0,145,195,500,21.917,4273.90,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_drug_seed0.json
+v1_seeds,graphdta_gin,kiba,cold_drug,seed_1,148,198,500,22.469,4448.89,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_drug_seed1.json
+v1_seeds,graphdta_gin,kiba,cold_drug,seed_2,72,122,500,22.364,2728.39,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_drug_seed2.json
+v1_seeds,graphdta_gin,kiba,cold_drug,seed_3,66,116,500,22.471,2606.63,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_drug_seed3.json
+v1_seeds,graphdta_gin,kiba,cold_drug,seed_4,153,203,500,16.648,3379.59,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_drug_seed4.json
+v1_seeds,graphdta_gin,kiba,cold_target,seed_0,59,141,500,9.995,1409.36,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_target_seed0.json
+v1_seeds,graphdta_gin,kiba,cold_target,seed_1,66,116,500,22.130,2567.10,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_target_seed1.json
+v1_seeds,graphdta_gin,kiba,cold_target,seed_2,78,128,500,22.224,2844.71,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_target_seed2.json
+v1_seeds,graphdta_gin,kiba,cold_target,seed_3,99,149,500,21.787,3246.20,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_target_seed3.json
+v1_seeds,graphdta_gin,kiba,cold_target,seed_4,93,143,500,22.202,3174.92,false,false,normal,outputs/results/runs/graphdta_gin_kiba_cold_target_seed4.json
+v1_seeds,graphdta_gin,kiba,random,seed_0,294,344,500,22.341,7685.33,false,false,ES <500 ep. (equiv. teto efetivo 1000),outputs/results/runs/graphdta_gin_kiba_random_seed0.json
+v1_seeds,graphdta_gin,kiba,random,seed_1,774,824,1000,0.646,532.43,false,false,retomado 500->1000 ep.; sec/ep distorcido (só retomada),outputs/results/runs/graphdta_gin_kiba_random_seed1.json
+v1_seeds,graphdta_gin,kiba,random,seed_2,286,336,500,22.351,7509.92,false,false,ES <500 ep. (equiv. teto efetivo 1000),outputs/results/runs/graphdta_gin_kiba_random_seed2.json
+v1_seeds,graphdta_gin,kiba,random,seed_3,509,559,1000,2.347,1311.70,false,false,retomado 500->1000 ep.; sec/ep distorcido (só retomada),outputs/results/runs/graphdta_gin_kiba_random_seed3.json
+v1_seeds,graphdta_gin,kiba,random,seed_4,343,393,500,22.323,8773.09,false,false,ES <500 ep. (equiv. teto efetivo 1000),outputs/results/runs/graphdta_gin_kiba_random_seed4.json
+v2_kfold,graphdta_cnn3,davis,cold_drug,fold_0,30,110,500,3.790,416.89,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_fold0.json
+v2_kfold,graphdta_cnn3,davis,cold_drug,fold_1,29,109,500,3.778,411.80,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_fold1.json
+v2_kfold,graphdta_cnn3,davis,cold_drug,fold_2,118,198,500,3.780,748.53,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_fold2.json
+v2_kfold,graphdta_cnn3,davis,cold_drug,fold_3,109,189,500,3.821,722.16,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_fold3.json
+v2_kfold,graphdta_cnn3,davis,cold_drug,fold_4,29,109,500,3.822,416.59,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_drug_fold4.json
+v2_kfold,graphdta_cnn3,davis,cold_target,fold_0,77,157,500,3.822,599.99,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_fold0.json
+v2_kfold,graphdta_cnn3,davis,cold_target,fold_1,79,159,500,3.913,622.09,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_fold1.json
+v2_kfold,graphdta_cnn3,davis,cold_target,fold_2,59,139,500,3.716,516.59,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_fold2.json
+v2_kfold,graphdta_cnn3,davis,cold_target,fold_3,47,127,500,3.839,487.52,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_fold3.json
+v2_kfold,graphdta_cnn3,davis,cold_target,fold_4,49,129,500,3.755,484.40,false,false,normal,outputs/results/runs/graphdta_cnn3_davis_cold_target_fold4.json
+v2_kfold,graphdta_gin,davis,cold_drug,fold_0,190,270,500,5.075,1370.33,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_fold0.json
+v2_kfold,graphdta_gin,davis,cold_drug,fold_1,199,279,500,5.119,1428.13,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_fold1.json
+v2_kfold,graphdta_gin,davis,cold_drug,fold_2,294,374,500,5.113,1912.23,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_fold2.json
+v2_kfold,graphdta_gin,davis,cold_drug,fold_3,57,137,500,5.145,704.87,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_fold3.json
+v2_kfold,graphdta_gin,davis,cold_drug,fold_4,2,82,500,5.148,422.12,false,false,normal,outputs/results/runs/graphdta_gin_davis_cold_drug_fold4.json
+v2_kfold,graphdta_gin,davis,cold_target,fold_0,236,316,500,5.180,1636.89,false,false,outlier tardio no cold_target,outputs/results/runs/graphdta_gin_davis_cold_target_fold0.json
+v2_kfold,graphdta_gin,davis,cold_target,fold_1,13,93,500,5.322,494.97,false,false,colapso precoce (best_epoch <= 13),outputs/results/runs/graphdta_gin_davis_cold_target_fold1.json
+v2_kfold,graphdta_gin,davis,cold_target,fold_2,3,83,500,5.034,417.84,false,false,colapso precoce (best_epoch <= 13),outputs/results/runs/graphdta_gin_davis_cold_target_fold2.json
+v2_kfold,graphdta_gin,davis,cold_target,fold_3,6,86,500,5.205,447.63,false,false,colapso precoce (best_epoch <= 13),outputs/results/runs/graphdta_gin_davis_cold_target_fold3.json
+v2_kfold,graphdta_gin,davis,cold_target,fold_4,9,89,500,5.107,454.49,false,false,colapso precoce (best_epoch <= 13),outputs/results/runs/graphdta_gin_davis_cold_target_fold4.json
