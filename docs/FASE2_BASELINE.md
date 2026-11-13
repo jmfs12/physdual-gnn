@@ -68,7 +68,7 @@ flowchart TD
 | **Encoder do Alvo** | **CNN 1D Original do GraphDTA:** `Embedding(26, 128)`, `Conv1d(1000, 32, kernel_size=8)`, flatten $32 \times 121 = 3872$, `Linear(3872, 128)` | **CNN 3 Camadas estilo DeepDTA:** `Embedding(26, 128, padding_idx=0)`, transposição, `Conv1d(128, 32, 4) -> Conv1d(32, 64, 8) -> Conv1d(64, 96, 12)`, `AdaptiveMaxPool1d(1)`, `Linear(96, 128)` | Oficial: `thinng/GraphDTA:models/ginconv.py`<br>Secundária: padrão adaptado de DeepDTA |
 | **Camada de Fusão (MLP)** | `Linear(256, 1024) -> ReLU -> Dropout(0.2) -> Linear(1024, 256) -> ReLU -> Dropout(0.2) -> Linear(256, 1)` | Idêntica à oficial | `thinng/GraphDTA:models/ginconv.py` |
 | **Otimizador e Taxa** | Adam com `lr = 0.0005`, `weight_decay = 0.0` (sem scheduler por padrão) | Adam com `lr = 0.0005`, `weight_decay = 0.0` | Nguyen et al. (2021), Tabela 1 |
-| **Batch Size e Épocas** | `batch_size = 512`, `epochs = 500` | `batch_size = 512`, `epochs = 500` | Nguyen et al. (2021), Tabela 1 |
+| **Batch Size e Épocas** | `batch_size = 512`, `epochs = 500` (estendido para `1000` nas seeds `1` e `3` de `kiba_random`, ADR #12/#13) | `batch_size = 512`, `epochs = 500` | Nguyen et al. (2021), Tabela 1; ADR #12/#13 |
 | **Paciência Early Stopping** | `patience = 50` (`random`); `davis_cold_patience = 80` (`cold_drug`, `cold_target`) | Idêntica à oficial | Otimização para splits cold (ADR #12) |
 | **Escopo de Execução** | Davis (3 splits $\times$ 5 seeds = 15 runs); KIBA condicional ao tempo de benchmark ($\le 15\text{ s/época}$) | Davis (3 splits $\times$ 5 seeds = 15 runs); KIBA secundário | Gestão de cota no Colab (ADR #12) |
 
@@ -113,8 +113,9 @@ A Tabela 2 do artigo original avalia o desempenho dos modelos no particionamento
 | **GraphDTA (GIN)** | **1D (CNN) / GIN (5 camadas)** | **0.893** | **0.229** |
 
 > [!NOTE]
-> - O modelo **GraphDTA (GIN)** atingiu o melhor desempenho global reportado no Davis Setting 1 com **CI = 0.893** e **MSE = 0.229**.
-> - As métricas para o dataset **KIBA (Tabela 3)**, bem como métricas complementares não reportadas na Tabela 2 (coeficientes de correlação de Pearson, Spearman, $r_m^2$ e resultados nos regimes de particionamento *cold-start*), constam como *"a verificar em Nguyen et al. (2021)"*.
+> - Segundo **Nguyen et al. (2021)**, *Bioinformatics* 37(8), p. 1144 (**Tabela 2**, Davis *Setting 1*): DeepDTA `CI = 0.878, MSE = 0.261`; WideDTA `CI = 0.886, MSE = 0.262`; GraphDTA GCN `CI = 0.880, MSE = 0.254`; GAT_GCN `CI = 0.881, MSE = 0.245`; GAT `CI = 0.892, MSE = 0.232`; **GraphDTA GIN `CI = 0.893, MSE = 0.229`**.
+> - Na **Tabela 3** (p. 1144, KIBA *Setting 1*): DeepDTA `CI = 0.863, MSE = 0.194`; WideDTA `CI = 0.875, MSE = 0.179`; GraphDTA GAT `CI = 0.866, MSE = 0.179`; **GraphDTA GIN `CI = 0.882, MSE = 0.147`**; GCN `CI = 0.889, MSE = 0.139`; GAT_GCN `CI = 0.891, MSE = 0.139`.
+> - Métricas ausentes nas Tabelas 2 e 3 (Pearson, Spearman, $r_m^2$, AUROC/AUPR e regimes *cold-start*) permanecem como *"a verificar"* na literatura externa.
 
 ---
 
@@ -193,14 +194,14 @@ A reprodução estrita de modelos baseados em grafos em GPUs CUDA enfrenta limit
 
 ### 6.2 Impacto dos 69.64% de Pares Censurados no Davis ($pK_d = 5.0$)
 No ensaio experimental de Davis et al. (2011), o limite superior de medição de constante de dissociação foi de $K_d = 10.000\text{ nM}$, truncando interações nulas ou muito fracas em $pK_d = -\log_{10}(10^{-5}) = 5.0$.
-- Isso gera uma concentração pontual em $5.0$ em **20.932 dos 30.056 pares (69.64%)**.
+- Isso gera uma concentração pontual em $5.0$ em **20.931 dos 30.056 pares (69.64%)**.
 - Em razão disso, modelos ingênuos que prevêem valores próximos de $5.0$ podem alcançar MSE relativamente baixo sem aprender afinidades relativas entre inibidores potentes.
 - Torna-se imperativo o uso combinado de **Concordance Index (CI)** e **Spearman ($\rho$)**, bem como a comparação com os baselines triviais (`mean_predictor` e `ridge_aa_composition`), exigida no Gate 6 da Fase 2.
 
 ### 6.3 Truncamento em 1000 Resíduos vs. Embeddings ESM-2
 - No GraphDTA original, a sequência do alvo proteico é uniformemente truncada em **1000 aminoácidos** (`max_seq_len = 1000`).
-- No dataset Davis, **83 quinases possuem comprimento superior a 1022 resíduos** (algumas ultrapassando 2000 aminoácidos). Com o truncamento em 1000 aminoácidos, o GraphDTA descarta completamente a porção C-terminal dessas enzimas.
-- Essa restrição arquitetural do GraphDTA constitui uma das principais motivações teóricas para o PhysDual-GNN: na **Fase 3**, os embeddings pré-computados do **ESM-2** processam a proteína inteira com janela deslizante de 1022 resíduos e agregação ponderada, fornecendo uma representação contextualizada de todo o polipeptídeo sem perda de domínios catalíticos ou regulatórios.
+- No dataset Davis, **70 sequências únicas (`109` `target_id`s)** possuem comprimento superior a `1022` resíduos (algumas ultrapassando `2000` aminoácidos), e **`76` sequências únicas (`7.820` pares)** ultrapassam `1000` aminoácidos. Com o truncamento em `1000` aminoácidos, o GraphDTA descarta completamente a porção C-terminal dessas enzimas.
+- Na **Fase 3** (`GIN + ESM + MLP`; física opcional como ablação na Fase 6), os embeddings pré-computados do **ESM-2** processam a proteína inteira com janela deslizante de `1022` resíduos (`overlap = 256`) sobre `112` sequências únicas `> 1022` aa combinadas (`70` Davis + `42` KIBA).
 
 ---
 
@@ -254,7 +255,7 @@ python scripts/verify_phase2.py --full --config configs/base.yaml
 - **Gate 1:** Presença e integridade dos JSONs de runs individuais com todas as 6 métricas (MSE, RMSE, Pearson, Spearman, $r_m^2$, CI).
 - **Gate 2:** Presença e consistência dos JSONs agregados com estatísticas amostrais (média e desvio-padrão com $ddof=1$).
 - **Gate 3:** Ausência de arquivos temporários órfãos (`.tmp_*`).
-- **Gate 4:** Confirmação do isolamento estrito de teste (`test_isolation_verified: true`).
+- **Gate 4:** Verifica em `verify_phase2.py` que todo run esperado gravou `test_metrics_full` e `val_metrics_at_best` não vazios, em complemento à garantia estrutural C1 em `trainer.py` (onde `test_loader` nunca é iterado dentro do loop de épocas); a flag explícita `test_isolation_verified` foi incorporada ao schema JSON em `run_phase2_baseline.py`.
 - **Gate 5:** Sanidade de convergência (Davis `random` com CI $\ge 0.86$ de referência).
 - **Gate 6:** Superação empírica dos baselines triviais (`mean_predictor` e `ridge_aa_composition`).
 
@@ -299,21 +300,21 @@ sequenceDiagram
 
 ## 9. Auditoria Forense dos Resultados da Fase 2 e Protocolo v2 (GroupKFold de 5 Dobras - ADR #13)
 
-### 9.1 Síntese da Auditoria Forense do Protocolo v1 (Seeds)
+### 9.1 Síntese do Protocolo v1 (5 Seeds)
 
-Após a conclusão das 9 combinações de baseline (18 runs agregadas com 5 seeds cada), a auditoria forense revelou achados cruciais para a fundamentação científica do projeto:
+Após a conclusão das 9 combinações de baseline em protocolo de 5 seeds (`0..4`) — com adoção oficial de 1000 épocas nas seeds `1` e `3` do `kiba_random` conforme ADRs #12 e #13 — os valores consolidados em `outputs/results/baseline_*.json` são:
 
-| Dataset / Split | Modelo | CI (Test) | MSE (Test) | Pearson ($r$) | Baseline de Promiscuidade ($\Delta\text{MSE}$) | Veredito |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Davis random** | GIN (oficial) | 0.8845 ± 0.0076 | 0.2354 ± 0.0152 | 0.8351 ± 0.0102 | -71% vs média global | **Aprovado** (reproduz Nguyen et al., 2021) |
-| **Davis random** | CNN3 | 0.8895 ± 0.0079 | 0.2223 ± 0.0157 | 0.8465 ± 0.0116 | -73% vs média global | **Aprovado** (variante secundária forte) |
-| **Davis cold-drug** | GIN (oficial) | 0.6930 ± 0.0210 | 0.5222 ± 0.0381 | 0.5367 ± 0.0321 | -15% vs média global | **Aprovado** (queda esperada por generalização) |
-| **Davis cold-drug** | CNN3 | 0.6918 ± 0.0343 | 0.5173 ± 0.0634 | 0.5401 ± 0.0460 | -16% vs média global | **Aprovado** (comportamento idêntico ao GIN) |
-| **Davis cold-target** | GIN (oficial) | 0.7282 ± 0.0245 | 0.7490 ± 0.0768 | 0.5012 ± 0.0389 | **+0.1076 vs `drug_mean_predictor`** | **Falha estrutural da CNN 1D oficial** |
-| **Davis cold-target** | CNN3 | 0.7698 ± 0.0374 | 0.5684 ± 0.0792 | 0.5732 ± 0.0528 | **-0.0740 vs `drug_mean_predictor`** | **Supera baseline marginal de droga** |
-| **KIBA random** | GIN (oficial) | 0.8540 ± 0.0062 | 0.1812 ± 0.0075 | 0.8482 ± 0.0070 | -74% vs média global | Abaixo do paper (CI ~0.88); seeds 1 e 3 no teto |
-| **KIBA cold-drug** | GIN (oficial) | 0.7561 ± 0.0124 | 0.3814 ± 0.0195 | 0.7301 ± 0.0162 | -44% vs média global | Generalização consistente |
-| **KIBA cold-target** | GIN (oficial) | 0.6582 ± 0.0189 | 0.5140 ± 0.0210 | 0.6012 ± 0.0205 | -25% vs média global | Generalização consistente |
+| Dataset / Split | Modelo | CI (Test) $\uparrow$ | MSE (Test) $\downarrow$ | Pearson ($r$) $\uparrow$ | $r_m^2$ $\uparrow$ | Vs. Média Global (`MSE`) | Veredito |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Davis random** | GIN (oficial) | 0.8845 ± 0.0057 | 0.2348 ± 0.0166 | 0.8455 ± 0.0151 | 0.7008 ± 0.0214 | -71.4% | **Aprovado** (reproduz Nguyen et al., 2021) |
+| **Davis random** | CNN3 | 0.8895 ± 0.0035 | 0.2216 ± 0.0128 | 0.8552 ± 0.0088 | 0.7123 ± 0.0297 | -73.0% | **Aprovado** (variante secundária forte) |
+| **Davis cold-drug** | GIN (oficial) | 0.6934 ± 0.0382 | 0.5221 ± 0.1495 | 0.4321 ± 0.0790 | 0.1512 ± 0.0580 | -15.2% | Alta variância em v1; reavaliado em GroupKFold v2 |
+| **Davis cold-drug** | CNN3 | 0.6918 ± 0.0343 | 0.5169 ± 0.1671 | 0.4341 ± 0.0674 | 0.1630 ± 0.0551 | -16.0% | Comportamento próximo ao GIN; reavaliado em v2 |
+| **Davis cold-target** | GIN (oficial) | 0.7284 ± 0.0312 | 0.7493 ± 0.3338 | 0.4652 ± 0.0520 | 0.2102 ± 0.0478 | -10.3% (`best_ep = 4.6 ± 2.1`) | **Falha estrutural da CNN 1D oficial** |
+| **Davis cold-target** | CNN3 | 0.7698 ± 0.0374 | 0.5677 ± 0.2908 | 0.6106 ± 0.0833 | 0.3692 ± 0.0936 | -32.0% (`best_ep = 81.0 ± 19.3`) | **Supera baseline marginal de droga** (confirmado em v2) |
+| **KIBA random** | GIN (oficial) | **0.8578 ± 0.0134** | **0.1753 ± 0.0190** | **0.8644 ± 0.0133** | **0.7337 ± 0.0301** | **-74.6%** | **Adotado 1000 ep. nas seeds 1 e 3** (seed 1: CI `0.8803`) |
+| **KIBA cold-drug** | GIN (oficial) | 0.7560 ± 0.0107 | 0.3808 ± 0.0532 | 0.6672 ± 0.0260 | 0.4082 ± 0.0297 | -43.5% | Generalização consistente |
+| **KIBA cold-target** | GIN (oficial) | 0.6579 ± 0.0437 | 0.5137 ± 0.0888 | 0.5137 ± 0.0708 | 0.2416 ± 0.0712 | -25.1% | Queda severa (`-0.1999` CI vs. `random`) e alta variância |
 
 ### 9.2 Causa-Raiz no Davis Cold-Target e Papel do CNN3
 
@@ -337,5 +338,36 @@ Conforme estabelecido no **ADR #13**, o Davis é reavaliado sob validação cruz
    - Métricas de classificação binária (AUROC e AUPR em $pK_d > 5.0$ e $pK_d \ge 7.0$).
    - Bootstrap agrupado no nível de cluster (*cluster-level bootstrap*, 1.000 replicações, IC 95%) para $\Delta\text{MSE}$ e $\Delta\text{CI}$ pareados contra os baselines marginais de promiscuidade (`drug_mean_predictor` e `target_mean_predictor`).
 4. **Controle de Épocas no KIBA Random (Seeds 1 e 3):**
-   - As seeds 1 e 3 de KIBA `random` são estendidas de 500 para 1000 épocas (`--extend-epochs`), preservando o histórico de loss e o estado do otimizador e early stopping a partir do `checkpoint_last.pt`.
+   - As seeds 1 e 3 de KIBA `random` foram estendidas de 500 para 1000 épocas (`--extend-epochs`), preservando o histórico de loss e o estado do otimizador e early stopping a partir do `checkpoint_last.pt`.
+
+### 9.4 Resultados Consolidados do Protocolo v2 (Davis 5-Fold GroupKFold)
+
+Avaliação completa fora da dobra (OOF sobre todos os 30.056 pares do Davis) consolidada em `outputs/results/baseline_*_kfold.json`:
+
+| Split / Modelo | Média entre Dobras (CI / MSE) | OOF Pooled (CI / MSE / $r_m^2$) | AUROC ($pK_d > 5.0$ / $\ge 7.0$) | Bootstrap Agrupado Exploratório vs. Marginal (`IC 95%`, fração favorável) | Referência kNN (CI / MSE) |
+| :--- | :---: | :---: | :---: | :--- | :---: |
+| **`cold_drug` / GIN** | `0.6623 ± 0.0572` / `0.7739 ± 0.2059` | `0.6424` / `0.7716` / `0.0923` | `0.6569` / `0.7199` | vs. `target_mean`: $\Delta\text{MSE} = +0.0410$ `[-0.0487, 0.1369]`, `220/1000` | `knn_tanimoto_drug`: `0.7100` / `0.7580` |
+| **`cold_drug` / CNN3** | `0.6572 ± 0.0776` / `0.7610 ± 0.1403` | `0.6519` / `0.7605` / `0.0911` | `0.6668` / `0.7351` | vs. `target_mean`: $\Delta\text{MSE} = +0.0277$ `[-0.0431, 0.1021]`, `220/1000` | `knn_tanimoto_drug`: `0.7100` / `0.7580` |
+| **`cold_target` / GIN** | `0.7117 ± 0.0112` / `0.7524 ± 0.2713` | `0.6861` / `0.7648` / `0.1327` | `0.7093` / `0.7296` | vs. `drug_mean`: $\Delta\text{MSE} = +0.1315$ `[0.0694, 0.2187]`, `0/1000` | `knn_kmer_target`: `0.8128` / `0.4591` |
+| **`cold_target` / CNN3** | **`0.7740 ± 0.0180` / `0.5350 ± 0.1152`** | **`0.7715` / `0.5407` / `0.3384`** | **`0.8020` / `0.8368`** | vs. `drug_mean`: $\Delta\text{MSE} = -0.0910$ `[-0.1415, -0.0464]`, `1000/1000` | `knn_kmer_target`: `0.8128` / `0.4591` |
+
+* **Diagnóstico crítico para a Fase 3 (comparações exploratórias):** No Davis `cold_target`, o `GraphDTAGIN` oficial perde em **1000/1000 reamostras bootstrap** para `drug_mean_predictor` (`CI = 0.7488 ± 0.0150`). O `GraphDTACNN3` vence `drug_mean_predictor` em **1000/1000 reamostras** em MSE e **992/1000** em CI ($\Delta\text{CI} = +0.0264$, `IC 95% [0.0038, 0.0463]`), porém ainda permanece abaixo do baseline de homologia `knn_kmer_target` (`CI = 0.8128 ± 0.0231`, `MSE = 0.4591 ± 0.1386`).
+
+### 9.5 Resolução de 1000 Épocas no KIBA Random e Análise Diagnóstica do KIBA
+
+1. **Aplicação da Regra de Decisão e Paridade Metodológica (Teto Efetivo de 1000 Épocas):**
+   - Antes da extensão, o agregado das 5 seeds com teto de 500 épocas registrava `CI = 0.8540 ± 0.0062` e `MSE = 0.1812 ± 0.0075`. As seeds `0`, `2` e `4` já haviam encerrado por *early stopping* (`patience = 50`) antes da época 500 (`best_epoch = 294`, `286`, `343`; `total_epochs_run = 344`, `336`, `393`; `CI = 0.8485`, `0.8467`, `0.8556`), enquanto as seeds `1` e `3` ainda estavam evoluindo na época 500.
+   - Após extensão até `1000` épocas (preservando otimizador e estado de *early stopping*):
+     - **Seed 1:** `best_epoch = 774` (`tot = 824`), passando de `val_ci@501 = 0.8572` (`val_mse = 0.1846`) para **`CI = 0.8803`**, **`MSE = 0.1451`**, `Pearson = 0.8860`, `RM2 = 0.7758`.
+     - **Seed 3:** `best_epoch = 509` (`tot = 559`), atingindo **`CI = 0.8579`**, **`MSE = 0.1697`**, `Pearson = 0.8688`, `RM2 = 0.7477`.
+   - Como as seeds `0`, `2` e `4` encerraram por *early stopping* muito antes de `500`, seu resultado é idêntico ao que obteriam sob um teto de `1000` épocas; portanto, **o teto efetivo do protocolo de `kiba_random` é `1000` épocas para todas as 5 seeds** (sem necessidade de re-execução das seeds 0, 2 e 4).
+   - Para cálculo de velocidade real por época em `kiba_random`, consideram-se apenas os 3 runs não retomados (`seeds 0, 2, 4`): **`22.338 ± 0.014 s/época`** (`23.968,34 s` somados em `357.7 ± 30.9` épocas), desconsiderando os artefatos distorcidos de `sec_per_epoch` das seeds 1 e 3 (`0.646 s` e `2.347 s`), que dividiram apenas o tempo pós-500 pelo total acumulado de épocas.
+2. **Comparação com Baselines Marginais e kNN em `kiba_random` (Todas as 5 Seeds, `cpu_audits.json`):**
+   - O `graphdta_gin` (`CI = 0.8578 ± 0.0134`, `MSE = 0.1753 ± 0.0190`) vence em **5/5 seeds** tanto em MSE (`ΔMSE = -0.2525 ± 0.0103`) quanto em CI (`ΔCI = +0.1568 ± 0.0134`) frente a `drug_mean_predictor` (`CI = 0.7010`, `MSE = 0.4278`) e supera `target_mean_predictor` (`CI = 0.6852`, `MSE = 0.5944`), `knn_tanimoto_drug` (`CI = 0.7899`, `MSE = 0.3448`) e `knn_kmer_target` (`CI = 0.7451`, `MSE = 0.3649`). Já em `kiba_cold_target` (5/5 seeds), repete-se o colapso do Davis: o `graphdta_gin` (`CI = 0.6579`, `MSE = 0.5137`) perde **0/5 seeds** em MSE (`ΔMSE = +0.0672 ± 0.0281`) e **1/5 seeds** em CI (`ΔCI = -0.0384 ± 0.0400`) frente a `drug_mean_predictor` (`CI = 0.6962`, `MSE = 0.4465`), ficando também atrás de `knn_kmer_target` (`CI = 0.7320`, `MSE = 0.3730`).
+3. **Impacto do Truncamento (`> 1000` aa) no KIBA:**
+   - Embora de `15.5%` a `20.4%` dos pares de teste possuam alvos com mais de `1000` resíduos, o erro quadrático médio degrada sistematicamente nessa subpopulação em todos os splits:
+     - **`kiba_random`** (`20.4%` > 1000 aa): `MSE 0.1642 → 0.2189` (**`+33.3%`**), `CI 0.8624 → 0.8362`.
+     - **`kiba_cold_drug`** (`20.2%` > 1000 aa): `MSE 0.3528 → 0.4909` (**`+39.1%`**), `CI 0.7641 → 0.7165`.
+     - **`kiba_cold_target`** (`15.5%` > 1000 aa): `MSE 0.4948 → 0.7113` (**`+43.8%`**), com alta dispersão entre seeds (`± 0.3516`).
+
 
