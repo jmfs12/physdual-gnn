@@ -112,3 +112,32 @@ evaluation:
 
 physics:
   enabled: false  # Módulo opcional (Fase 6), avaliado por ablação
+
+physdual_phase3:
+  model_name: "physdual_gin_esm_mlp"
+  drug_in_dim: 78
+  gin_hidden_dim: 32
+  gin_num_layers: 5
+  drug_output_dim: 128
+  gin_dropout: 0.2
+  esm_dim: 1280
+  esm_dropout_in: 0.4
+  prot_output_dim: 128
+  prot_dropout: 0.3
+  prot_activation: "gelu"
+  mlp_hidden_dims: [512, 256]
+  mlp_dropout: 0.3
+  training:
+    optimizer: "adamw"
+    lr: 0.0005
+    weight_decay: 0.001
+    use_lr_scheduler: false
+    batch_size: 512
+    epochs: 500
+    patience: 50
+    davis_cold_patience: 80
+    monitor: "mse"
+    save_last_every: 10
+    num_workers: 2
+    pin_memory: true
+    persistent_workers: true

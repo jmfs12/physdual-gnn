@@ -1,4 +1,4 @@
-"""Módulo de arquiteturas de modelos (Fase 2)."""
+"""Módulo de arquiteturas de modelos (Fases 2 e 3)."""
 
 from physdual.models.graphdta import (
     DeepDTAStyleCNN3TargetEncoder,
@@ -8,6 +8,11 @@ from physdual.models.graphdta import (
     OfficialGraphDTATargetEncoder,
     build_baseline_model,
 )
+from physdual.models.physdual import (
+    ESMTargetEncoder,
+    PhysDualPhase3,
+    build_physdual_phase3_model,
+)
 
 __all__ = [
     "GINEncoder",
@@ -16,4 +21,7 @@ __all__ = [
     "GraphDTAGIN",
     "GraphDTACNN3",
     "build_baseline_model",
+    "ESMTargetEncoder",
+    "PhysDualPhase3",
+    "build_physdual_phase3_model",
 ]

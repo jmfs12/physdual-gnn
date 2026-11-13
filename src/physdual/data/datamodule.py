@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import tarfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
@@ -23,6 +23,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.data import Batch, Data
 
+from physdual.data.esm_cache import load_cached_protein_embedding
 from physdual.data.featurizer_drug import load_drug_graph, load_drug_graph_cache
 from physdual.data.splits import load_splits
 from physdual.utils.paths import get_project_root
@@ -82,12 +83,51 @@ def compute_aa_composition(seq: str) -> np.ndarray:
     return comp / float(total_len)
 
 
+def resolve_esm_cache_dir(
+    config: dict[str, Any] | None = None,
+    root: Path | None = None,
+    esm_cache_dir: Path | str | None = None,
+) -> Path:
+    """Resolve o diretório do cache ESM-2 priorizando argumento explícito e depois `configs/base.yaml`."""
+    if esm_cache_dir is not None:
+        return Path(esm_cache_dir)
+    if config is None:
+        from physdual.utils.config import load_config
+        config = load_config()
+    base_root = Path(root) if root is not None else Path(config.get("project_root", get_project_root()))
+    rel_cache = config.get("paths", {}).get("esm_cache_dir", "cache/esm_embeddings")
+    p = Path(rel_cache)
+    return p if p.is_absolute() else (base_root / p)
+
+
+def load_esm_mean_pool_dict(
+    sequences: Iterable[str],
+    model_name: str = "esm2_t33_650M_UR50D",
+    cache_dir: Path | str = "cache/esm_embeddings",
+    expected_dim: int = 1280,
+) -> dict[str, torch.Tensor]:
+    """Carrega embeddings `.pt` (`weights_only=True`) e retorna `seq -> mean_pool(fp32)`."""
+    cache_path = Path(cache_dir)
+    out: dict[str, torch.Tensor] = {}
+    for seq in sorted({str(s) for s in sequences}):
+        emb = load_cached_protein_embedding(
+            sequence=seq,
+            model_name=model_name,
+            cache_dir=cache_path,
+            expected_dim=expected_dim,
+        )
+        vec = emb.mean(dim=0).to(dtype=torch.float32).contiguous()
+        if not torch.isfinite(vec).all():
+            raise ValueError(f"Embedding ESM-2 contém NaN/Inf para sequência de len={len(seq)}")
+        out[seq] = vec
+    return out
+
+
 class DTADataset(Dataset):
     """Dataset de afinidade fármaco-alvo com pré-construção em memória para máxima eficiência de CPU/IO.
 
     Pré-constrói os objetos `torch_geometric.data.Data` para cada SMILES único e os tensores
-    de tokens para cada sequência única durante a inicialização, reduzindo a indexação no
-    `__getitem__` a um lookup de referências O(1).
+    de tokens (ou vetores mean-pooled do ESM-2 quando `esm_cache` é fornecido) durante a inicialização.
     """
 
     def __init__(
@@ -95,6 +135,9 @@ class DTADataset(Dataset):
         df: pd.DataFrame,
         drug_graph_cache: dict[str, Any] | Path | str,
         max_seq_len: int = 1000,
+        esm_cache: dict[str, torch.Tensor] | Path | str | None = None,
+        esm_model_name: str = "esm2_t33_650M_UR50D",
+        esm_dim: int = 1280,
     ) -> None:
         """Inicializa o DTADataset.
 
@@ -102,6 +145,9 @@ class DTADataset(Dataset):
             df: DataFrame com colunas obrigatórias `smiles`, `sequence` e `affinity`.
             drug_graph_cache: Dicionário contendo os grafos featurizados ou caminho do arquivo `.pt`.
             max_seq_len: Comprimento máximo de truncamento/padding para tokens de proteínas.
+            esm_cache: Dicionário `seq -> Tensor[esm_dim]` (ou `[L, esm_dim]`) ou caminho do diretório cache.
+            esm_model_name: Nome do modelo ESM-2 caso `esm_cache` seja caminho em disco.
+            esm_dim: Dimensão esperada do embedding ESM-2.
         """
         for req_col in ("smiles", "sequence", "affinity"):
             if req_col not in df.columns:
@@ -140,6 +186,34 @@ class DTADataset(Dataset):
             self.unique_tokens[seq] = torch.tensor(tokens_np, dtype=torch.long)
             self.unique_seq_lens[seq] = len(seq)
 
+        # Cache opcional de embeddings ESM-2 (mean-pooled em float32)
+        self.unique_esm_vecs: dict[str, torch.Tensor] | None = None
+        if esm_cache is not None:
+            if isinstance(esm_cache, (str, Path)):
+                self.unique_esm_vecs = load_esm_mean_pool_dict(
+                    unique_seqs,
+                    model_name=esm_model_name,
+                    cache_dir=Path(esm_cache),
+                    expected_dim=int(esm_dim),
+                )
+            elif isinstance(esm_cache, dict):
+                self.unique_esm_vecs = {}
+                for seq in unique_seqs:
+                    if seq not in esm_cache:
+                        raise KeyError(f"Sequência ausente no `esm_cache` (len={len(seq)}).")
+                    t = torch.as_tensor(esm_cache[seq], dtype=torch.float32)
+                    if t.ndim == 2:
+                        t = t.mean(dim=0)
+                    if t.ndim != 1 or int(t.size(0)) != int(esm_dim):
+                        raise ValueError(
+                            f"Shape ESM inválido para seq len={len(seq)}: {tuple(t.shape)}, esperado ({esm_dim},)"
+                        )
+                    self.unique_esm_vecs[seq] = t.contiguous()
+            else:
+                raise TypeError(
+                    f"`esm_cache` deve ser dict, Path/str ou None, recebido: {type(esm_cache)}"
+                )
+
         # Vetores indexados para acesso O(1) de alta velocidade
         self._smiles_list: list[str] = self.df["smiles"].astype(str).tolist()
         self._seq_list: list[str] = self.df["sequence"].astype(str).tolist()
@@ -161,7 +235,7 @@ class DTADataset(Dataset):
     def __getitem__(self, idx: int) -> dict[str, Any]:
         smiles = self._smiles_list[idx]
         seq = self._seq_list[idx]
-        return {
+        item: dict[str, Any] = {
             "drug_graph": self.unique_graphs[smiles],
             "target_tokens": self.unique_tokens[seq],
             "seq_len": int(self.unique_seq_lens[seq]),
@@ -171,20 +245,23 @@ class DTADataset(Dataset):
             "drug_id": str(self._drug_id_list[idx]),
             "affinity": torch.tensor(float(self._affinity_list[idx]), dtype=torch.float32),
         }
+        if self.unique_esm_vecs is not None:
+            item["target_esm"] = self.unique_esm_vecs[seq]
+        return item
 
 
 def dta_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
-    """Agrupa amostras individuais em um lote PyG para GraphDTA.
+    """Agrupa amostras individuais em um lote PyG para GraphDTA / PhysDual-GNN.
 
     Empacota `drug_graph` via `torch_geometric.data.Batch.from_data_list`,
-    empilha os tensores de sequência em `[B, max_len]` e as afinidades em `[B]`.
+    empilha os tensores de sequência (e `target_esm` se presente) e as afinidades em `[B]`.
     """
     drug_batch = Batch.from_data_list([item["drug_graph"] for item in batch])
     target_tokens = torch.stack([item["target_tokens"] for item in batch])
     affinity = torch.stack([item["affinity"] for item in batch])
     seq_lengths = torch.tensor([item["seq_len"] for item in batch], dtype=torch.long)
 
-    return {
+    collated: dict[str, Any] = {
         "drug_batch": drug_batch,
         "target_tokens": target_tokens,
         "affinity": affinity,
@@ -194,6 +271,9 @@ def dta_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
         "target_id": [item["target_id"] for item in batch],
         "drug_id": [item["drug_id"] for item in batch],
     }
+    if "target_esm" in batch[0]:
+        collated["target_esm"] = torch.stack([item["target_esm"] for item in batch])
+    return collated
 
 
 def get_dta_dataloaders(
@@ -204,6 +284,8 @@ def get_dta_dataloaders(
     root: Path | None = None,
     protocol: str = "seeds",
     fold: int | None = None,
+    use_esm: bool = False,
+    esm_cache_dir: Path | str | None = None,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """Cria e retorna os DataLoaders `(train_loader, val_loader, test_loader)` para um dataset e split.
 
@@ -276,11 +358,52 @@ def get_dta_dataloaders(
     graphdta_cfg = config.get("graphdta", {})
     max_seq_len = int(graphdta_cfg.get("max_seq_len", 1000))
 
-    train_ds = DTADataset(train_df, drug_graph_cache=drug_cache, max_seq_len=max_seq_len)
-    val_ds = DTADataset(val_df, drug_graph_cache=drug_cache, max_seq_len=max_seq_len)
-    test_ds = DTADataset(test_df, drug_graph_cache=drug_cache, max_seq_len=max_seq_len)
+    shared_esm_cache: dict[str, torch.Tensor] | None = None
+    esm_model_name = str(config.get("esm", {}).get("model_name", "esm2_t33_650M_UR50D"))
+    esm_dim = int(config.get("esm", {}).get("esm_dim", 1280))
+    if use_esm:
+        resolved_esm_dir = resolve_esm_cache_dir(config=config, root=base_root, esm_cache_dir=esm_cache_dir)
+        all_unique_seqs = pd.concat(
+            [train_df["sequence"], val_df["sequence"], test_df["sequence"]],
+            ignore_index=True,
+        ).astype(str).unique()
+        shared_esm_cache = load_esm_mean_pool_dict(
+            all_unique_seqs,
+            model_name=esm_model_name,
+            cache_dir=resolved_esm_dir,
+            expected_dim=esm_dim,
+        )
 
-    train_cfg = graphdta_cfg.get("training", {})
+    train_ds = DTADataset(
+        train_df,
+        drug_graph_cache=drug_cache,
+        max_seq_len=max_seq_len,
+        esm_cache=shared_esm_cache,
+        esm_model_name=esm_model_name,
+        esm_dim=esm_dim,
+    )
+    val_ds = DTADataset(
+        val_df,
+        drug_graph_cache=drug_cache,
+        max_seq_len=max_seq_len,
+        esm_cache=shared_esm_cache,
+        esm_model_name=esm_model_name,
+        esm_dim=esm_dim,
+    )
+    test_ds = DTADataset(
+        test_df,
+        drug_graph_cache=drug_cache,
+        max_seq_len=max_seq_len,
+        esm_cache=shared_esm_cache,
+        esm_model_name=esm_model_name,
+        esm_dim=esm_dim,
+    )
+
+    train_cfg = (
+        config.get("physdual_phase3", {}).get("training", graphdta_cfg.get("training", {}))
+        if use_esm
+        else graphdta_cfg.get("training", {})
+    )
     batch_size = int(train_cfg.get("batch_size", 512))
     num_workers = int(train_cfg.get("num_workers", 0))
     pin_memory = bool(train_cfg.get("pin_memory", True))

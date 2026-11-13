@@ -110,7 +110,11 @@ def _forward_batch(
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
     """Encaminha o lote através do modelo, suportando formatos de Batch PyG e dicionários."""
     if isinstance(batch, dict):
-        if "drug_batch" in batch and "target_tokens" in batch:
+        if "drug_batch" in batch and "target_esm" in batch:
+            drug_batch = batch["drug_batch"].to(device)
+            target_esm = batch["target_esm"].to(device)
+            out = model(drug_batch, target_esm)
+        elif "drug_batch" in batch and "target_tokens" in batch:
             drug_batch = batch["drug_batch"].to(device)
             target_tokens = batch["target_tokens"].to(device)
             out = model(drug_batch, target_tokens)
@@ -297,6 +301,7 @@ def train_model(
     drive_checkpoint_dir: Path | str | None = None,
     delta: float = 1e-4,
     resume: bool = True,
+    optimizer_name: str = "adam",
 ) -> dict[str, Any]:
     """Orquestra o treinamento com parada antecipada, atomicidade e isolamento estrito de teste.
 
@@ -336,7 +341,13 @@ def train_model(
         effective_patience = max(patience, davis_cold_patience)
 
     mode = get_monitor_mode(monitor)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    opt_key = str(optimizer_name).lower().strip()
+    if opt_key == "adamw":
+        optimizer: Optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    elif opt_key == "adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    else:
+        raise ValueError(f"Otimizador não suportado: '{optimizer_name}'. Use 'adam' ou 'adamw'.")
     criterion = nn.MSELoss()
 
     scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau | None = None
@@ -367,6 +378,7 @@ def train_model(
     best_epoch = 0
     best_metric_val = float("inf") if mode == "min" else float("-inf")
     val_metrics_at_best: dict[str, float] = {}
+    train_loss_at_best: float | None = None
     total_epochs_run = 0
     history: list[dict[str, float]] = []
 
@@ -425,6 +437,7 @@ def train_model(
             best_metric_val = current_metric
             best_epoch = epoch
             val_metrics_at_best = dict(val_metrics)
+            train_loss_at_best = float(train_loss)
 
             best_state = {
                 "epoch": epoch,
@@ -497,10 +510,37 @@ def train_model(
                 "y_pred": float(test_pred[i]),
             })
 
+    if train_loss_at_best is None and best_epoch > 0 and history:
+        for h in history:
+            if int(h.get("epoch", -1)) == best_epoch:
+                train_loss_at_best = float(h.get("train_loss", 0.0))
+                break
+
+    val_mse_best = float(val_metrics_at_best.get("mse", float("nan")))
+    train_val_mse_gap_at_best = (
+        float(val_mse_best - train_loss_at_best)
+        if train_loss_at_best is not None and not np.isnan(val_mse_best)
+        else None
+    )
+    early_memorization_warn = bool(
+        best_epoch > 0
+        and best_epoch < 15
+        and "cold_target" in split_type.lower().strip()
+    )
+    if early_memorization_warn:
+        print(
+            f"[WARN] best_epoch ({best_epoch}) < 15 em '{split_type}': "
+            "sinal de memorização precoce das proteínas de treino; considere aumentar regularização."
+        )
+
     return {
         "best_epoch": best_epoch,
         "total_epochs_run": total_epochs_run,
         "near_epoch_ceiling_warn": near_epoch_ceiling_warn,
+        "early_memorization_warn": early_memorization_warn,
+        "optimizer_name": opt_key,
+        "train_loss_at_best": train_loss_at_best,
+        "train_val_mse_gap_at_best": train_val_mse_gap_at_best,
         "val_metrics_at_best": val_metrics_at_best,
         "test_metrics_full": test_metrics_full,
         "test_metrics_uncensored": test_metrics_uncensored,
