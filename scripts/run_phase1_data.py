@@ -188,18 +188,29 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    summary_path = logs_dir / "phase1_summary_report.json"
+    existing_datasets: dict[str, Any] = {}
+    if summary_path.exists():
+        try:
+            prev = json.loads(summary_path.read_text(encoding="utf-8"))
+            if isinstance(prev.get("datasets"), dict):
+                existing_datasets = dict(prev["datasets"])
+        except Exception:
+            existing_datasets = {}
+
     summary_report: dict[str, Any] = {
         "model_name": model_name,
         "esm_dim": int(esm_cfg.get("esm_dim", 1280)),
         "max_len": max_len,
         "overlap": overlap,
-        "datasets": {},
+        "datasets": existing_datasets,
         "windowed_sequences": {"count": 0, "target_ids": []},
         "davis_censoring": {"censored_count": 0, "censored_pct": 0.0},
         "smiles_audit": {"modified_count": 0, "failed_count": 0, "failures": []},
     }
 
     all_protein_sequences: list[tuple[str, str]] = []
+    windowed_target_ids: list[str] = []
 
     for ds in datasets_to_run:
         print(f"[Fase 1] Processando dataset: {ds.upper()} ...")
@@ -306,16 +317,25 @@ def main(argv: list[str] | None = None) -> int:
             f"(versão={feat_version}, sucesso={graph_report['num_succeeded']}, falhas={graph_report['num_failed']})"
         )
 
-        # Coleta sequências únicas para extração do ESM-2
+        # Coleta sequências únicas para extração do ESM-2 e contabiliza janelas (> max_len)
         unique_targets_df = df[["target_id", "sequence"]].drop_duplicates(subset=["sequence"])
         for _, row in unique_targets_df.iterrows():
-            all_protein_sequences.append((str(row["target_id"]), str(row["sequence"])))
+            tid = str(row["target_id"])
+            seq = str(row["sequence"])
+            all_protein_sequences.append((tid, seq))
+            if len(seq) > max_len:
+                windowed_target_ids.append(tid)
 
         summary_report["datasets"][ds] = {
             "ingestion": ing_report,
             "drug_graphs": graph_report,
             "splits": split_stats,
         }
+
+    summary_report["windowed_sequences"] = {
+        "count": len(windowed_target_ids),
+        "target_ids": windowed_target_ids,
+    }
 
     if not args.skip_esm and all_protein_sequences:
         print(f"[Fase 1] Extraindo embeddings do ESM-2 ({model_name}) para sequências únicas ...")

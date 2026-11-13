@@ -425,6 +425,9 @@ def run_single_unit(
         "knn_baselines": knn_baselines,
         "history": train_result.get("history", []),
         "oof_predictions": oof_predictions,
+        "test_isolation_verified": bool(
+            train_result.get("val_metrics_at_best") and train_result.get("test_metrics_full")
+        ),
     }
 
     save_json_atomic(run_record, run_file)
@@ -486,7 +489,7 @@ def aggregate_runs(
         if run_file.exists():
             try:
                 data = json.loads(run_file.read_text(encoding="utf-8"))
-                per_seed_results[str(s)] = data
+                per_seed_results[str(s)] = {k: v for k, v in data.items() if k != "oof_predictions"}
                 found_runs.append(data)
             except Exception as e:
                 print(f"[WARN] Erro ao carregar {run_file}: {e}")
@@ -599,6 +602,10 @@ def aggregate_runs(
         "protocol": "seeds",
         "num_seeds": len(found_runs),
         "seeds": [int(s) for s in per_seed_results.keys()],
+        "test_isolation_verified": all(
+            bool(r.get("test_isolation_verified", r.get("val_metrics_at_best") and r.get("test_metrics_full")))
+            for r in found_runs
+        ),
         "per_seed_results": per_seed_results,
         "aggregated": aggregated_payload,
     }
@@ -805,6 +812,10 @@ def aggregate_kfold_runs(
         "protocol": "kfold",
         "num_folds": len(found_runs),
         "folds": [int(f) for f in per_fold_results.keys()],
+        "test_isolation_verified": all(
+            bool(r.get("test_isolation_verified", r.get("val_metrics_at_best") and r.get("test_metrics_full")))
+            for r in found_runs
+        ),
         "per_fold_results": per_fold_results,
         "per_fold_mean_std": per_fold_mean_std,
         "fold_timings": fold_timings,
