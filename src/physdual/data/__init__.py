@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from physdual.data.datamodule import (
-    PROTEIN_ALPHABET,
-    PROTEIN_CHAR_TO_IDX,
-    DTADataset,
-    compute_aa_composition,
-    dta_collate_fn,
-    get_dta_dataloaders,
-    prepare_local_cache,
-    tokenize_protein_sequence,
-)
+try:
+    from physdual.data.datamodule import (
+        PROTEIN_ALPHABET,
+        PROTEIN_CHAR_TO_IDX,
+        DTADataset,
+        compute_aa_composition,
+        dta_collate_fn,
+        get_dta_dataloaders,
+        prepare_local_cache,
+        tokenize_protein_sequence,
+    )
+except ImportError:
+    pass
 from physdual.data.datasets import (
     EXPECTED_COUNTS,
     canonicalize_largest_fragment,
@@ -39,9 +42,13 @@ from physdual.data.featurizer_drug import (
     smiles_to_pyg_graph,
 )
 from physdual.data.splits import (
+    create_group_kfold_splits,
+    create_sequence_identity_kfold_splits,
     create_splits,
     load_splits,
     save_splits,
+    verify_group_kfold_coverage,
+    verify_sequence_identity_splits,
     verify_split_leakage,
 )
 

@@ -12,10 +12,22 @@ from typing import Any
 
 import numpy as np
 from scipy import stats
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.linear_model import Ridge, RidgeCV
-from sklearn.metrics import average_precision_score, roc_auc_score
-from sklearn.metrics.pairwise import cosine_similarity
+
+try:
+    from sklearn.feature_extraction.text import CountVectorizer
+    from sklearn.linear_model import Ridge, RidgeCV
+    from sklearn.metrics import average_precision_score, roc_auc_score
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    _HAS_SKLEARN = True
+except ImportError:
+    CountVectorizer = None  # type: ignore[assignment,misc]
+    Ridge = None  # type: ignore[assignment,misc]
+    RidgeCV = None  # type: ignore[assignment,misc]
+    average_precision_score = None  # type: ignore[assignment]
+    roc_auc_score = None  # type: ignore[assignment]
+    cosine_similarity = None  # type: ignore[assignment]
+    _HAS_SKLEARN = False
 
 try:
     from rdkit import Chem

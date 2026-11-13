@@ -776,9 +776,10 @@ def aggregate_kfold_runs(
         )
 
         # 3. Bootstrap agrupado (cluster-level) por droga ou por alvo
-        group_col = "sequence" if split == "cold_target" else "smiles"
+        is_cold_target = split.startswith("cold_target")
+        group_col = "sequence" if is_cold_target else "smiles"
         if group_col not in oof_df.columns or oof_df[group_col].nunique() < 2:
-            alt_col = "target_id" if split == "cold_target" else "drug_id"
+            alt_col = "target_id" if is_cold_target else "drug_id"
             if alt_col in oof_df.columns and oof_df[alt_col].nunique() >= 2:
                 group_col = alt_col
 
@@ -935,8 +936,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--split",
         type=str,
         default="random",
-        choices=["random", "cold_drug", "cold_target", "all"],
-        help="Tipo de partição a executar ou 'all'.",
+        choices=[
+            "random",
+            "cold_drug",
+            "cold_target",
+            "cold_target_seqid30",
+            "cold_target_seqid40",
+            "all",
+        ],
+        help="Tipo de partição a executar ou 'all' ('random', 'cold_drug', 'cold_target', 'cold_target_seqid30', 'cold_target_seqid40').",
     )
     parser.add_argument(
         "--model",
@@ -1031,7 +1039,10 @@ def main(argv: list[str] | None = None) -> int:
                 seed_trios.add((m.group(1), m.group(2), m.group(3)))
 
         for f in runs_dir.glob("*_*_*_fold*.json"):
-            m = re.match(r"^(.+)_(davis|kiba)_(random|cold_drug|cold_target)_fold\d+$", f.stem)
+            m = re.match(
+                r"^(.+)_(davis|kiba)_(random|cold_drug|cold_target|cold_target_seqid30|cold_target_seqid40)_fold\d+$",
+                f.stem,
+            )
             if m:
                 fold_trios.add((m.group(1), m.group(2), m.group(3)))
 
@@ -1059,6 +1070,11 @@ def main(argv: list[str] | None = None) -> int:
     splits = ["random", "cold_drug", "cold_target"] if args.split == "all" else [args.split]
 
     protocol = args.protocol
+    if protocol != "kfold" and any(sp.startswith("cold_target_seqid") for sp in splits):
+        raise ValueError(
+            "Os splits por identidade de sequência ('cold_target_seqid30', 'cold_target_seqid40') "
+            "requerem --protocol kfold (5-fold)."
+        )
     if protocol == "kfold":
         units = [int(f.strip()) for f in args.folds.split(",") if f.strip()]
     else:

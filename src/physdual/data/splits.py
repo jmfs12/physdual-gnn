@@ -8,13 +8,25 @@ Agrupa entidades únicas pelo conteúdo químico/biológico:
 
 from __future__ import annotations
 
+from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 import json
+import os
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 VALID_SPLIT_TYPES = ("random", "cold_drug", "cold_target")
+
+
+def _normalize_split_type(split_type: str) -> str:
+    """Normaliza variantes de `cold_target` (como `cold_target_seqid30`/`seqid40`) para o tipo base."""
+    st = str(split_type).strip().lower()
+    if st.startswith("cold_target_seqid") or st in ("seqid30", "seqid40", "seqid50"):
+        return "cold_target"
+    return st
 
 
 def _compute_partition_bounds(n_items: int, ratios: tuple[float, float, float]) -> tuple[int, int]:
@@ -56,7 +68,7 @@ def create_splits(
     Returns:
         Dicionário `{"train": list[int], "val": list[int], "test": list[int]}` com índices posicionais (`0..len(df)-1`).
     """
-    st = split_type.strip().lower()
+    st = _normalize_split_type(split_type)
     if st not in VALID_SPLIT_TYPES:
         raise ValueError(f"split_type inválido: '{split_type}'. Opções válidas: {VALID_SPLIT_TYPES}")
 
@@ -119,7 +131,7 @@ def verify_split_leakage(
     3. Em `cold_drug`: os conjuntos de `smiles` canônicos em `train`, `val` e `test` forem mutuamente disjuntos.
     4. Em `cold_target`: os conjuntos de `sequence` em `train`, `val` e `test` forem mutuamente disjuntos.
     """
-    st = split_type.strip().lower()
+    st = _normalize_split_type(split_type)
     if st not in VALID_SPLIT_TYPES:
         raise ValueError(f"split_type inválido: '{split_type}'. Opções válidas: {VALID_SPLIT_TYPES}")
 
@@ -290,10 +302,10 @@ def verify_group_kfold_coverage(
             st = "cold_target"
             resolved_col = "sequence"
         else:
-            st = split_type.strip().lower()
+            st = _normalize_split_type(split_type)
             resolved_col = group_col
     else:
-        st = split_type.strip().lower()
+        st = _normalize_split_type(split_type)
         resolved_col = "smiles" if st == "cold_drug" else "sequence"
 
     if resolved_col not in df.columns:
@@ -325,4 +337,262 @@ def verify_group_kfold_coverage(
         all_tested_groups.update(df.iloc[f["test"]][resolved_col].astype(str))
 
     return all_tested_groups == unique_groups
+
+
+_SEQID_ALIGNER: Any = None
+_SEQID_LIST: list[str] = []
+
+
+def _build_global_aligner() -> Any:
+    from Bio.Align import PairwiseAligner, substitution_matrices
+
+    blosum62 = substitution_matrices.load("BLOSUM62")
+    return PairwiseAligner(
+        mode="global",
+        substitution_matrix=blosum62,
+        open_gap_score=-10.0,
+        extend_gap_score=-0.5,
+    )
+
+
+def _init_seqid_worker(seqs: list[str]) -> None:
+    global _SEQID_LIST, _SEQID_ALIGNER
+    _SEQID_LIST = seqs
+    _SEQID_ALIGNER = _build_global_aligner()
+
+
+def _align_seqid_pair_worker(pair: tuple[int, int]) -> tuple[int, int, float]:
+    i, j = pair
+    si = _SEQID_LIST[i]
+    sj = _SEQID_LIST[j]
+    max_l = len(si) if len(si) >= len(sj) else len(sj)
+    aln = _SEQID_ALIGNER.align(si, sj)[0]
+    ident = float(aln.counts().identities) / float(max_l)
+    return i, j, ident
+
+
+def compute_global_sequence_identity(seq_a: str, seq_b: str, aligner: Any | None = None) -> float:
+    """Calcula identidade global BLOSUM62 definida por `exact_matches / max(len_a, len_b)`."""
+    if not seq_a and not seq_b:
+        return 1.0
+    max_l = max(len(seq_a), len(seq_b))
+    if max_l == 0:
+        return 0.0
+    if seq_a == seq_b:
+        return 1.0
+    aln_obj = aligner if aligner is not None else _build_global_aligner()
+    aln = aln_obj.align(seq_a, seq_b)[0]
+    return float(aln.counts().identities) / float(max_l)
+
+
+def create_sequence_identity_kfold_splits(
+    df: pd.DataFrame,
+    identity_thresholds: tuple[float, ...] = (0.30, 0.40),
+    n_splits: int = 5,
+    group_col: str = "sequence",
+    n_workers: int | None = None,
+) -> dict[float, list[dict[str, Any]]]:
+    """Cria partições K-Fold agrupadas por clusters de identidade global de sequência.
+
+    Especificação auditável:
+    - Alinhamento: `Bio.Align.PairwiseAligner(mode='global', matrix='BLOSUM62', open_gap=-10.0, extend_gap=-0.5)`.
+    - Identidade: `exact_matches / max(len_a, len_b)`.
+    - Clustering: ligação simples (*single-linkage*) via componentes conexos sobre pares com `ident >= tau`.
+    - Balanceamento: distribuição gulosa LPT dos clusters (maiores em pares primeiro) em `n_splits` dobras,
+      rotacionando `test = dobra k`, `val = dobra (k + 1) % n_splits` e `train = demais dobras`.
+    """
+    if group_col not in df.columns:
+        raise ValueError(f"Coluna obrigatória '{group_col}' ausente no DataFrame.")
+    if n_splits < 3:
+        raise ValueError(f"n_splits deve ser >= 3 para manter train/val/test disjuntos, recebido: {n_splits}")
+    if not identity_thresholds:
+        raise ValueError("identity_thresholds não pode estar vazio.")
+
+    import Bio
+
+    thresholds = sorted(float(t) for t in identity_thresholds)
+    min_tau = thresholds[0]
+
+    uniq_seqs = sorted(df[group_col].astype(str).unique().tolist())
+    n = len(uniq_seqs)
+    lens = [len(s) for s in uniq_seqs]
+    aa_counters = [Counter(s) for s in uniq_seqs]
+
+    # Pré-filtro matemático exato: nem razão de comprimentos nem interseção multiset de AA pode ficar abaixo de min_tau
+    candidate_pairs: list[tuple[int, int]] = []
+    for i in range(n):
+        li = lens[i]
+        ci = aa_counters[i]
+        for j in range(i + 1, n):
+            lj = lens[j]
+            max_l = li if li >= lj else lj
+            min_l = lj if li >= lj else li
+            if max_l == 0 or (min_l / max_l) < min_tau:
+                continue
+            cj = aa_counters[j]
+            max_matches = sum(min(cnt, cj[aa]) for aa, cnt in ci.items() if aa in cj)
+            if (max_matches / max_l) < min_tau:
+                continue
+            candidate_pairs.append((i, j))
+
+    pair_identities: list[tuple[int, int, float]] = []
+    use_workers = n_workers if n_workers is not None else (1 if len(candidate_pairs) < 500 else max(1, min(os.cpu_count() or 4, 8)))
+    if use_workers <= 1:
+        _init_seqid_worker(uniq_seqs)
+        pair_identities = [_align_seqid_pair_worker(p) for p in candidate_pairs]
+    else:
+        with ProcessPoolExecutor(
+            max_workers=use_workers,
+            initializer=_init_seqid_worker,
+            initargs=(uniq_seqs,),
+        ) as pool:
+            pair_identities = list(pool.map(_align_seqid_pair_worker, candidate_pairs, chunksize=256))
+
+    seq_row_indices: dict[str, list[int]] = {}
+    for row_idx, seq_val in enumerate(df[group_col].astype(str).tolist()):
+        seq_row_indices.setdefault(seq_val, []).append(row_idx)
+
+    has_target_id = "target_id" in df.columns
+    seq_tid_counts = df.groupby(group_col)["target_id"].nunique().to_dict() if has_target_id else {}
+    alignment_desc = (
+        f"biopython=={Bio.__version__} PairwiseAligner(mode='global', matrix='BLOSUM62', "
+        f"open_gap=-10.0, extend_gap=-0.5)"
+    )
+
+    out_by_threshold: dict[float, list[dict[str, Any]]] = {}
+    for tau in thresholds:
+        adj: list[list[int]] = [[] for _ in range(n)]
+        for i, j, ident in pair_identities:
+            if ident >= tau:
+                adj[i].append(j)
+                adj[j].append(i)
+
+        visited = [False] * n
+        clusters: list[list[int]] = []
+        for i in range(n):
+            if visited[i]:
+                continue
+            comp: list[int] = []
+            stack = [i]
+            visited[i] = True
+            while stack:
+                u = stack.pop()
+                comp.append(u)
+                for v in adj[u]:
+                    if not visited[v]:
+                        visited[v] = True
+                        stack.append(v)
+            comp.sort()
+            clusters.append(comp)
+
+        if len(clusters) < n_splits:
+            raise ValueError(
+                f"Número de clusters ({len(clusters)}) em tau={tau:.2f} é menor que n_splits={n_splits}."
+            )
+
+        cluster_infos: list[tuple[int, int, int, int, list[int]]] = []
+        for cid, comp in enumerate(clusters):
+            seqs = [uniq_seqs[idx] for idx in comp]
+            n_pairs = sum(len(seq_row_indices[s]) for s in seqs)
+            n_tids = sum(int(seq_tid_counts.get(s, 1)) for s in seqs)
+            cluster_infos.append((n_pairs, len(comp), n_tids, cid, comp))
+
+        cluster_infos.sort(key=lambda x: (-x[0], -x[1], x[3]))
+
+        fold_buckets: list[dict[str, Any]] = [
+            {"pairs": 0, "unique_seqs": 0, "target_ids": 0, "clusters": 0, "seq_indices": []}
+            for _ in range(n_splits)
+        ]
+        for n_pairs, n_seqs, n_tids, _, comp in cluster_infos:
+            best_f = min(
+                range(n_splits),
+                key=lambda f_i: (fold_buckets[f_i]["pairs"], fold_buckets[f_i]["unique_seqs"], f_i),
+            )
+            fold_buckets[best_f]["pairs"] += n_pairs
+            fold_buckets[best_f]["unique_seqs"] += n_seqs
+            fold_buckets[best_f]["target_ids"] += n_tids
+            fold_buckets[best_f]["clusters"] += 1
+            fold_buckets[best_f]["seq_indices"].extend(comp)
+
+        pct = int(round(tau * 100))
+        num_singletons = int(sum(1 for c in clusters if len(c) == 1))
+        largest_seqs = int(max(len(c) for c in clusters))
+        largest_pairs = int(max(ci[0] for ci in cluster_infos))
+
+        folds: list[dict[str, Any]] = []
+        for k in range(n_splits):
+            val_f = (k + 1) % n_splits
+            train_fs = [f_i for f_i in range(n_splits) if f_i not in (k, val_f)]
+
+            test_seqs = [uniq_seqs[idx] for idx in fold_buckets[k]["seq_indices"]]
+            val_seqs = [uniq_seqs[idx] for idx in fold_buckets[val_f]["seq_indices"]]
+            train_seqs = [
+                uniq_seqs[idx]
+                for tf in train_fs
+                for idx in fold_buckets[tf]["seq_indices"]
+            ]
+
+            test_indices = sorted(r for s in test_seqs for r in seq_row_indices[s])
+            val_indices = sorted(r for s in val_seqs for r in seq_row_indices[s])
+            train_indices = sorted(r for s in train_seqs for r in seq_row_indices[s])
+
+            folds.append({
+                "train": train_indices,
+                "val": val_indices,
+                "test": test_indices,
+                "fold_id": k,
+                "n_splits": n_splits,
+                "split_type": f"cold_target_seqid{pct}",
+                "base_split_type": "cold_target",
+                "group_col": group_col,
+                "identity_threshold": tau,
+                "identity_definition": "exact_matches / max(len_a, len_b)",
+                "alignment_tool": alignment_desc,
+                "clustering_algorithm": "single_linkage_connected_components + greedy_LPT_balancing",
+                "num_clusters_total": len(clusters),
+                "singleton_clusters": num_singletons,
+                "largest_cluster_unique_seqs": largest_seqs,
+                "largest_cluster_pairs": largest_pairs,
+                "fold_test_clusters": int(fold_buckets[k]["clusters"]),
+                "fold_val_clusters": int(fold_buckets[val_f]["clusters"]),
+                "fold_train_clusters": int(sum(fold_buckets[tf]["clusters"] for tf in train_fs)),
+                "num_train_groups": len(train_seqs),
+                "num_val_groups": len(val_seqs),
+                "num_test_groups": len(test_seqs),
+                "num_train_target_ids": int(sum(fold_buckets[tf]["target_ids"] for tf in train_fs)),
+                "num_val_target_ids": int(fold_buckets[val_f]["target_ids"]),
+                "num_test_target_ids": int(fold_buckets[k]["target_ids"]),
+            })
+
+        out_by_threshold[tau] = folds
+
+    return out_by_threshold
+
+
+def verify_sequence_identity_splits(
+    df: pd.DataFrame,
+    folds: list[dict[str, Any]],
+    identity_threshold: float,
+    group_col: str = "sequence",
+) -> bool:
+    """Verifica cobertura 100%, disjunção de índices/sequências e ausência de pares `>= threshold` entre partições."""
+    if not verify_group_kfold_coverage(df, folds, split_type="cold_target", group_col=group_col):
+        return False
+
+    aligner = _build_global_aligner()
+    for fold in folds:
+        tr_seqs = sorted(df.iloc[fold["train"]][group_col].astype(str).unique())
+        va_seqs = sorted(df.iloc[fold["val"]][group_col].astype(str).unique())
+        te_seqs = sorted(df.iloc[fold["test"]][group_col].astype(str).unique())
+        for part_a, part_b in ((tr_seqs, va_seqs), (tr_seqs, te_seqs), (va_seqs, te_seqs)):
+            for sa in part_a:
+                la = len(sa)
+                for sb in part_b:
+                    max_l = la if la >= len(sb) else len(sb)
+                    min_l = len(sb) if la >= len(sb) else la
+                    if max_l == 0 or (min_l / max_l) < identity_threshold:
+                        continue
+                    if compute_global_sequence_identity(sa, sb, aligner=aligner) >= identity_threshold:
+                        return False
+    return True
 

@@ -332,7 +332,7 @@ def train_model(
 
     # Regra de paciência: Davis cold requer no mínimo davis_cold_patience (80)
     effective_patience = patience
-    if dataset_name.lower().strip() == "davis" and split_type.lower().strip() in ("cold_drug", "cold_target"):
+    if dataset_name.lower().strip() == "davis" and split_type.lower().strip().startswith(("cold_drug", "cold_target")):
         effective_patience = max(patience, davis_cold_patience)
 
     mode = get_monitor_mode(monitor)
