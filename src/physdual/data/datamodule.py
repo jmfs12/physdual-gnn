@@ -166,6 +166,7 @@ class DTADataset(Dataset):
             "target_tokens": self.unique_tokens[seq],
             "seq_len": int(self.unique_seq_lens[seq]),
             "smiles": str(smiles),
+            "sequence": str(seq),
             "target_id": str(self._target_id_list[idx]),
             "drug_id": str(self._drug_id_list[idx]),
             "affinity": torch.tensor(float(self._affinity_list[idx]), dtype=torch.float32),
@@ -189,6 +190,7 @@ def dta_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
         "affinity": affinity,
         "seq_lengths": seq_lengths,
         "smiles": [item["smiles"] for item in batch],
+        "sequence": [item["sequence"] for item in batch],
         "target_id": [item["target_id"] for item in batch],
         "drug_id": [item["drug_id"] for item in batch],
     }

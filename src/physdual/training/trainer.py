@@ -243,6 +243,7 @@ def evaluate(
                 t_ids = batch.get("target_id")
                 d_ids = batch.get("drug_id")
                 smiles_list = batch.get("smiles")
+                seq_list = batch.get("sequence")
                 seq_lens = batch.get("sequence_length", batch.get("seq_lengths"))
                 uncensored = batch.get("uncensored_mask")
 
@@ -254,6 +255,8 @@ def evaluate(
                         meta_item["drug_id"] = d_ids[i] if isinstance(d_ids, (list, tuple)) or (isinstance(d_ids, np.ndarray) and d_ids.ndim > 0) else d_ids
                     if smiles_list is not None:
                         meta_item["smiles"] = smiles_list[i] if isinstance(smiles_list, (list, tuple)) else smiles_list
+                    if seq_list is not None:
+                        meta_item["sequence"] = seq_list[i] if isinstance(seq_list, (list, tuple)) else seq_list
                     if seq_lens is not None:
                         if hasattr(seq_lens, "__getitem__"):
                             val = seq_lens[i]

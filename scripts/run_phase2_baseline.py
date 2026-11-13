@@ -374,12 +374,19 @@ def run_single_unit(
     train_dataset = getattr(train_loader, "dataset", None)
     train_df = getattr(train_dataset, "df", None)
     if train_df is not None and oof_predictions:
-        drug_means = train_df.groupby("smiles")["affinity"].mean().to_dict()
-        target_means = train_df.groupby("sequence")["affinity"].mean().to_dict()
+        seq_map = dict(zip(train_df["target_id"].astype(str), train_df["sequence"])) if "target_id" in train_df.columns and "sequence" in train_df.columns else {}
+        smi_map = dict(zip(train_df["drug_id"].astype(str), train_df["smiles"])) if "drug_id" in train_df.columns and "smiles" in train_df.columns else {}
+
+        drug_means = train_df.groupby("smiles")["affinity"].mean().to_dict() if "smiles" in train_df.columns else {}
+        target_means = train_df.groupby("sequence")["affinity"].mean().to_dict() if "sequence" in train_df.columns else {}
         global_mean = float(train_df["affinity"].mean())
         for rec in oof_predictions:
             rec["fold"] = unit_id if protocol == "kfold" else None
             rec["seed"] = unit_id if protocol == "seeds" else None
+            if (not rec.get("sequence")) and rec.get("target_id") in seq_map:
+                rec["sequence"] = str(seq_map[rec["target_id"]])
+            if (not rec.get("smiles")) and rec.get("drug_id") in smi_map:
+                rec["smiles"] = str(smi_map[rec["drug_id"]])
             rec["y_pred_drug_mean"] = float(drug_means.get(rec.get("smiles", ""), global_mean))
             rec["y_pred_target_mean"] = float(target_means.get(rec.get("sequence", ""), global_mean))
 
@@ -696,6 +703,45 @@ def aggregate_kfold_runs(
 
     if all_oof_records:
         oof_df = pd.DataFrame(all_oof_records)
+
+        # Auto-recuperação de metadados e baselines marginais por dobra a partir de dados curados
+        clean_csv = base_root / "data" / "processed" / f"{dataset.lower()}_clean.csv"
+        splits_dir = base_root / "data" / "processed" / "splits"
+        if clean_csv.exists():
+            try:
+                clean_df = pd.read_csv(clean_csv)
+                t_to_seq = dict(zip(clean_df["target_id"].astype(str), clean_df["sequence"]))
+                d_to_smi = dict(zip(clean_df["drug_id"].astype(str), clean_df["smiles"]))
+                if "sequence" not in oof_df.columns or oof_df["sequence"].nunique() < 2:
+                    if "target_id" in oof_df.columns:
+                        oof_df["sequence"] = oof_df["target_id"].astype(str).map(t_to_seq).fillna("")
+                if "smiles" not in oof_df.columns or oof_df["smiles"].nunique() < 2:
+                    if "drug_id" in oof_df.columns:
+                        oof_df["smiles"] = oof_df["drug_id"].astype(str).map(d_to_smi).fillna("")
+
+                # Se y_pred_drug_mean ou y_pred_target_mean faltam ou são constantes, recalcula por dobra
+                recalc_marginals = False
+                if "y_pred_drug_mean" not in oof_df.columns or oof_df["y_pred_drug_mean"].nunique() < 2:
+                    recalc_marginals = True
+                if "y_pred_target_mean" not in oof_df.columns or oof_df["y_pred_target_mean"].nunique() < 2:
+                    recalc_marginals = True
+
+                if recalc_marginals and splits_dir.exists():
+                    for f in oof_df["fold"].unique():
+                        sp_file = splits_dir / f"{dataset.lower()}_{split}_fold{int(f)}.json"
+                        if sp_file.exists():
+                            sp_data = json.loads(sp_file.read_text(encoding="utf-8"))
+                            f_train = clean_df.iloc[sp_data["train"]]
+                            f_drug_means = f_train.groupby("smiles")["affinity"].mean().to_dict()
+                            f_target_means = f_train.groupby("sequence")["affinity"].mean().to_dict()
+                            f_gmean = float(f_train["affinity"].mean())
+
+                            mask = (oof_df["fold"] == f)
+                            oof_df.loc[mask, "y_pred_drug_mean"] = oof_df.loc[mask, "smiles"].map(f_drug_means).fillna(f_gmean)
+                            oof_df.loc[mask, "y_pred_target_mean"] = oof_df.loc[mask, "sequence"].map(f_target_means).fillna(f_gmean)
+            except Exception as exc:
+                print(f"[WARN] Falha na auto-recuperação de metadados OOF: {exc}")
+
         oof_df.to_csv(oof_csv_path, index=False)
         print(f"[OOF] Previsões fora da dobra salvas em: {oof_csv_path} ({len(oof_df)} pares)")
 
@@ -708,8 +754,10 @@ def aggregate_kfold_runs(
 
         # 3. Bootstrap agrupado (cluster-level) por droga ou por alvo
         group_col = "sequence" if split == "cold_target" else "smiles"
-        if group_col not in oof_df.columns:
-            group_col = "target_id" if split == "cold_target" else "drug_id"
+        if group_col not in oof_df.columns or oof_df[group_col].nunique() < 2:
+            alt_col = "target_id" if split == "cold_target" else "drug_id"
+            if alt_col in oof_df.columns and oof_df[alt_col].nunique() >= 2:
+                group_col = alt_col
 
         if group_col in oof_df.columns:
             bootstrap_results["cluster_group_col"] = group_col
