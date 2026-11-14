@@ -110,7 +110,11 @@ def _forward_batch(
 ) -> tuple[torch.Tensor, torch.Tensor | None]:
     """Encaminha o lote através do modelo, suportando formatos de Batch PyG e dicionários."""
     if isinstance(batch, dict):
-        if "drug_batch" in batch and "target_esm" in batch:
+        if "drug_ecfp" in batch and "target_esm" in batch and bool(getattr(model, "expects_ecfp", False)):
+            drug_ecfp = batch["drug_ecfp"].to(device)
+            target_esm = batch["target_esm"].to(device)
+            out = model(drug_ecfp, target_esm)
+        elif "drug_batch" in batch and "target_esm" in batch:
             drug_batch = batch["drug_batch"].to(device)
             target_esm = batch["target_esm"].to(device)
             out = model(drug_batch, target_esm)
@@ -539,7 +543,7 @@ def train_model(
     early_memorization_warn = bool(
         best_epoch > 0
         and best_epoch < 15
-        and "cold_target" in split_type.lower().strip()
+        and "cold" in split_type.lower().strip()
     )
     if early_memorization_warn:
         print(

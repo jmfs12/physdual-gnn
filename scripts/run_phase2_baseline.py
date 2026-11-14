@@ -1114,23 +1114,31 @@ def main(argv: list[str] | None = None) -> int:
                         extend_epochs=args.extend_epochs,
                     )
 
-                # Agregação automática após completar todas as unidades do trio
+                # Agregação automática sobre TODAS as unidades disponíveis em disco (evita sobrescrever com subconjunto parcial)
                 try:
                     if protocol == "kfold":
+                        avail_folds = sorted({
+                            u_idx for u_idx in set(units) | {0, 1, 2, 3, 4}
+                            if (runs_dir / get_run_filename(m, ds, sp, u_idx, protocol="kfold")).exists()
+                        })
                         aggregate_kfold_runs(
                             model=m,
                             dataset=ds,
                             split=sp,
                             runs_dir=runs_dir,
-                            folds=units,
+                            folds=avail_folds or units,
                         )
                     else:
+                        avail_seeds = sorted({
+                            u_idx for u_idx in set(units) | {0, 1, 2, 3, 4}
+                            if (runs_dir / get_run_filename(m, ds, sp, u_idx, protocol="seeds")).exists()
+                        })
                         aggregate_runs(
                             model=m,
                             dataset=ds,
                             split=sp,
                             runs_dir=runs_dir,
-                            seeds=units,
+                            seeds=avail_seeds or units,
                         )
                 except Exception as exc:
                     print(f"[WARN] Agregação pendente para ({m}, {ds}, {sp}): {exc}")

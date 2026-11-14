@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Gera e audita os splits 5-fold por identidade de sequência para o Davis (`seqid30` e `seqid40`).
+"""Gera e audita os splits 5-fold por identidade de sequência (`seqid30` e `seqid40`) para Davis ou KIBA.
 
 Saídas geradas em `PHYSDUAL_ROOT`:
-- `data/processed/splits/davis_cold_target_seqid30_fold{0..4}.json`
-- `data/processed/splits/davis_cold_target_seqid40_fold{0..4}.json`
-- `outputs/logs/davis_seqid_splits_summary.json`
+- `data/processed/splits/{dataset}_cold_target_seqid30_fold{0..4}.json`
+- `data/processed/splits/{dataset}_cold_target_seqid40_fold{0..4}.json`
+- `outputs/logs/{dataset}_seqid_splits_summary.json`
+- `outputs/logs/{dataset}_seqid_cluster_map.json`
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 import sys
@@ -22,16 +24,25 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from physdual.data.splits import (  # noqa: E402
+    compute_sequence_identity_clusters,
     create_sequence_identity_kfold_splits,
     save_splits,
     verify_group_kfold_coverage,
+    verify_sequence_identity_splits,
 )
 from physdual.utils.paths import get_project_root  # noqa: E402
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Gera splits 5-fold por identidade de sequência (seqid30/40).")
+    parser.add_argument("--dataset", type=str, default="davis", choices=["davis", "kiba"])
+    parser.add_argument("--cluster-map-only", action="store_true", help="Salva apenas o mapa sequência->cluster sem reescrever splits.")
+    parser.add_argument("--force", action="store_true", help="Recalcula alinhamentos mesmo se cluster_map já existir.")
+    args = parser.parse_args(argv)
+
+    dataset = args.dataset.lower()
     root = get_project_root()
-    csv_path = root / "data" / "processed" / "davis_clean.csv"
+    csv_path = root / "data" / "processed" / f"{dataset}_clean.csv"
     if not csv_path.exists():
         print(f"ERRO: arquivo não encontrado: {csv_path}", file=sys.stderr)
         return 2
@@ -41,15 +52,60 @@ def main() -> int:
     splits_dir.mkdir(parents=True, exist_ok=True)
 
     thresholds = (0.30, 0.40)
+    cmap_path = root / "outputs" / "logs" / f"{dataset}_seqid_cluster_map.json"
+
+    if cmap_path.exists() and not args.force:
+        cmap_data = json.loads(cmap_path.read_text(encoding="utf-8"))
+        uniq_seqs = sorted(df["sequence"].astype(str).unique().tolist())
+        seq_to_idx = {s: i for i, s in enumerate(uniq_seqs)}
+        alignment_desc = str(cmap_data.get("alignment_tool", "biopython PairwiseAligner"))
+        clusters_by_tau: dict[float, list[list[int]]] = {}
+        for tau in thresholds:
+            pct = int(round(tau * 100))
+            sp_name = f"cold_target_seqid{pct}"
+            s2c = cmap_data["thresholds"][sp_name]["seq_to_cluster"]
+            by_cid: dict[int, list[int]] = {}
+            for s, cid in s2c.items():
+                by_cid.setdefault(int(cid), []).append(seq_to_idx[s])
+            clusters_by_tau[tau] = [sorted(v) for _, v in sorted(by_cid.items())]
+    else:
+        uniq_seqs, clusters_by_tau, alignment_desc = compute_sequence_identity_clusters(
+            df["sequence"].astype(str).tolist(),
+            identity_thresholds=thresholds,
+        )
+        cluster_map_payload: dict[str, Any] = {
+            "dataset": dataset,
+            "alignment_tool": alignment_desc,
+            "thresholds": {},
+        }
+        for tau in thresholds:
+            pct = int(round(tau * 100))
+            split_name = f"cold_target_seqid{pct}"
+            seq_to_cluster: dict[str, int] = {}
+            for cid, comp in enumerate(clusters_by_tau[tau]):
+                for seq_idx in comp:
+                    seq_to_cluster[uniq_seqs[seq_idx]] = int(cid)
+            cluster_map_payload["thresholds"][split_name] = {
+                "num_clusters": len(clusters_by_tau[tau]),
+                "seq_to_cluster": seq_to_cluster,
+            }
+        cmap_path.parent.mkdir(parents=True, exist_ok=True)
+        cmap_path.write_text(json.dumps(cluster_map_payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    if args.cluster_map_only:
+        print(f"[OK] Mapa de clusters salvo em {cmap_path}")
+        return 0
+
     by_tau = create_sequence_identity_kfold_splits(
         df=df,
         identity_thresholds=thresholds,
         n_splits=5,
         group_col="sequence",
+        precomputed_clusters=(uniq_seqs, clusters_by_tau, alignment_desc),
     )
 
     summary: dict[str, Any] = {
-        "dataset": "davis",
+        "dataset": dataset,
         "num_rows": int(len(df)),
         "num_unique_sequences": int(df["sequence"].nunique()),
         "thresholds": {},
@@ -60,11 +116,13 @@ def main() -> int:
         split_name = f"cold_target_seqid{pct}"
         if not verify_group_kfold_coverage(df, folds, split_type=split_name, group_col="sequence"):
             raise RuntimeError(f"Falha de verificação GroupKFold em {split_name}!")
+        if not verify_sequence_identity_splits(df, folds, identity_threshold=tau, group_col="sequence"):
+            raise RuntimeError(f"Falha de verificação de limiar de identidade em {split_name}!")
 
         fold_files: list[str] = []
         fold_stats: list[dict[str, Any]] = []
         for fold_dict in folds:
-            fname = f"davis_{split_name}_fold{fold_dict['fold_id']}.json"
+            fname = f"{dataset}_{split_name}_fold{fold_dict['fold_id']}.json"
             out_path = splits_dir / fname
             save_splits(fold_dict, out_path)
             fold_files.append(fname)
@@ -95,7 +153,7 @@ def main() -> int:
             "folds": fold_stats,
         }
 
-    log_path = root / "outputs" / "logs" / "davis_seqid_splits_summary.json"
+    log_path = root / "outputs" / "logs" / f"{dataset}_seqid_splits_summary.json"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(summary, indent=2, ensure_ascii=False))

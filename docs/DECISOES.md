@@ -205,6 +205,39 @@ Este documento registra as decisões técnicas tomadas na configuração do proj
   - *Positivas:* Elimina viés de homologia intra-família, separa o valor puro do pré-treino ESM-2 (`Ridge`/`kNN`) do ganho real da fusão multimodal neural (`GIN + ESM-2 + MLP`), e mantém o escopo do manuscrito enxuto e falsificável.
   - *Negativas / Mitigações:* Em `seqid30`, o *chaining* concentra `92` quinases homólogas em uma única dobra (`Dobra 0`), exigindo leitura conjunta com `seqid40` para dissociar dificuldade por corte de identidade de eventual desequilíbrio de subfamília.
 
+---
+
+## 15. Reclassificação Exploratória do Davis Cold, Nomenclatura `gin_esm_mlp`, Congelamento Pré-KIBA e Critérios Primários
+- **Contexto:**
+  1. Após a execução completa dos `20` runs da Fase 3 no Davis (`cold_target`, `cold_drug`, `cold_target_seqid40`, `cold_target_seqid30`), a auditoria com bootstrap pareado agrupado em `1.000` reamostras revelou que: (i) no `cold_target` padrão, `gin_esm_mlp` supera `CNN3`, `GIN`, `ridge_esm` e `knn_esm_target`, mas contra `knn_kmer_target` o ganho está dentro do ruído (`ΔMSE = -0.0227 [-0.0603, +0.0085]`, `911/1000` fav.; `ΔCI = +0.0021 [-0.0061, +0.0106]`, `691/1000` fav.); (ii) a vantagem sobre `ridge_esm` decai monotonicamente com a queda de identidade (`ΔMSE = -0.1489 -> -0.0507 -> -0.0020`, de `cold_target` padrão $\to$ `seqid40` $\to$ `seqid30`), sem ganho demonstrável em `30%` (`IC 95% [-0.0449, +0.0518]`, `582/1000` fav.); e (iii) em `cold_drug`, ocorre colapso na dobra `2` (`best_epoch = 5`, `MSE = 1.3670`, `CI = 0.5720`), ficando atrás de `knn_tanimoto_drug`, `target_mean_predictor` e `ridge_esm`.
+  2. Para evitar HARKing (*Hypothesizing After the Results are Known*) e vazamento de decisões no conjunto de teste antes das execuções no KIBA e no controle Davis `random`, torna-se necessário congelar a configuração, os comparadores e os critérios operacionais de sucesso/fracasso em ADR formal + tag Git pré-run.
+- **Decisões:**
+  1. **Reclassificação Formal do Davis `cold` como Exploratório:**
+     - Todos os resultados de `gin_esm_mlp` nos 4 regimes `cold` do Davis (`cold_target`, `cold_drug`, `cold_target_seqid40`, `cold_target_seqid30`) e respectivos bootstraps são declarados **exploratórios**.
+     - A explicação mecanicista associando o platô em `30%` de identidade ou limitações de especificidade à ausência de atenção cruzada / contatos explícitos permanece registrada estritamente como **HIPÓTESE** a ser testada nas fases subsequentes.
+  2. **Regra Estrita de Nomenclatura (`gin_esm_mlp`):**
+     - Em todas as tabelas, gráficos e textos referentes à arquitetura da Fase 3 (sem módulo físico e sem atenção cruzada), utilizar o nome **`gin_esm_mlp`** (identificador técnico em arquivos JSON/scripts: `physdual_gin_esm_mlp`).
+     - O nome **"PhysDual"** fica reservado exclusivamente à arquitetura completa com módulo físico e atenção cruzada.
+  3. **Congelamento da Configuração Antes do KIBA e Davis `random`:**
+     - Hiperparâmetros congelados conforme `configs/base.yaml` (`physdual_phase3`): `lr = 5e-4`, `weight_decay = 1e-3`, `optimizer = AdamW`, `batch_size = 512`, `esm_dropout_in = 0.4`, `prot_dropout = 0.3`, `prot_output_dim = 128`, `mlp_hidden_dims = [512, 256]`, `mlp_dropout = 0.3`, `epochs = 1000`, `patience = 50` (com `davis_cold_patience = 80` apenas em Davis cold).
+     - Proibição explícita de reajustar arquitetura, dropout, `lr`, `weight_decay` ou paciência a partir dos resultados observados em KIBA ou Davis `random`.
+  4. **Regimes Primários do KIBA e Limitação das Comparações:**
+     - Geram-se os splits **`kiba_cold_target_seqid40`** (`117` clusters) e **`kiba_cold_target_seqid30`** (`75` clusters) no Protocolo `v2_kfold` antes da execução GPU, incorporando-os como **regimes primários** ao lado do **`kiba_cold_drug`** (`v1_seeds`, priorizado para avaliação do ramo molecular por possuir `2.065` SMILES canônicos) e `kiba_cold_target` (`v1_seeds`).
+     - Documenta-se obrigatoriamente que: (i) KIBA compartilha **`179` sequências únicas com o Davis (`78,2%` das `229` proteínas do KIBA)**; (ii) no protocolo `v1_seeds`, `kiba_cold_target` avalia apenas `~23` proteínas de teste por seed; (iii) no KIBA, `graphdta_gin` é um **adversário fraco** em `cold_target` (derrotado por `drug_mean_predictor`) e `graphdta_cnn3` **não existe no KIBA** — logo os comparadores principais em CPU são `ridge_esm`, `knn_kmer_target`, `knn_tanimoto_drug` e `drug_mean_predictor`/`target_mean_predictor`; e (iv) **`davis_random` e `kiba_random` têm papel estritamente de sanidade**, sem reajuste.
+     - **Comparações primárias (apenas 2 por regime):** (a) `gin_esm_mlp` vs. **`ridge_esm`**; e (b) `gin_esm_mlp` vs. **melhor baseline sem ESM-2** do regime (`knn_kmer_target`/`drug_mean_predictor` em regimes `cold_target`/`seqid`; `knn_tanimoto_drug`/`graphdta_gin` em `cold_drug`). Todas as demais comparações (`knn_esm_target`, `ridge_esm_target_only`, `target_mean_predictor` em cold_target, etc.) são classificadas como **exploratórias**.
+  5. **Critérios Operacionais Pré-Especificados (Sucesso vs. Resultado Negativo):**
+     - **Sucesso primário em um regime:** `gin_esm_mlp` vence o comparador primário com **`ΔMSE < 0` e `ΔCI > 0` em $\ge 4/5$ dobras/seeds** **E** IC de `95%` do bootstrap agrupado por cluster **excluindo zero** em direção favorável.
+     - **Resultado negativo formal em um regime:** `≤ 2/5` dobras/seeds favoráveis **OU** IC de `95%` do bootstrap agrupado **incluindo zero** (ou desfavorável). Resultados com `3/5` e IC cruzando zero são declarados inconclusivos / dentro do ruído.
+  6. **Controles Diagnósticos Baratos e Política Pós-Hoc:**
+     - Implementam-se três controles estritamente diagnósticos: `--shuffle-esm` (mapeamento fixo `sequência -> embedding de outra sequência` em todos os splits com $\ge 3$ permutações, interpretado principalmente em `cold_target`), `--train-seed-offset` (2ª seed de treino no `seqid30` e na dobra `2` do `cold_drug`, mantendo o split intacto) e `ecfp_mlp` (`physdual_ecfp_esm_mlp`, mantendo `ESMTargetEncoder` e `fusion_mlp` idênticos). **Proibido** usar qualquer controle diagnóstico para selecionar configuração final pelo teste.
+     - Qualquer correção futura para o comportamento da dobra `2` ou para o `cold_drug` será classificada como **análise pós-hoc**, com seleção exclusivamente pela validação interna.
+  7. **Integridade de Gates e Tag Pré-Run:**
+     - `verify_phase3.py` passa a exigir `n_seeds`/`n_folds` completo (`5/5`) também nos agregados `baseline_*.json`, e o alerta `early_memorization_warn` (`best_epoch < 15`) aplica-se a todos os splits `cold` (`cold_drug`, `cold_target`, `seqid30`, `seqid40`), afetando apenas o registro de alerta (sem alterar treino/otimização).
+     - Este ADR, a auditoria do Davis e o protocolo congelado são commitados e marcados com tag Git **antes** de qualquer execução GPU em KIBA, Davis `random`, extensão da dobra `1` (`davis/cold_target`, `1000` épocas) ou controles diagnósticos.
+- **Consequências Científicas e Técnicas:**
+  - *Positivas:* Elimina viés de seleção pós-hoc no KIBA, padroniza comparações pareadas contra os adversários mais fortes em CPU (`ridge_esm`, `knn_kmer`, `knn_tanimoto`), explicita os limites estruturais do `v1_seeds` no KIBA (`~23` proteínas e `179` sobrepostas ao Davis) e documenta com transparência os resultados negativos/neutros do Davis.
+  - *Negativas / Mitigações:* Exige execução GPU adicional de `kiba_cold_target_seqid30`/`40` (5 folds cada) e controles no Colab; mitigado pelo reaproveitamento do cache local completo (`429` `.pt`) já auditado e scripts idempotentes com checkpoint atômico.
+
 
 
 

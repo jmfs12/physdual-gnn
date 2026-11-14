@@ -44,6 +44,22 @@ except ImportError:
     DataStructs = None
 
 
+def _build_tanimoto_sim_matrix(smiles_list: list[str]) -> tuple[np.ndarray, dict[str, int]]:
+    """Pré-computa matriz simétrica de similaridade de Tanimoto (ECFP4) via BulkTanimotoSimilarity."""
+    uniq = sorted(set(str(s) for s in smiles_list))
+    fps = _build_morgan_bitvects(uniq)
+    n = len(uniq)
+    mat = np.zeros((n, n), dtype=np.float64)
+    if DataStructs is not None:
+        fp_list = [fps.get(s) for s in uniq]
+        valid_idx = [i for i, fp in enumerate(fp_list) if fp is not None]
+        valid_fps = [fp_list[i] for i in valid_idx]
+        for row_pos, i in enumerate(valid_idx):
+            sims = DataStructs.BulkTanimotoSimilarity(valid_fps[row_pos], valid_fps)
+            mat[i, valid_idx] = np.asarray(sims, dtype=np.float64)
+    return mat, {s: i for i, s in enumerate(uniq)}
+
+
 def _compute_classical_unit(
     train_df: pd.DataFrame,
     test_df: pd.DataFrame,
@@ -51,6 +67,8 @@ def _compute_classical_unit(
     seq_to_idx: dict[str, int],
     drug_fps: dict[str, Any],
     k: int = 5,
+    tanimoto_sim_mat: np.ndarray | None = None,
+    drug_to_idx: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Calcula `mean_predictor`, `drug_mean`, `target_mean`, `knn_tanimoto` e `knn_kmer` determinísticos."""
     y_tr = train_df["affinity"].to_numpy(dtype=np.float64)
@@ -64,26 +82,50 @@ def _compute_classical_unit(
     pred_target = np.array([target_means.get(s, global_mean) for s in test_df["sequence"]], dtype=np.float64)
 
     # knn_tanimoto_drug
-    train_by_target: dict[str, list[tuple[str, float]]] = {}
-    for seq, smi, aff in zip(train_df["sequence"], train_df["smiles"], y_tr):
-        train_by_target.setdefault(str(seq), []).append((str(smi), float(aff)))
     pred_knn_drug = np.full(len(test_df), global_mean, dtype=np.float64)
-    for idx, (seq, smi) in enumerate(zip(test_df["sequence"], test_df["smiles"])):
-        cands = train_by_target.get(str(seq), [])
-        fp_d = drug_fps.get(str(smi))
-        if cands and fp_d is not None and DataStructs is not None:
-            sims = np.array(
-                [DataStructs.TanimotoSimilarity(fp_d, drug_fps[cs]) if cs in drug_fps else 0.0 for cs, _ in cands],
-                dtype=np.float64,
-            )
-            affs = np.array([ca for _, ca in cands], dtype=np.float64)
-            order = np.argsort(-sims, kind="stable")[:k]
-            w = sims[order]
-            a = affs[order]
-            ws = float(np.sum(w))
-            pred_knn_drug[idx] = float(np.sum(w * a) / ws) if ws > 1e-6 else float(np.mean(a))
-        else:
-            pred_knn_drug[idx] = float(drug_means.get(str(smi), global_mean))
+    if tanimoto_sim_mat is not None and drug_to_idx is not None:
+        tmp_by_target: dict[str, list[tuple[int, float]]] = {}
+        for seq, smi, aff in zip(train_df["sequence"], train_df["smiles"], y_tr):
+            d_i = drug_to_idx.get(str(smi))
+            if d_i is not None:
+                tmp_by_target.setdefault(str(seq), []).append((d_i, float(aff)))
+        train_by_target_idx = {
+            seq: (np.array([x[0] for x in lst], dtype=np.int64), np.array([x[1] for x in lst], dtype=np.float64))
+            for seq, lst in tmp_by_target.items()
+        }
+        for idx, (seq, smi) in enumerate(zip(test_df["sequence"], test_df["smiles"])):
+            cand = train_by_target_idx.get(str(seq))
+            d_idx = drug_to_idx.get(str(smi))
+            if cand is not None and d_idx is not None:
+                c_idx, c_aff = cand
+                sims = tanimoto_sim_mat[c_idx, d_idx]
+                order = np.argsort(-sims, kind="stable")[:k]
+                w = sims[order]
+                a = c_aff[order]
+                ws = float(np.sum(w))
+                pred_knn_drug[idx] = float(np.sum(w * a) / ws) if ws > 1e-6 else float(np.mean(a))
+            else:
+                pred_knn_drug[idx] = float(drug_means.get(str(smi), global_mean))
+    else:
+        train_by_target: dict[str, list[tuple[str, float]]] = {}
+        for seq, smi, aff in zip(train_df["sequence"], train_df["smiles"], y_tr):
+            train_by_target.setdefault(str(seq), []).append((str(smi), float(aff)))
+        for idx, (seq, smi) in enumerate(zip(test_df["sequence"], test_df["smiles"])):
+            cands = train_by_target.get(str(seq), [])
+            fp_d = drug_fps.get(str(smi))
+            if cands and fp_d is not None and DataStructs is not None:
+                sims = np.array(
+                    [DataStructs.TanimotoSimilarity(fp_d, drug_fps[cs]) if cs in drug_fps else 0.0 for cs, _ in cands],
+                    dtype=np.float64,
+                )
+                affs = np.array([ca for _, ca in cands], dtype=np.float64)
+                order = np.argsort(-sims, kind="stable")[:k]
+                w = sims[order]
+                a = affs[order]
+                ws = float(np.sum(w))
+                pred_knn_drug[idx] = float(np.sum(w * a) / ws) if ws > 1e-6 else float(np.mean(a))
+            else:
+                pred_knn_drug[idx] = float(drug_means.get(str(smi), global_mean))
 
     # knn_kmer_target
     train_by_drug: dict[str, tuple[np.ndarray, np.ndarray]] = {}
@@ -177,6 +219,9 @@ def _aggregate_units(per_unit: list[dict[str, dict[str, Any]]], key_names: list[
 def main() -> int:
     parser = argparse.ArgumentParser(description="Controles baratos em CPU da Fase 3 (Etapa 3.0).")
     parser.add_argument("--classical-seqid-only", action="store_true", help="Roda apenas clássicos (sem ESM/torch) nos splits seqid30/40 do Davis.")
+    parser.add_argument("--kiba-classical", action="store_true", help="Calcula marginais e kNN em CPU para KIBA (v1_seeds e seqid30/40).")
+    parser.add_argument("--export-davis-oof", action="store_true", help="Exporta OOFs alinhados dos baselines CPU (ESM + clássicos) para Davis kfold.")
+    parser.add_argument("--regimes", type=str, default=None, help="Lista separada por vírgula de regimes a executar e mesclar no JSON existente.")
     parser.add_argument("--esm-model", default="esm2_t33_650M_UR50D")
     parser.add_argument("--esm-dim", type=int, default=1280)
     args = parser.parse_args()
@@ -187,6 +232,56 @@ def main() -> int:
 
     davis_df = pd.read_csv(root / "data" / "processed" / "davis_clean.csv")
     kiba_df = pd.read_csv(root / "data" / "processed" / "kiba_clean.csv")
+
+    if args.kiba_classical:
+        kmer_mat, seq_to_idx = _build_3mer_norm_matrix(kiba_df["sequence"].astype(str).tolist())
+        kmer_sim_mat = kmer_mat @ kmer_mat.T
+        tan_sim_mat, drug_to_idx = _build_tanimoto_sim_matrix(kiba_df["smiles"].astype(str).tolist())
+        fps: dict[str, Any] = {}
+        kiba_regimes = [
+            ("random", "seeds"),
+            ("cold_drug", "seeds"),
+            ("cold_target", "seeds"),
+            ("cold_target_seqid30", "kfold"),
+            ("cold_target_seqid40", "kfold"),
+        ]
+        model_keys = ["mean_predictor", "drug_mean_predictor", "target_mean_predictor", "knn_tanimoto_drug", "knn_kmer_target"]
+        kiba_out: dict[str, Any] = {"dataset": "kiba", "regimes": {}}
+        for sp_name, proto in kiba_regimes:
+            u_prefix = "fold" if proto == "kfold" else "seed"
+            per_unit = []
+            oof_yt: list[np.ndarray] = []
+            oof_preds: dict[str, list[np.ndarray]] = {}
+            for u in range(5):
+                sp = load_splits(splits_dir / f"kiba_{sp_name}_{u_prefix}{u}.json")
+                tr_df = kiba_df.iloc[sp["train"]]
+                te_df = kiba_df.iloc[sp["test"]]
+                res_u = _compute_classical_unit(
+                    tr_df, te_df, kmer_sim_mat, seq_to_idx, fps, k=5,
+                    tanimoto_sim_mat=tan_sim_mat, drug_to_idx=drug_to_idx,
+                )
+                per_unit.append({u_prefix: u, **{m: {"metrics": d["metrics"]} for m, d in res_u.items()}})
+                if proto == "kfold":
+                    oof_yt.append(te_df["affinity"].to_numpy(dtype=np.float64))
+                    for m, d in res_u.items():
+                        oof_preds.setdefault(m, []).append(d["y_pred"])
+            entry: dict[str, Any] = {
+                "protocol": proto,
+                "per_unit": per_unit,
+                "mean_std": _aggregate_units(per_unit, model_keys),
+            }
+            if proto == "kfold" and oof_yt:
+                yt_all = np.concatenate(oof_yt)
+                entry["global_oof_metrics"] = {
+                    m: compute_all_metrics(yt_all, np.concatenate(oof_preds[m])) for m in model_keys
+                }
+            kiba_out["regimes"][sp_name] = entry
+        kiba_out["elapsed_sec"] = round(time.perf_counter() - t0, 2)
+        out_path = root / "outputs" / "results" / "kiba_cpu_classical_baselines.json"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(kiba_out, indent=2), encoding="utf-8")
+        print(f"[OK] Baselines clássicos KIBA salvos em: {out_path} ({kiba_out['elapsed_sec']}s)")
+        return 0
 
     if args.classical_seqid_only:
         kmer_mat, seq_to_idx = _build_3mer_norm_matrix(davis_df["sequence"].astype(str).tolist())
@@ -239,25 +334,48 @@ def main() -> int:
         ("kiba_v1_random", kiba_df, "kiba", "random", 5),
         ("kiba_v1_cold_drug", kiba_df, "kiba", "cold_drug", 5),
         ("kiba_v1_cold_target", kiba_df, "kiba", "cold_target", 5),
+        ("kiba_seqid30_kfold", kiba_df, "kiba", "cold_target_seqid30", 5),
+        ("kiba_seqid40_kfold", kiba_df, "kiba", "cold_target_seqid40", 5),
     ]
 
-    full_out: dict[str, Any] = {
-        "esm_model": args.esm_model,
-        "esm_dim": args.esm_dim,
-        "regimes": {},
-    }
+    oof_dir = root / "outputs" / "results" / "oof"
+    oof_dir.mkdir(parents=True, exist_ok=True)
+    davis_kmer_mat, davis_seq_to_idx, davis_tan_mat, davis_drug_to_idx = None, None, None, None
+    if args.export_davis_oof:
+        davis_kmer_mat, davis_seq_to_idx = _build_3mer_norm_matrix(davis_df["sequence"].astype(str).tolist())
+        davis_kmer_mat = davis_kmer_mat @ davis_kmer_mat.T
+        davis_tan_mat, davis_drug_to_idx = _build_tanimoto_sim_matrix(davis_df["smiles"].astype(str).tolist())
+
+    out_path = root / "outputs" / "results" / "phase3_esm_cpu_baselines.json"
+    selected_regimes = {r.strip() for r in args.regimes.split(",") if r.strip()} if args.regimes else None
+    if selected_regimes:
+        regimes = [r for r in regimes if r[0] in selected_regimes]
+        if out_path.exists():
+            full_out = json.loads(out_path.read_text(encoding="utf-8"))
+        else:
+            full_out = {"esm_model": args.esm_model, "esm_dim": args.esm_dim, "regimes": {}}
+    else:
+        full_out = {
+            "esm_model": args.esm_model,
+            "esm_dim": args.esm_dim,
+            "regimes": {},
+        }
     for label, df, ds_name, sp_name, n_units in regimes:
         is_kfold = "kfold" in label
         unit_prefix = "fold" if is_kfold else "seed"
         per_unit = []
         oof_yt = []
         oof_preds: dict[str, list[np.ndarray]] = {}
+        oof_rows: list[pd.DataFrame] = []
         for u in range(n_units):
             sp = load_splits(splits_dir / f"{ds_name}_{sp_name}_{unit_prefix}{u}.json")
+            tr_df = df.iloc[sp["train"]]
+            va_df = df.iloc[sp["val"]]
+            te_df = df.iloc[sp["test"]]
             res_u = evaluate_esm_cpu_baselines_split(
-                df.iloc[sp["train"]],
-                df.iloc[sp["val"]],
-                df.iloc[sp["test"]],
+                tr_df,
+                va_df,
+                te_df,
                 seq_to_vec=seq_to_vec,
                 drug_to_fp=drug_to_fp,
                 k=5,
@@ -274,9 +392,43 @@ def main() -> int:
             }
             per_unit.append(entry)
             if is_kfold:
-                oof_yt.append(df.iloc[sp["test"]]["affinity"].to_numpy(dtype=np.float64))
+                oof_yt.append(te_df["affinity"].to_numpy(dtype=np.float64))
                 for m, d in res_u.items():
                     oof_preds.setdefault(m, []).append(d["y_pred"])
+                if args.export_davis_oof and ds_name == "davis":
+                    assert (
+                        davis_kmer_mat is not None
+                        and davis_seq_to_idx is not None
+                        and davis_tan_mat is not None
+                        and davis_drug_to_idx is not None
+                    )
+                    cl_u = _compute_classical_unit(
+                        tr_df, te_df, davis_kmer_mat, davis_seq_to_idx, {}, k=5,
+                        tanimoto_sim_mat=davis_tan_mat, drug_to_idx=davis_drug_to_idx,
+                    )
+                    df_fold = pd.DataFrame({
+                        "row_index": sp["test"],
+                        "fold": u,
+                        "drug_id": te_df["drug_id"].astype(str).tolist(),
+                        "target_id": te_df["target_id"].astype(str).tolist(),
+                        "smiles": te_df["smiles"].astype(str).tolist(),
+                        "sequence": te_df["sequence"].astype(str).tolist(),
+                        "y_true": te_df["affinity"].to_numpy(dtype=np.float64),
+                        "y_pred_knn_esm_target": res_u["knn_esm_target"]["y_pred"],
+                        "y_pred_ridge_esm_target_only": res_u["ridge_esm_target_only"]["y_pred"],
+                        "y_pred_ridge_esm": res_u["ridge_esm"]["y_pred"],
+                        "y_pred_mean_predictor": cl_u["mean_predictor"]["y_pred"],
+                        "y_pred_drug_mean_predictor": cl_u["drug_mean_predictor"]["y_pred"],
+                        "y_pred_target_mean_predictor": cl_u["target_mean_predictor"]["y_pred"],
+                        "y_pred_knn_tanimoto_drug": cl_u["knn_tanimoto_drug"]["y_pred"],
+                        "y_pred_knn_kmer_target": cl_u["knn_kmer_target"]["y_pred"],
+                    })
+                    oof_rows.append(df_fold)
+        if args.export_davis_oof and ds_name == "davis" and oof_rows:
+            pd.concat(oof_rows, ignore_index=True).to_csv(
+                oof_dir / f"cpu_baselines_davis_{sp_name}_oof.csv",
+                index=False,
+            )
         m_keys = ["knn_esm_target", "ridge_esm_target_only", "ridge_esm"]
         reg_entry: dict[str, Any] = {
             "per_unit": per_unit,
@@ -290,7 +442,6 @@ def main() -> int:
         full_out["regimes"][label] = reg_entry
 
     full_out["elapsed_sec"] = round(time.perf_counter() - t0, 2)
-    out_path = root / "outputs" / "results" / "phase3_esm_cpu_baselines.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(full_out, indent=2), encoding="utf-8")
     print(f"[OK] Controles ESM CPU salvos em: {out_path} ({full_out['elapsed_sec']}s)")

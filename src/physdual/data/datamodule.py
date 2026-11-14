@@ -83,6 +83,29 @@ def compute_aa_composition(seq: str) -> np.ndarray:
     return comp / float(total_len)
 
 
+def build_shuffled_esm_map(
+    esm_cache: dict[str, torch.Tensor],
+    perm_seed: int = 0,
+) -> dict[str, torch.Tensor]:
+    """Cria mapeamento fixo e determinístico `sequência -> embedding de outra sequência`.
+
+    Usa algoritmo de Sattolo sobre as chaves ordenadas para garantir derangement
+    (nenhuma sequência mantém seu próprio embedding quando `len(keys) >= 2`).
+    """
+    keys = sorted(esm_cache.keys())
+    n = len(keys)
+    if n < 2:
+        raise ValueError(f"shuffle_esm requer ao menos 2 sequências únicas no cache, encontrado {n}.")
+
+    rng = np.random.default_rng(10_000 + int(perm_seed))
+    perm = list(keys)
+    for i in range(n - 1, 0, -1):
+        j = int(rng.integers(0, i))
+        perm[i], perm[j] = perm[j], perm[i]
+
+    return {seq: esm_cache[other] for seq, other in zip(keys, perm)}
+
+
 def resolve_esm_cache_dir(
     config: dict[str, Any] | None = None,
     root: Path | None = None,
@@ -138,6 +161,8 @@ class DTADataset(Dataset):
         esm_cache: dict[str, torch.Tensor] | Path | str | None = None,
         esm_model_name: str = "esm2_t33_650M_UR50D",
         esm_dim: int = 1280,
+        use_ecfp: bool = False,
+        ecfp_dim: int = 2048,
     ) -> None:
         """Inicializa o DTADataset.
 
@@ -214,6 +239,21 @@ class DTADataset(Dataset):
                     f"`esm_cache` deve ser dict, Path/str ou None, recebido: {type(esm_cache)}"
                 )
 
+        # Cache opcional de Morgan ECFP4 para controle diagnóstico `ecfp_mlp`
+        self.unique_ecfp_vecs: dict[str, torch.Tensor] | None = None
+        if use_ecfp:
+            from physdual.eval.esm_baselines import compute_morgan_ecfp4_map
+
+            ecfp_map = compute_morgan_ecfp4_map(
+                [str(s) for s in unique_smiles],
+                radius=2,
+                n_bits=int(ecfp_dim),
+            )
+            self.unique_ecfp_vecs = {
+                smi: torch.tensor(ecfp_map[str(smi)], dtype=torch.float32)
+                for smi in unique_smiles
+            }
+
         # Vetores indexados para acesso O(1) de alta velocidade
         self._smiles_list: list[str] = self.df["smiles"].astype(str).tolist()
         self._seq_list: list[str] = self.df["sequence"].astype(str).tolist()
@@ -247,6 +287,8 @@ class DTADataset(Dataset):
         }
         if self.unique_esm_vecs is not None:
             item["target_esm"] = self.unique_esm_vecs[seq]
+        if self.unique_ecfp_vecs is not None:
+            item["drug_ecfp"] = self.unique_ecfp_vecs[smiles]
         return item
 
 
@@ -273,6 +315,8 @@ def dta_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
     }
     if "target_esm" in batch[0]:
         collated["target_esm"] = torch.stack([item["target_esm"] for item in batch])
+    if "drug_ecfp" in batch[0]:
+        collated["drug_ecfp"] = torch.stack([item["drug_ecfp"] for item in batch])
     return collated
 
 
@@ -287,6 +331,10 @@ def get_dta_dataloaders(
     use_esm: bool = False,
     esm_cache_dir: Path | str | None = None,
     esm_cache: dict[str, torch.Tensor] | None = None,
+    shuffle_esm: bool = False,
+    shuffle_esm_seed: int = 0,
+    use_ecfp: bool = False,
+    ecfp_dim: int = 2048,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """Cria e retorna os DataLoaders `(train_loader, val_loader, test_loader)` para um dataset e split.
 
@@ -363,10 +411,11 @@ def get_dta_dataloaders(
     esm_model_name = str(config.get("esm", {}).get("model_name", "esm2_t33_650M_UR50D"))
     esm_dim = int(config.get("esm", {}).get("esm_dim", 1280))
     if use_esm:
-        all_unique_seqs = pd.concat(
+        seq_source = df["sequence"] if shuffle_esm else pd.concat(
             [train_df["sequence"], val_df["sequence"], test_df["sequence"]],
             ignore_index=True,
-        ).astype(str).unique()
+        )
+        all_unique_seqs = seq_source.astype(str).unique()
         if esm_cache is not None:
             missing_seqs = [str(s) for s in all_unique_seqs if str(s) not in esm_cache]
             if missing_seqs:
@@ -392,6 +441,8 @@ def get_dta_dataloaders(
                 cache_dir=resolved_esm_dir,
                 expected_dim=esm_dim,
             )
+        if shuffle_esm and shared_esm_cache is not None:
+            shared_esm_cache = build_shuffled_esm_map(shared_esm_cache, perm_seed=shuffle_esm_seed)
 
     train_ds = DTADataset(
         train_df,
@@ -400,6 +451,8 @@ def get_dta_dataloaders(
         esm_cache=shared_esm_cache,
         esm_model_name=esm_model_name,
         esm_dim=esm_dim,
+        use_ecfp=use_ecfp,
+        ecfp_dim=ecfp_dim,
     )
     val_ds = DTADataset(
         val_df,
@@ -408,6 +461,8 @@ def get_dta_dataloaders(
         esm_cache=shared_esm_cache,
         esm_model_name=esm_model_name,
         esm_dim=esm_dim,
+        use_ecfp=use_ecfp,
+        ecfp_dim=ecfp_dim,
     )
     test_ds = DTADataset(
         test_df,
@@ -416,6 +471,8 @@ def get_dta_dataloaders(
         esm_cache=shared_esm_cache,
         esm_model_name=esm_model_name,
         esm_dim=esm_dim,
+        use_ecfp=use_ecfp,
+        ecfp_dim=ecfp_dim,
     )
 
     train_cfg = (

@@ -32,6 +32,10 @@ def _load_all_runs(data_root: Path) -> list[dict[str, Any]]:
     runs = []
     for f in files:
         d = load_json_strict(f)
+        if not str(d.get("model", "")).startswith("graphdta_"):
+            continue
+        if "seqid" in str(d.get("split", "")):
+            continue
         d["_filename"] = f.name
         d["_proto"] = "v2_kfold" if d.get("fold") is not None else "v1_seeds"
         d["_unit"] = int(d["fold"]) if d["_proto"] == "v2_kfold" else int(d["seed"])
@@ -193,7 +197,7 @@ def build_t3(data_root: Path, runs: list[dict[str, Any]], tables_dir: Path) -> d
 
     # 1. Protocolo v1 (seeds)
     for agg_path in sorted(res_dir.glob("baseline_*.json")):
-        if agg_path.name.endswith("_kfold.json"):
+        if agg_path.name.endswith("_kfold.json") or "seqid" in agg_path.stem:
             continue
         ad = load_json_strict(agg_path)
         agg = ad["aggregated"]
@@ -226,6 +230,8 @@ def build_t3(data_root: Path, runs: list[dict[str, Any]], tables_dir: Path) -> d
 
     # 2. Protocolo v2 (kfold) — estritamente separado
     for agg_path in sorted(res_dir.glob("baseline_*_kfold.json")):
+        if "seqid" in agg_path.stem:
+            continue
         ad = load_json_strict(agg_path)
         pf = ad["per_fold_mean_std"]
         oof = ad["global_oof_metrics"]
@@ -287,6 +293,8 @@ def build_t4(data_root: Path, runs: list[dict[str, Any]], tables_dir: Path) -> d
 
     # Protocolo v2_kfold: completo com marginais por dobra, pareados, wins e bootstrap exploratorio
     for agg_path in sorted(res_dir.glob("baseline_*_kfold.json")):
+        if "seqid" in agg_path.stem:
+            continue
         ad = load_json_strict(agg_path)
         split = ad["split"]
         rel_key = "target_mean_predictor" if split == "cold_drug" else "drug_mean_predictor"
@@ -324,6 +332,16 @@ def build_t4(data_root: Path, runs: list[dict[str, Any]], tables_dir: Path) -> d
         bs = ad["bootstrap_analysis"][boot_key]
         bs_mse = bs["delta_mse"]
         bs_ci = bs["delta_ci"]
+        mse_win_str = (
+            f"{bs_mse['wins']}/{bs_mse['total_bootstraps']} fav."
+            if ("wins" in bs_mse and "total_bootstraps" in bs_mse)
+            else "N/A fav."
+        )
+        ci_win_str = (
+            f"{bs_ci['wins']}/{bs_ci['total_bootstraps']} fav."
+            if ("wins" in bs_ci and "total_bootstraps" in bs_ci)
+            else "N/A fav."
+        )
 
         rows.append({
             "protocolo": "v2_kfold",
@@ -339,8 +357,8 @@ def build_t4(data_root: Path, runs: list[dict[str, Any]], tables_dir: Path) -> d
             "delta_mse_pareado": fmt_mean_std(*sample_mean_std(d_mse_paired), signed=True),
             "delta_ci_pareado": fmt_mean_std(*sample_mean_std(d_ci_paired), signed=True),
             "vitorias_mse_ci": f"{wins_mse}/{len(pfr)} MSE | {wins_ci}/{len(pfr)} CI",
-            "bootstrap_delta_mse_ic95_frac_expl": f"{bs_mse['mean']:+.4f} [{bs_mse['ci_95'][0]:.4f}, {bs_mse['ci_95'][1]:.4f}] | {bs_mse['wins']}/{bs_mse['total_bootstraps']} fav. (exploratório)",
-            "bootstrap_delta_ci_ic95_frac_expl": f"{bs_ci['mean']:+.4f} [{bs_ci['ci_95'][0]:.4f}, {bs_ci['ci_95'][1]:.4f}] | {bs_ci['wins']}/{bs_ci['total_bootstraps']} fav. (exploratório)",
+            "bootstrap_delta_mse_ic95_frac_expl": f"{bs_mse['mean']:+.4f} [{bs_mse['ci_95'][0]:.4f}, {bs_mse['ci_95'][1]:.4f}] | {mse_win_str} (exploratório)",
+            "bootstrap_delta_ci_ic95_frac_expl": f"{bs_ci['mean']:+.4f} [{bs_ci['ci_95'][0]:.4f}, {bs_ci['ci_95'][1]:.4f}] | {ci_win_str} (exploratório)",
             "knn_tanimoto_ci_mse": f"{sample_mean_std(knn_d_ci)[0]:.4f} / {sample_mean_std(knn_d_mse)[0]:.4f}",
             "knn_kmer_ci_mse": f"{sample_mean_std(knn_t_ci)[0]:.4f} / {sample_mean_std(knn_t_mse)[0]:.4f}",
             "fonte": f"outputs/results/{agg_path.name}",
@@ -435,6 +453,8 @@ def build_t5(data_root: Path, tables_dir: Path) -> dict[str, Path]:
 
     # v2_kfold (Davis)
     for agg_path in sorted(res_dir.glob("baseline_*_davis_*_kfold.json")):
+        if "seqid" in agg_path.stem:
+            continue
         ad = load_json_strict(agg_path)
         pfr = [v for _, v in sorted(ad["per_fold_results"].items(), key=lambda x: int(x[0]))]
         uncs = [f["test_metrics_uncensored"] for f in pfr]
@@ -477,7 +497,7 @@ def build_t6(data_root: Path, tables_dir: Path) -> dict[str, Path]:
 
     # v1_seeds
     for agg_path in sorted(res_dir.glob("baseline_*.json")):
-        if agg_path.name.endswith("_kfold.json"):
+        if agg_path.name.endswith("_kfold.json") or "seqid" in agg_path.stem:
             continue
         ad = load_json_strict(agg_path)
         sl = ad["aggregated"]["test_metrics_by_seq_len"]
@@ -497,6 +517,8 @@ def build_t6(data_root: Path, tables_dir: Path) -> dict[str, Path]:
 
     # v2_kfold
     for agg_path in sorted(res_dir.glob("baseline_*_kfold.json")):
+        if "seqid" in agg_path.stem:
+            continue
         ad = load_json_strict(agg_path)
         pfr = [v for _, v in sorted(ad["per_fold_results"].items(), key=lambda x: int(x[0]))]
         for faixa, label in (("le_1000", "<= 1000 aa"), ("gt_1000", "> 1000 aa")):

@@ -90,6 +90,12 @@ def _create_synthetic_phase3_workspace(tmp_path: Path) -> tuple[dict, Path]:
     (res_dir / "phase3_esm_cpu_baselines.json").write_text(json.dumps(esm_cpu), encoding="utf-8")
 
     cnn3_mock = {
+        "model": "graphdta_cnn3",
+        "dataset": "davis",
+        "split": "cold_target_seqid30",
+        "protocol": "kfold",
+        "num_folds": 2,
+        "folds": [0, 1],
         "per_fold_results": {
             "0": {"test_metrics_full": {"ci": 0.71, "mse": 0.89}},
             "1": {"test_metrics_full": {"ci": 0.70, "mse": 0.91}},
@@ -168,6 +174,11 @@ def test_verify_phase3_smoke_and_full_gates(tmp_path: Path, monkeypatch):
 
     monkeypatch.setenv("PHYSDUAL_ROOT", str(tmp_path))
     cfg, esm_dir = _create_synthetic_phase3_workspace(tmp_path)
+    splits_dir = tmp_path / "data" / "processed" / "splits"
+    split0_cd = {"train": [0, 1, 2, 3, 4, 5, 6, 7], "val": [8, 9, 10, 11], "test": [12, 13, 14, 15]}
+    split1_cd = {"train": [8, 9, 10, 11, 12, 13, 14, 15], "val": [0, 1, 2, 3], "test": [4, 5, 6, 7]}
+    (splits_dir / "davis_cold_drug_fold0.json").write_text(json.dumps(split0_cd), encoding="utf-8")
+    (splits_dir / "davis_cold_drug_fold1.json").write_text(json.dumps(split1_cd), encoding="utf-8")
     for fold in (0, 1):
         run_single_unit(
             dataset_name="davis",
@@ -291,6 +302,11 @@ def test_verify_phase3_full_rejects_nan_incomplete_and_missing_baselines(tmp_pat
 
     monkeypatch.setenv("PHYSDUAL_ROOT", str(tmp_path))
     cfg, esm_dir = _create_synthetic_phase3_workspace(tmp_path)
+    splits_dir = tmp_path / "data" / "processed" / "splits"
+    split0_cd = {"train": [0, 1, 2, 3, 4, 5, 6, 7], "val": [8, 9, 10, 11], "test": [12, 13, 14, 15]}
+    split1_cd = {"train": [8, 9, 10, 11, 12, 13, 14, 15], "val": [0, 1, 2, 3], "test": [4, 5, 6, 7]}
+    (splits_dir / "davis_cold_drug_fold0.json").write_text(json.dumps(split0_cd), encoding="utf-8")
+    (splits_dir / "davis_cold_drug_fold1.json").write_text(json.dumps(split1_cd), encoding="utf-8")
     for fold in (0, 1):
         run_single_unit(
             dataset_name="davis",
@@ -403,3 +419,100 @@ def test_run_phase3_extend_epochs_resumes_only_unconverged_runs(tmp_path: Path, 
         extend_epochs=True,
     )
     assert res1_ext["total_epochs_run"] == 2
+
+
+def test_verify_phase3_rejects_truncated_baseline_aggregate_and_warns_cold_drug(tmp_path: Path, monkeypatch):
+    """Garante checagem de n_seeds em baseline_*.json (Gate 2) e alerta cold_drug em Gate 5."""
+    from run_phase3_physdual import aggregate_phase3_kfold_runs, run_single_unit
+    from verify_phase3 import run_phase3_full_verification
+
+    monkeypatch.setenv("PHYSDUAL_ROOT", str(tmp_path))
+    cfg, esm_dir = _create_synthetic_phase3_workspace(tmp_path)
+    splits_dir = tmp_path / "data" / "processed" / "splits"
+    split0_cd = {"train": [0, 1, 2, 3, 4, 5, 6, 7], "val": [8, 9, 10, 11], "test": [12, 13, 14, 15]}
+    split1_cd = {"train": [8, 9, 10, 11, 12, 13, 14, 15], "val": [0, 1, 2, 3], "test": [4, 5, 6, 7]}
+    (splits_dir / "davis_cold_drug_fold0.json").write_text(json.dumps(split0_cd), encoding="utf-8")
+    (splits_dir / "davis_cold_drug_fold1.json").write_text(json.dumps(split1_cd), encoding="utf-8")
+    for fold in (0, 1):
+        run_single_unit(
+            dataset_name="davis",
+            split_type="cold_drug",
+            protocol="kfold",
+            fold=fold,
+            config=cfg,
+            root=tmp_path,
+            esm_cache_dir=esm_dir,
+            device="cpu",
+            smoke=True,
+        )
+    aggregate_phase3_kfold_runs(dataset="davis", split="cold_drug", folds=[0, 1], config=cfg, root=tmp_path)
+
+    # Gate 5 deve alertar para best_epoch=1 < 15 em cold_drug
+    rep_ok = run_phase3_full_verification(root=tmp_path, require_paired_win=False, expected_units=2)
+    assert rep_ok["gates"]["gate2_aggregates_present"]["passed"] is True
+    assert len(rep_ok["gates"]["gate5_anti_memorization_warnings"]["warnings"]) == 2
+
+    # Baseline agregado truncado (num_seeds=2 quando expected_units=5) deve falhar Gate 2
+    bad_base = tmp_path / "outputs" / "results" / "baseline_graphdta_gin_kiba_random.json"
+    bad_base.write_text(
+        json.dumps({"model": "graphdta_gin", "dataset": "kiba", "split": "random", "protocol": "seeds", "num_seeds": 2, "seeds": [1, 3]}),
+        encoding="utf-8",
+    )
+    rep_bad = run_phase3_full_verification(root=tmp_path, require_paired_win=False, expected_units=5)
+    assert rep_bad["gates"]["gate2_aggregates_present"]["passed"] is False
+    assert any("baseline_graphdta_gin_kiba_random.json" in e for e in rep_bad["gates"]["gate2_aggregates_present"]["errors"])
+
+
+def test_trainer_cold_drug_memorization_alert_does_not_alter_training(tmp_path: Path):
+    """Prova que o alerta early_memorization_warn em cold_drug não altera pesos, perdas ou best_epoch."""
+    import torch
+    from torch.utils.data import DataLoader
+    from torch_geometric.data import Data
+    from physdual.data.datamodule import dta_collate_fn
+    from physdual.models.physdual import PhysDualPhase3
+    from physdual.training.trainer import train_model
+    from physdual.utils.seed import set_seed
+
+    def _make_loader(seed_val: int):
+        rng = torch.Generator().manual_seed(seed_val)
+        items = []
+        for i in range(8):
+            g = Data(x=torch.randn(3, 78, generator=rng), edge_index=torch.tensor([[0, 1], [1, 2]], dtype=torch.long))
+            items.append({
+                "drug_graph": g,
+                "target_tokens": torch.zeros(10, dtype=torch.long),
+                "target_esm": torch.randn(16, generator=rng),
+                "affinity": torch.tensor(float(5.0 + 0.1 * i)),
+                "seq_len": 100,
+                "smiles": f"C{'C'*i}",
+                "sequence": f"M{'A'*i}",
+                "target_id": f"T{i}",
+                "drug_id": f"D{i}",
+            })
+        return DataLoader(items, batch_size=4, shuffle=False, collate_fn=dta_collate_fn)
+
+    loader = _make_loader(7)
+
+    set_seed(123)
+    m_target = PhysDualPhase3(drug_in_dim=78, esm_dim=16, gin_hidden_dim=8, gin_num_layers=2, drug_output_dim=8, prot_output_dim=8, mlp_hidden_dims=(16,))
+    res_target = train_model(
+        model=m_target, train_loader=loader, val_loader=loader, test_loader=loader,
+        epochs=2, patience=5, davis_cold_patience=5, checkpoint_dir=tmp_path / "ckpt_t",
+        device="cpu", dataset_name="davis", split_type="cold_target", resume=False,
+    )
+
+    set_seed(123)
+    m_drug = PhysDualPhase3(drug_in_dim=78, esm_dim=16, gin_hidden_dim=8, gin_num_layers=2, drug_output_dim=8, prot_output_dim=8, mlp_hidden_dims=(16,))
+    res_drug = train_model(
+        model=m_drug, train_loader=loader, val_loader=loader, test_loader=loader,
+        epochs=2, patience=5, davis_cold_patience=5, checkpoint_dir=tmp_path / "ckpt_d",
+        device="cpu", dataset_name="davis", split_type="cold_drug", resume=False,
+    )
+
+    assert res_target["early_memorization_warn"] is True
+    assert res_drug["early_memorization_warn"] is True
+    assert res_drug["best_epoch"] == res_target["best_epoch"]
+    assert res_drug["total_epochs_run"] == res_target["total_epochs_run"]
+    assert res_drug["test_metrics_full"]["mse"] == pytest.approx(res_target["test_metrics_full"]["mse"], abs=1e-7)
+    for (_, p_t), (_, p_d) in zip(m_target.named_parameters(), m_drug.named_parameters()):
+        assert torch.allclose(p_t, p_d, atol=1e-7)

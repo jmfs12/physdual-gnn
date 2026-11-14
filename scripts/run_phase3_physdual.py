@@ -50,6 +50,29 @@ from run_phase2_baseline import (  # noqa: E402
 )
 
 PHASE3_MODEL_NAME = "physdual_gin_esm_mlp"
+PHASE3_ECFP_MODEL_NAME = "physdual_ecfp_esm_mlp"
+
+
+def normalize_phase3_model_name(model_name: str) -> str:
+    norm = model_name.strip().lower()
+    if norm in ("ecfp_mlp", PHASE3_ECFP_MODEL_NAME):
+        return PHASE3_ECFP_MODEL_NAME
+    return model_name.strip()
+
+
+def resolve_diagnostic_model_name(
+    base_model: str,
+    shuffle_esm: bool = False,
+    shuffle_esm_seed: int = 0,
+    train_seed_offset: int = 0,
+) -> str:
+    """Constrói o identificador único da run sem colidir com execuções primárias."""
+    name = normalize_phase3_model_name(base_model)
+    if shuffle_esm:
+        name = f"{name}_shuf{int(shuffle_esm_seed)}"
+    if int(train_seed_offset) != 0:
+        name = f"{name}_tsoff{int(train_seed_offset)}"
+    return name
 
 _ESM_CPU_REGIME_MAP: dict[tuple[str, str, str], str] = {
     ("davis", "cold_target", "kfold"): "davis_v2_cold_target_kfold",
@@ -131,10 +154,21 @@ def run_single_unit(
     prot_dropout: float | None = None,
     mlp_dropout: float | None = None,
     prot_output_dim: int | None = None,
+    shuffle_esm: bool = False,
+    shuffle_esm_seed: int = 0,
+    train_seed_offset: int = 0,
 ) -> dict[str, Any]:
-    """Executa uma unidade (dobra ou seed) completa do `PhysDualPhase3`."""
+    """Executa uma unidade (dobra ou seed) completa do `PhysDualPhase3` ou controles diagnósticos."""
     if unit_id is None:
         unit_id = fold if fold is not None else (seed if seed is not None else 0)
+
+    base_model_name = normalize_phase3_model_name(model_name)
+    eff_model_name = resolve_diagnostic_model_name(
+        base_model_name,
+        shuffle_esm=shuffle_esm,
+        shuffle_esm_seed=shuffle_esm_seed,
+        train_seed_offset=train_seed_offset,
+    )
 
     cfg = _apply_phase3_overrides(
         config if config is not None else load_config(root=root),
@@ -151,7 +185,7 @@ def run_single_unit(
         runs_path = Path(runs_dir)
     runs_path.mkdir(parents=True, exist_ok=True)
 
-    run_file = runs_path / get_run_filename(model_name, dataset_name, split_type, unit_id, protocol=protocol)
+    run_file = runs_path / get_run_filename(eff_model_name, dataset_name, split_type, unit_id, protocol=protocol)
 
     p3_cfg = cfg.get("physdual_phase3", {})
     train_cfg = p3_cfg.get("training", cfg.get("graphdta", {}).get("training", {}))
@@ -178,7 +212,7 @@ def run_single_unit(
 
     should_skip = False
     if not force and is_run_completed(
-        model=model_name,
+        model=eff_model_name,
         dataset=dataset_name,
         split=split_type,
         unit_id=unit_id,
@@ -203,11 +237,11 @@ def run_single_unit(
             pass
 
     if should_skip:
-        print(f"[SKIP] {model_name} | {dataset_name}/{split_type}/{protocol}={unit_id} já concluído.", flush=True)
+        print(f"[SKIP] {eff_model_name} | {dataset_name}/{split_type}/{protocol}={unit_id} já concluído.", flush=True)
         return json.loads(run_file.read_text(encoding="utf-8"))
 
-    # Determinismo estrito
-    run_seed = int(unit_id if protocol == "seeds" else (42 + unit_id))
+    # Determinismo estrito (mantém partição de dados inalterada mesmo com train_seed_offset)
+    run_seed = int((unit_id if protocol == "seeds" else (42 + unit_id)) + int(train_seed_offset))
     set_seed(run_seed)
 
     target_device = (
@@ -223,13 +257,13 @@ def run_single_unit(
 
     unit_prefix = "fold" if protocol == "kfold" else "seed"
     print(
-        f"[START] {model_name} | {dataset_name}/{split_type} ({unit_prefix}={unit_id}) | "
+        f"[START] {eff_model_name} | {dataset_name}/{split_type} ({unit_prefix}={unit_id}) | "
         f"device={target_device} | epochs={eff_epochs} | extend={extend_epochs}",
         flush=True,
     )
-    run_ckpt_dir = ckpt_base / f"{model_name}_{dataset_name}_{split_type}_{unit_prefix}{unit_id}"
+    run_ckpt_dir = ckpt_base / f"{eff_model_name}_{dataset_name}_{split_type}_{unit_prefix}{unit_id}"
     run_drive_ckpt_dir = (
-        Path(drive_checkpoint_dir) / f"{model_name}_{dataset_name}_{split_type}_{unit_prefix}{unit_id}"
+        Path(drive_checkpoint_dir) / f"{eff_model_name}_{dataset_name}_{split_type}_{unit_prefix}{unit_id}"
         if drive_checkpoint_dir is not None
         else None
     )
@@ -237,6 +271,9 @@ def run_single_unit(
     cfg_loader = copy.deepcopy(cfg)
     cfg_loader.setdefault("physdual_phase3", {}).setdefault("training", {})["batch_size"] = eff_batch_size
     cfg_loader["physdual_phase3"]["training"]["num_workers"] = eff_workers
+
+    use_ecfp = base_model_name == PHASE3_ECFP_MODEL_NAME
+    ecfp_dim = int(p3_cfg.get("ecfp_dim", 2048))
 
     train_loader, val_loader, test_loader = get_dta_dataloaders(
         dataset_name=dataset_name,
@@ -249,9 +286,13 @@ def run_single_unit(
         use_esm=True,
         esm_cache_dir=esm_cache_dir,
         esm_cache=esm_cache,
+        shuffle_esm=shuffle_esm,
+        shuffle_esm_seed=shuffle_esm_seed,
+        use_ecfp=use_ecfp,
+        ecfp_dim=ecfp_dim,
     )
 
-    model = build_physdual_phase3_model(cfg)
+    model = build_physdual_phase3_model(cfg, model_name=base_model_name)
     print(
         f"[TRAIN] DataLoaders + ESM-2 prontos ({len(train_loader.dataset)} treino / "
         f"{len(val_loader.dataset)} val / {len(test_loader.dataset)} teste). Iniciando épocas...",
@@ -301,13 +342,21 @@ def run_single_unit(
             rec["fold"] = unit_id if protocol == "kfold" else None
 
     result_payload: dict[str, Any] = {
-        "model": model_name,
+        "model": eff_model_name,
+        "base_model": base_model_name,
         "dataset": dataset_name,
         "split": split_type,
         "protocol": protocol,
         "unit_id": unit_id,
         "seed": unit_id if protocol == "seeds" else run_seed,
+        "run_seed": run_seed,
         "fold": unit_id if protocol == "kfold" else None,
+        "diagnostic_control": {
+            "is_control": bool(base_model_name != PHASE3_MODEL_NAME or shuffle_esm or int(train_seed_offset) != 0),
+            "shuffle_esm": bool(shuffle_esm),
+            "shuffle_esm_seed": int(shuffle_esm_seed) if shuffle_esm else None,
+            "train_seed_offset": int(train_seed_offset),
+        },
         "esm_model": str(cfg.get("esm", {}).get("model_name", "esm2_t33_650M_UR50D")),
         "esm_dim": int(model.esm_dim),
         "drug_in_dim": int(model.drug_in_dim),
@@ -348,7 +397,7 @@ def run_single_unit(
     }
     save_json_atomic(result_payload, run_file)
     print(
-        f"[OK] {model_name} | {dataset_name}/{split_type} ({unit_prefix}={unit_id}) | "
+        f"[OK] {eff_model_name} | {dataset_name}/{split_type} ({unit_prefix}={unit_id}) | "
         f"best_ep={result_payload['best_epoch']}/{total_epochs} | "
         f"CI={result_payload['test_metrics_full']['ci']:.4f} | "
         f"MSE={result_payload['test_metrics_full']['mse']:.4f}",
@@ -641,6 +690,13 @@ def _parse_int_list(raw: str) -> list[int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Executa treinamento e avaliação da Fase 3 (PhysDualPhase3).")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=PHASE3_MODEL_NAME,
+        choices=[PHASE3_MODEL_NAME, PHASE3_ECFP_MODEL_NAME, "ecfp_mlp"],
+        help="Arquitetura Fase 3 (`physdual_gin_esm_mlp` padrão ou controle diagnóstico `ecfp_mlp`).",
+    )
     parser.add_argument("--protocol", type=str, default="kfold", choices=["seeds", "kfold"])
     parser.add_argument("--dataset", type=str, default="davis", choices=["davis", "kiba"])
     parser.add_argument(
@@ -669,6 +725,23 @@ def main() -> None:
     parser.add_argument("--extend-epochs", action="store_true")
     parser.add_argument("--aggregate-only", action="store_true")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument(
+        "--shuffle-esm",
+        action="store_true",
+        help="Controle diagnóstico: embaralha embeddings ESM-2 via mapeamento fixo sequência->outra sequência.",
+    )
+    parser.add_argument(
+        "--shuffle-esm-seeds",
+        type=str,
+        default="0",
+        help="Lista de seeds de permutação para `--shuffle-esm` (ex: '0,1,2').",
+    )
+    parser.add_argument(
+        "--train-seed-offset",
+        type=int,
+        default=0,
+        help="Controle diagnóstico: desloca a seed de inicialização/shuffle de treino sem alterar os splits.",
+    )
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--root", type=str, default=None)
     args = parser.parse_args()
@@ -711,38 +784,74 @@ def main() -> None:
 
     units = _parse_int_list(args.folds if args.protocol == "kfold" else args.seeds)
     shared_esm_cache: dict[str, torch.Tensor] = {}
-    for sp in splits:
-        for u in units:
-            run_single_unit(
-                dataset_name=args.dataset,
-                split_type=sp,
-                protocol=args.protocol,
-                unit_id=u,
-                config=cfg,
-                root=base_root,
-                esm_cache_dir=args.esm_cache_dir,
-                esm_cache=shared_esm_cache,
-                force=args.force,
-                device=args.device,
-                epochs=args.epochs,
-                patience=args.patience,
-                davis_cold_patience=args.davis_cold_patience,
-                batch_size=args.batch_size,
-                lr=args.lr,
-                weight_decay=args.weight_decay,
-                num_workers=args.num_workers,
-                drive_checkpoint_dir=args.drive_checkpoint_dir,
-                smoke=args.smoke,
-                extend_epochs=args.extend_epochs,
-                esm_dropout_in=args.esm_dropout_in,
-                prot_dropout=args.prot_dropout,
-                mlp_dropout=args.mlp_dropout,
-                prot_output_dim=args.prot_output_dim,
-            )
-        if args.protocol == "kfold":
-            aggregate_phase3_kfold_runs(dataset=args.dataset, split=sp, folds=units, config=cfg, root=base_root)
-        else:
-            aggregate_phase3_seed_runs(dataset=args.dataset, split=sp, seeds=units, config=cfg, root=base_root)
+    base_model_name = normalize_phase3_model_name(args.model)
+    shuf_seeds = _parse_int_list(args.shuffle_esm_seeds) if args.shuffle_esm else [0]
+
+    for s_seed in shuf_seeds:
+        eff_model_name = resolve_diagnostic_model_name(
+            base_model_name,
+            shuffle_esm=args.shuffle_esm,
+            shuffle_esm_seed=s_seed,
+            train_seed_offset=args.train_seed_offset,
+        )
+        for sp in splits:
+            for u in units:
+                run_single_unit(
+                    dataset_name=args.dataset,
+                    split_type=sp,
+                    protocol=args.protocol,
+                    unit_id=u,
+                    config=cfg,
+                    root=base_root,
+                    esm_cache_dir=args.esm_cache_dir,
+                    esm_cache=shared_esm_cache,
+                    force=args.force,
+                    device=args.device,
+                    epochs=args.epochs,
+                    patience=args.patience,
+                    davis_cold_patience=args.davis_cold_patience,
+                    batch_size=args.batch_size,
+                    lr=args.lr,
+                    weight_decay=args.weight_decay,
+                    num_workers=args.num_workers,
+                    drive_checkpoint_dir=args.drive_checkpoint_dir,
+                    smoke=args.smoke,
+                    extend_epochs=args.extend_epochs,
+                    model_name=base_model_name,
+                    esm_dropout_in=args.esm_dropout_in,
+                    prot_dropout=args.prot_dropout,
+                    mlp_dropout=args.mlp_dropout,
+                    prot_output_dim=args.prot_output_dim,
+                    shuffle_esm=args.shuffle_esm,
+                    shuffle_esm_seed=s_seed,
+                    train_seed_offset=args.train_seed_offset,
+                )
+            if args.protocol == "kfold":
+                avail_folds = sorted({
+                    u_idx for u_idx in set(units) | {0, 1, 2, 3, 4}
+                    if (runs_dir / get_run_filename(eff_model_name, args.dataset, sp, u_idx, protocol="kfold")).exists()
+                })
+                aggregate_phase3_kfold_runs(
+                    dataset=args.dataset,
+                    split=sp,
+                    folds=avail_folds or units,
+                    config=cfg,
+                    root=base_root,
+                    model=eff_model_name,
+                )
+            else:
+                avail_seeds = sorted({
+                    u_idx for u_idx in set(units) | {0, 1, 2, 3, 4}
+                    if (runs_dir / get_run_filename(eff_model_name, args.dataset, sp, u_idx, protocol="seeds")).exists()
+                })
+                aggregate_phase3_seed_runs(
+                    dataset=args.dataset,
+                    split=sp,
+                    seeds=avail_seeds or units,
+                    config=cfg,
+                    root=base_root,
+                    model=eff_model_name,
+                )
 
 
 if __name__ == "__main__":

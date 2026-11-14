@@ -2,87 +2,59 @@
 
 from __future__ import annotations
 
-try:
-    from physdual.data.datamodule import (
-        PROTEIN_ALPHABET,
-        PROTEIN_CHAR_TO_IDX,
-        DTADataset,
-        compute_aa_composition,
-        dta_collate_fn,
-        get_dta_dataloaders,
-        prepare_local_cache,
-        tokenize_protein_sequence,
-    )
-except ImportError:
-    pass
-from physdual.data.datasets import (
-    EXPECTED_COUNTS,
-    canonicalize_largest_fragment,
-    download_canonical_dataset,
-    load_raw_dataset,
-    prepare_dataset,
-    standardize_dataset,
-    validate_protein_sequence,
-)
-from physdual.data.esm_cache import (
-    compute_seq_hash,
-    create_cache_tarball,
-    extract_esm_embeddings_batch,
-    generate_sliding_windows,
-    get_embedding_cache_path,
-    load_cached_protein_embedding,
-    save_protein_embedding,
-)
-from physdual.data.featurizer_drug import (
-    build_drug_graph_cache,
-    graph_dict_to_pyg_data,
-    load_drug_graph,
-    load_drug_graph_cache,
-    smiles_to_graph_dict,
-    smiles_to_pyg_graph,
-)
-from physdual.data.splits import (
-    create_group_kfold_splits,
-    create_sequence_identity_kfold_splits,
-    create_splits,
-    load_splits,
-    save_splits,
-    verify_group_kfold_coverage,
-    verify_sequence_identity_splits,
-    verify_split_leakage,
-)
+import importlib
+from typing import Any
 
-__all__ = [
-    "DTADataset",
-    "EXPECTED_COUNTS",
-    "PROTEIN_ALPHABET",
-    "PROTEIN_CHAR_TO_IDX",
-    "build_drug_graph_cache",
-    "canonicalize_largest_fragment",
-    "compute_aa_composition",
-    "compute_seq_hash",
-    "create_cache_tarball",
-    "create_splits",
-    "dta_collate_fn",
-    "download_canonical_dataset",
-    "extract_esm_embeddings_batch",
-    "generate_sliding_windows",
-    "get_dta_dataloaders",
-    "get_embedding_cache_path",
-    "graph_dict_to_pyg_data",
-    "load_cached_protein_embedding",
-    "load_drug_graph",
-    "load_drug_graph_cache",
-    "load_raw_dataset",
-    "load_splits",
-    "prepare_dataset",
-    "prepare_local_cache",
-    "save_protein_embedding",
-    "save_splits",
-    "smiles_to_graph_dict",
-    "smiles_to_pyg_graph",
-    "standardize_dataset",
-    "tokenize_protein_sequence",
-    "validate_protein_sequence",
-    "verify_split_leakage",
-]
+_EXPORTS: dict[str, str] = {
+    # datamodule
+    "PROTEIN_ALPHABET": "physdual.data.datamodule",
+    "PROTEIN_CHAR_TO_IDX": "physdual.data.datamodule",
+    "DTADataset": "physdual.data.datamodule",
+    "compute_aa_composition": "physdual.data.datamodule",
+    "dta_collate_fn": "physdual.data.datamodule",
+    "get_dta_dataloaders": "physdual.data.datamodule",
+    "prepare_local_cache": "physdual.data.datamodule",
+    "tokenize_protein_sequence": "physdual.data.datamodule",
+    # datasets
+    "EXPECTED_COUNTS": "physdual.data.datasets",
+    "canonicalize_largest_fragment": "physdual.data.datasets",
+    "download_canonical_dataset": "physdual.data.datasets",
+    "load_raw_dataset": "physdual.data.datasets",
+    "prepare_dataset": "physdual.data.datasets",
+    "standardize_dataset": "physdual.data.datasets",
+    "validate_protein_sequence": "physdual.data.datasets",
+    # esm_cache
+    "compute_seq_hash": "physdual.data.esm_cache",
+    "create_cache_tarball": "physdual.data.esm_cache",
+    "extract_esm_embeddings_batch": "physdual.data.esm_cache",
+    "generate_sliding_windows": "physdual.data.esm_cache",
+    "get_embedding_cache_path": "physdual.data.esm_cache",
+    "load_cached_protein_embedding": "physdual.data.esm_cache",
+    "save_protein_embedding": "physdual.data.esm_cache",
+    # featurizer_drug
+    "build_drug_graph_cache": "physdual.data.featurizer_drug",
+    "graph_dict_to_pyg_data": "physdual.data.featurizer_drug",
+    "load_drug_graph": "physdual.data.featurizer_drug",
+    "load_drug_graph_cache": "physdual.data.featurizer_drug",
+    "smiles_to_graph_dict": "physdual.data.featurizer_drug",
+    "smiles_to_pyg_graph": "physdual.data.featurizer_drug",
+    # splits
+    "create_group_kfold_splits": "physdual.data.splits",
+    "create_sequence_identity_kfold_splits": "physdual.data.splits",
+    "create_splits": "physdual.data.splits",
+    "load_splits": "physdual.data.splits",
+    "save_splits": "physdual.data.splits",
+    "verify_group_kfold_coverage": "physdual.data.splits",
+    "verify_sequence_identity_splits": "physdual.data.splits",
+    "verify_split_leakage": "physdual.data.splits",
+}
+
+__all__ = list(_EXPORTS.keys())
+
+
+def __getattr__(name: str) -> Any:
+    mod_name = _EXPORTS.get(name)
+    if mod_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    mod = importlib.import_module(mod_name)
+    return getattr(mod, name)

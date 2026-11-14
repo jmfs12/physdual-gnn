@@ -20,6 +20,7 @@ import argparse
 import json
 import math
 from pathlib import Path
+import re
 import sys
 import tempfile
 from typing import Any
@@ -147,7 +148,14 @@ def run_phase3_full_verification(
         "gate6_paired_superiority": {"passed": True, "errors": [], "warnings": []},
     }
 
-    run_files = sorted(runs_dir.glob("physdual_gin_esm_mlp_*.json")) if runs_dir.exists() else []
+    run_files = (
+        sorted(
+            rf for rf in runs_dir.glob("physdual_gin_esm_mlp_*.json")
+            if re.match(r"^physdual_gin_esm_mlp_(davis|kiba)_", rf.name)
+        )
+        if runs_dir.exists()
+        else []
+    )
     gates["gate1_runs_integrity"]["num_runs"] = len(run_files)
     if not run_files:
         gates["gate1_runs_integrity"]["passed"] = False
@@ -169,18 +177,41 @@ def run_phase3_full_verification(
         if not bool(data.get("test_isolation_verified", False)):
             gates["gate4_strict_test_isolation"]["passed"] = False
             gates["gate4_strict_test_isolation"]["errors"].append(f"{rf.name}: test_isolation_verified != True")
-        if "cold_target" in str(data.get("split", "")).lower() and int(data.get("best_epoch", 0)) < 15:
+        if "cold" in str(data.get("split", "")).lower() and int(data.get("best_epoch", 0)) < 15:
             gates["gate5_anti_memorization_warnings"]["warnings"].append(
                 f"{rf.name}: best_epoch={data.get('best_epoch')} (< 15) indica memorização precoce."
             )
 
-    agg_files = sorted(results_dir.glob("phase3_physdual_gin_esm_mlp_*.json")) if results_dir.exists() else []
+    agg_files = (
+        sorted(
+            af for af in results_dir.glob("phase3_physdual_gin_esm_mlp_*.json")
+            if re.match(r"^phase3_physdual_gin_esm_mlp_(davis|kiba)_", af.name)
+        )
+        if results_dir.exists()
+        else []
+    )
     gates["gate2_aggregates_present"]["num_aggregates"] = len(agg_files)
     if not agg_files:
         gates["gate2_aggregates_present"]["passed"] = False
         gates["gate2_aggregates_present"]["errors"].append(
             f"Nenhum agregado 'phase3_physdual_gin_esm_mlp_*.json' em {results_dir}"
         )
+
+    baseline_agg_files = sorted(results_dir.glob("baseline_*.json")) if results_dir.exists() else []
+    gates["gate2_aggregates_present"]["num_baseline_aggregates"] = len(baseline_agg_files)
+    for bf in baseline_agg_files:
+        bagg = json.loads(bf.read_text(encoding="utf-8"))
+        b_proto = str(bagg.get("protocol", "kfold" if bf.name.endswith("_kfold.json") else "seeds"))
+        b_list_key = "folds" if b_proto == "kfold" else "seeds"
+        b_count_key = "num_folds" if b_proto == "kfold" else "num_seeds"
+        b_count = int(bagg.get(b_count_key, 0))
+        b_units = bagg.get(b_list_key, [])
+        if b_count != int(expected_units) or len(b_units) != int(expected_units):
+            gates["gate2_aggregates_present"]["passed"] = False
+            gates["gate2_aggregates_present"]["errors"].append(
+                f"{bf.name}: esperado {expected_units} unidades ({b_proto}), "
+                f"encontrado {b_count_key}={b_count}, {b_list_key}={b_units}."
+            )
 
     tmp_files = list(base_root.glob("**/.tmp_*")) if base_root.exists() else []
     if tmp_files:
