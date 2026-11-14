@@ -215,3 +215,62 @@ def test_train_seed_offset_preserves_split_and_isolates_outputs(tmp_path: Path, 
     assert (runs_dir / "physdual_gin_esm_mlp_davis_cold_target_seqid30_fold0.json").exists()
     assert (runs_dir / "physdual_gin_esm_mlp_tsoff1000_davis_cold_target_seqid30_fold0.json").exists()
     assert json.loads((runs_dir / "physdual_gin_esm_mlp_davis_cold_target_seqid30_fold0.json").read_text())["model"] == "physdual_gin_esm_mlp"
+
+
+def test_aggregate_only_supports_diagnostic_models_and_kiba_kfold_splits(tmp_path: Path, monkeypatch):
+    from run_phase3_physdual import _resolve_requested_splits, main as p3_main, run_single_unit
+
+    assert _resolve_requested_splits("kiba", "all", "kfold") == ["cold_target_seqid30", "cold_target_seqid40"]
+    assert _resolve_requested_splits("davis", "all", "kfold") == [
+        "cold_drug",
+        "cold_target",
+        "cold_target_seqid30",
+        "cold_target_seqid40",
+    ]
+    assert _resolve_requested_splits("kiba", "all", "seeds") == ["random", "cold_drug", "cold_target"]
+
+    monkeypatch.setenv("PHYSDUAL_ROOT", str(tmp_path))
+    cfg, esm_dir = _create_synthetic_phase3_workspace(tmp_path)
+    for fold in (0, 1):
+        run_single_unit(
+            dataset_name="davis",
+            split_type="cold_target_seqid30",
+            protocol="kfold",
+            unit_id=fold,
+            config=cfg,
+            root=tmp_path,
+            esm_cache_dir=esm_dir,
+            force=True,
+            device="cpu",
+            smoke=True,
+            model_name="ecfp_mlp",
+            train_seed_offset=1000,
+        )
+
+    agg_path = (
+        tmp_path
+        / "outputs"
+        / "results"
+        / "phase3_physdual_ecfp_esm_mlp_tsoff1000_davis_cold_target_seqid30_kfold.json"
+    )
+    assert not agg_path.exists()
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_phase3_physdual.py",
+            "--aggregate-only",
+            "--model",
+            "ecfp_mlp",
+            "--train-seed-offset",
+            "1000",
+            "--root",
+            str(tmp_path),
+        ],
+    )
+    p3_main()
+    assert agg_path.exists()
+    agg_data = json.loads(agg_path.read_text(encoding="utf-8"))
+    assert agg_data["model"] == "physdual_ecfp_esm_mlp_tsoff1000"
+    assert agg_data["folds"] == [0, 1]

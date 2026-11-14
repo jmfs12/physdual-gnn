@@ -516,3 +516,80 @@ def test_trainer_cold_drug_memorization_alert_does_not_alter_training(tmp_path: 
     assert res_drug["test_metrics_full"]["mse"] == pytest.approx(res_target["test_metrics_full"]["mse"], abs=1e-7)
     for (_, p_t), (_, p_d) in zip(m_target.named_parameters(), m_drug.named_parameters()):
         assert torch.allclose(p_t, p_d, atol=1e-7)
+
+
+def test_kiba_seqid_esm_baselines_collected_and_gate6_skips_absent_cnn3(tmp_path: Path, monkeypatch):
+    """Garante mapeamento kiba_seqid30_kfold, cluster_group_col=seqid_cluster e Gate 6 sem graphdta_cnn3."""
+    from run_phase3_physdual import aggregate_phase3_kfold_runs, run_single_unit
+    from verify_phase3 import run_phase3_full_verification
+
+    monkeypatch.setenv("PHYSDUAL_ROOT", str(tmp_path))
+    cfg, esm_dir = _create_synthetic_phase3_workspace(tmp_path)
+    proc_dir = tmp_path / "data" / "processed"
+    splits_dir = proc_dir / "splits"
+    res_dir = tmp_path / "outputs" / "results"
+    logs_dir = tmp_path / "outputs" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Reaproveita CSV/cache para simular KIBA cold_target_seqid30 sem graphdta_cnn3
+    davis_df = pd.read_csv(proc_dir / "davis_clean.csv")
+    davis_df.to_csv(proc_dir / "kiba_clean.csv", index=False)
+    torch.save(
+        torch.load(proc_dir / "davis_drug_graphs_v2_onehot78_l1norm.pt", weights_only=False),
+        proc_dir / "kiba_drug_graphs_v2_onehot78_l1norm.pt",
+    )
+    for f_id in (0, 1):
+        (splits_dir / f"kiba_cold_target_seqid30_fold{f_id}.json").write_text(
+            (splits_dir / f"davis_cold_target_seqid30_fold{f_id}.json").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+    esm_cpu = json.loads((res_dir / "phase3_esm_cpu_baselines.json").read_text(encoding="utf-8"))
+    esm_cpu["regimes"]["kiba_seqid30_kfold"] = esm_cpu["regimes"]["davis_seqid30_kfold"]
+    (res_dir / "phase3_esm_cpu_baselines.json").write_text(json.dumps(esm_cpu), encoding="utf-8")
+
+    # Mapa de clusters para seqid30
+    (logs_dir / "kiba_seqid_cluster_map.json").write_text(
+        json.dumps({
+            "dataset": "kiba",
+            "thresholds": {
+                "cold_target_seqid30": {
+                    "num_clusters": 4,
+                    "seq_to_cluster": {"MKTVRQ": 0, "ACDEFG": 1, "GHIKLM": 2, "NPQRST": 3},
+                }
+            },
+        }),
+        encoding="utf-8",
+    )
+
+    for fold in (0, 1):
+        run_single_unit(
+            dataset_name="kiba",
+            split_type="cold_target_seqid30",
+            protocol="kfold",
+            fold=fold,
+            config=cfg,
+            root=tmp_path,
+            esm_cache_dir=esm_dir,
+            device="cpu",
+            smoke=True,
+        )
+
+    agg = aggregate_phase3_kfold_runs(dataset="kiba", split="cold_target_seqid30", folds=[0, 1], config=cfg, root=tmp_path)
+    assert "ridge_esm" in agg["paired_vs_baselines"]
+    assert "knn_esm_target" in agg["paired_vs_baselines"]
+    assert agg["bootstrap_analysis"]["cluster_group_col"] == "seqid_cluster"
+
+    # Remove baseline mock de Davis para isolar checagem no KIBA
+    (res_dir / "baseline_graphdta_cnn3_davis_cold_target_seqid30_kfold.json").unlink()
+    rep = run_phase3_full_verification(root=tmp_path, require_paired_win=False, expected_units=2)
+    assert rep["gates"]["gate6_paired_superiority"]["passed"] is True
+    assert not any("ausente em paired_vs_baselines" in w for w in rep["gates"]["gate6_paired_superiority"]["warnings"])
+
+    # Se ridge_esm faltar em paired_vs_baselines do KIBA, Gate 6 estrito deve falhar
+    agg_path = res_dir / "phase3_physdual_gin_esm_mlp_kiba_cold_target_seqid30_kfold.json"
+    agg["paired_vs_baselines"].pop("ridge_esm")
+    agg_path.write_text(json.dumps(agg), encoding="utf-8")
+    rep_missing = run_phase3_full_verification(root=tmp_path, require_paired_win=True, expected_units=2)
+    assert rep_missing["gates"]["gate6_paired_superiority"]["passed"] is False
+    assert any("ridge_esm" in e for e in rep_missing["gates"]["gate6_paired_superiority"]["errors"])

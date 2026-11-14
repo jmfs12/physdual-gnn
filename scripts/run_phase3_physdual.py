@@ -83,6 +83,8 @@ _ESM_CPU_REGIME_MAP: dict[tuple[str, str, str], str] = {
     ("kiba", "random", "seeds"): "kiba_v1_random",
     ("kiba", "cold_drug", "seeds"): "kiba_v1_cold_drug",
     ("kiba", "cold_target", "seeds"): "kiba_v1_cold_target",
+    ("kiba", "cold_target_seqid30", "kfold"): "kiba_seqid30_kfold",
+    ("kiba", "cold_target_seqid40", "kfold"): "kiba_seqid40_kfold",
 }
 
 
@@ -121,7 +123,8 @@ def _resolve_output_dir(cfg: dict[str, Any], key: str, root: Path | str | None =
             return base_root / rel
         except ValueError:
             pass
-    return base_root / "outputs" / ("results" if key == "results_dir" else "checkpoints")
+    fallback_sub = {"results_dir": "results", "checkpoints_dir": "checkpoints", "logs_dir": "logs"}.get(key, key)
+    return base_root / "outputs" / fallback_sub
 
 
 def run_single_unit(
@@ -565,6 +568,16 @@ def aggregate_phase3_kfold_runs(
 
         is_cold_target = "cold_target" in split.lower()
         group_col = "sequence" if is_cold_target else "smiles"
+        if "seqid" in split.lower():
+            logs_dir = _resolve_output_dir(cfg, "logs_dir", root=root)
+            cmap_path = logs_dir / f"{dataset}_seqid_cluster_map.json"
+            if cmap_path.exists():
+                cmap_data = json.loads(cmap_path.read_text(encoding="utf-8"))
+                seq_to_cluster = cmap_data.get("thresholds", {}).get(split, {}).get("seq_to_cluster", {})
+                mapped_clusters = oof_df["sequence"].astype(str).map(seq_to_cluster)
+                if not mapped_clusters.isna().any():
+                    oof_df["seqid_cluster"] = mapped_clusters.astype(int)
+                    group_col = "seqid_cluster"
         baseline_cols = [c for c in ("y_pred_drug_mean", "y_pred_target_mean") if c in oof_df.columns]
         if group_col in oof_df.columns and oof_df[group_col].nunique() >= 2 and baseline_cols:
             bootstrap_results["cluster_group_col"] = group_col
@@ -688,6 +701,16 @@ def _parse_int_list(raw: str) -> list[int]:
     return [int(x.strip()) for x in raw.split(",") if x.strip()]
 
 
+def _resolve_requested_splits(dataset: str, split: str, protocol: str) -> list[str]:
+    if split != "all":
+        return [split]
+    if protocol == "kfold":
+        if dataset.lower().strip() == "kiba":
+            return ["cold_target_seqid30", "cold_target_seqid40"]
+        return ["cold_drug", "cold_target", "cold_target_seqid30", "cold_target_seqid40"]
+    return ["random", "cold_drug", "cold_target"]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Executa treinamento e avaliação da Fase 3 (PhysDualPhase3).")
     parser.add_argument(
@@ -749,43 +772,61 @@ def main() -> None:
     cfg = load_config(config_path=args.config, root=args.root)
     base_root = Path(cfg["project_root"])
     runs_dir = base_root / cfg["paths"]["results_dir"] / "runs"
+    base_model_name = normalize_phase3_model_name(args.model)
+    shuf_seeds = _parse_int_list(args.shuffle_esm_seeds) if args.shuffle_esm else [0]
 
     if args.aggregate_only:
-        seed_groups: set[tuple[str, str]] = set()
-        fold_groups: set[tuple[str, str]] = set()
-        if runs_dir.exists():
-            for jf in runs_dir.glob(f"{PHASE3_MODEL_NAME}_*.json"):
-                m_f = re.match(
-                    rf"^{PHASE3_MODEL_NAME}_(davis|kiba)_(random|cold_drug|cold_target|cold_target_seqid30|cold_target_seqid40)_fold\d+$",
-                    jf.stem,
+        for s_seed in shuf_seeds:
+            eff_model_name = resolve_diagnostic_model_name(
+                base_model_name,
+                shuffle_esm=args.shuffle_esm,
+                shuffle_esm_seed=s_seed,
+                train_seed_offset=args.train_seed_offset,
+            )
+            esc_model = re.escape(eff_model_name)
+            seed_groups: dict[tuple[str, str], list[int]] = {}
+            fold_groups: dict[tuple[str, str], list[int]] = {}
+            if runs_dir.exists():
+                for jf in runs_dir.glob(f"{eff_model_name}_*.json"):
+                    m_f = re.match(
+                        rf"^{esc_model}_(davis|kiba)_(random|cold_drug|cold_target|cold_target_seqid30|cold_target_seqid40)_fold(\d+)$",
+                        jf.stem,
+                    )
+                    if m_f:
+                        fold_groups.setdefault((m_f.group(1), m_f.group(2)), []).append(int(m_f.group(3)))
+                        continue
+                    m_s = re.match(
+                        rf"^{esc_model}_(davis|kiba)_(random|cold_drug|cold_target)_seed(\d+)$",
+                        jf.stem,
+                    )
+                    if m_s:
+                        seed_groups.setdefault((m_s.group(1), m_s.group(2)), []).append(int(m_s.group(3)))
+            for (ds_val, sp_val), u_list in sorted(fold_groups.items()):
+                aggregate_phase3_kfold_runs(
+                    dataset=ds_val,
+                    split=sp_val,
+                    folds=sorted(set(u_list)),
+                    config=cfg,
+                    root=base_root,
+                    model=eff_model_name,
                 )
-                if m_f:
-                    fold_groups.add((m_f.group(1), m_f.group(2)))
-                    continue
-                m_s = re.match(
-                    rf"^{PHASE3_MODEL_NAME}_(davis|kiba)_(random|cold_drug|cold_target)_seed\d+$",
-                    jf.stem,
+            for (ds_val, sp_val), u_list in sorted(seed_groups.items()):
+                aggregate_phase3_seed_runs(
+                    dataset=ds_val,
+                    split=sp_val,
+                    seeds=sorted(set(u_list)),
+                    config=cfg,
+                    root=base_root,
+                    model=eff_model_name,
                 )
-                if m_s:
-                    seed_groups.add((m_s.group(1), m_s.group(2)))
-        for ds_val, sp_val in sorted(fold_groups):
-            aggregate_phase3_kfold_runs(dataset=ds_val, split=sp_val, config=cfg, root=base_root)
-        for ds_val, sp_val in sorted(seed_groups):
-            aggregate_phase3_seed_runs(dataset=ds_val, split=sp_val, config=cfg, root=base_root)
         return
 
-    splits = (
-        ["cold_drug", "cold_target", "cold_target_seqid30", "cold_target_seqid40"]
-        if (args.split == "all" and args.protocol == "kfold")
-        else (["random", "cold_drug", "cold_target"] if args.split == "all" else [args.split])
-    )
+    splits = _resolve_requested_splits(args.dataset, args.split, args.protocol)
     if args.protocol != "kfold" and any(sp.startswith("cold_target_seqid") for sp in splits):
         raise ValueError("Splits `cold_target_seqid30/40` requerem `--protocol kfold`.")
 
     units = _parse_int_list(args.folds if args.protocol == "kfold" else args.seeds)
     shared_esm_cache: dict[str, torch.Tensor] = {}
-    base_model_name = normalize_phase3_model_name(args.model)
-    shuf_seeds = _parse_int_list(args.shuffle_esm_seeds) if args.shuffle_esm else [0]
 
     for s_seed in shuf_seeds:
         eff_model_name = resolve_diagnostic_model_name(

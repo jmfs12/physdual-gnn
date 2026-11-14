@@ -218,9 +218,14 @@ def run_phase3_full_verification(
         gates["gate3_no_orphan_tmp_files"]["passed"] = False
         gates["gate3_no_orphan_tmp_files"]["errors"] = [str(p) for p in tmp_files[:10]]
 
-    req_baselines = ("drug_mean_predictor", "knn_kmer_target", "knn_esm_target", "ridge_esm", "graphdta_cnn3")
     for af in agg_files:
         agg = json.loads(af.read_text(encoding="utf-8"))
+        agg_dataset = str(agg.get("dataset", "")).lower().strip()
+        req_baselines = (
+            ("drug_mean_predictor", "knn_kmer_target", "knn_esm_target", "ridge_esm")
+            if agg_dataset == "kiba"
+            else ("drug_mean_predictor", "knn_kmer_target", "knn_esm_target", "ridge_esm", "graphdta_cnn3")
+        )
         proto = str(agg.get("protocol", "kfold"))
         unit_count = int(agg.get("num_folds" if proto == "kfold" else "num_seeds", 0))
         if unit_count < int(expected_units):
