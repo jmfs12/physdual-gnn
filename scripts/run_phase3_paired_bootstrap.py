@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Audita OOFs locais, verifica reprodução dos baselines e executa bootstrap agrupado pareado (Davis Fase 3)."""
+"""Audita OOFs locais, verifica reprodução dos baselines e executa bootstrap agrupado pareado (Davis/KIBA Fase 3)."""
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 import sys
@@ -27,6 +28,11 @@ DAVIS_KFOLD_SPLITS = (
     "cold_target_seqid40",
 )
 
+KIBA_KFOLD_SPLITS = (
+    "cold_target_seqid30",
+    "cold_target_seqid40",
+)
+
 
 def _mean_std_median(vals: list[float]) -> dict[str, float]:
     arr = np.asarray(vals, dtype=np.float64)
@@ -37,39 +43,87 @@ def _mean_std_median(vals: list[float]) -> dict[str, float]:
     }
 
 
-def main() -> int:
+def _evaluate_adr15_outcome(
+    paired_entry: dict[str, Any] | None,
+    bs_entry: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Classifica critério operacional pré-registrado no ADR #15 para um comparador."""
+    if not paired_entry or not bs_entry:
+        return None
+    wins_mse = int(paired_entry.get("wins_mse", 0))
+    wins_ci = int(paired_entry.get("wins_ci", 0))
+    ci_mse = bs_entry.get("mse_delta", {}).get("ci_95", [0.0, 0.0])
+    ci_ci = bs_entry.get("ci_delta", {}).get("ci_95", [0.0, 0.0])
+    mse_excl_zero = bool(float(ci_mse[1]) < 0.0)
+    ci_excl_zero = bool(float(ci_ci[0]) > 0.0)
+    if wins_mse >= 4 and wins_ci >= 4 and mse_excl_zero and ci_excl_zero:
+        verdict = "primary_win"
+    elif wins_mse <= 2 or wins_ci <= 2 or not mse_excl_zero or not ci_excl_zero:
+        verdict = "formal_negative"
+    else:
+        verdict = "inconclusive"
+    return {
+        "verdict": verdict,
+        "wins_mse": wins_mse,
+        "wins_ci": wins_ci,
+        "mse_ic95_excludes_zero_favorable": mse_excl_zero,
+        "ci_ic95_excludes_zero_favorable": ci_excl_zero,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Auditoria OOF e bootstrap agrupado pareado (Davis ou KIBA Fase 3).")
+    parser.add_argument("--dataset", type=str, default="davis", choices=["davis", "kiba"])
+    args = parser.parse_args(argv)
+    dataset = args.dataset.lower().strip()
+
     root = get_project_root()
     results_dir = root / "outputs" / "results"
     oof_dir = results_dir / "oof"
-    cmap_path = root / "outputs" / "logs" / "davis_seqid_cluster_map.json"
+    cmap_path = root / "outputs" / "logs" / f"{dataset}_seqid_cluster_map.json"
     cmap = json.loads(cmap_path.read_text(encoding="utf-8")) if cmap_path.exists() else {}
 
     esm_cpu = json.loads((results_dir / "phase3_esm_cpu_baselines.json").read_text(encoding="utf-8"))
-    esm_key_map = {
-        "cold_target": "davis_v2_cold_target_kfold",
-        "cold_drug": "davis_v2_cold_drug_kfold",
-        "cold_target_seqid30": "davis_seqid30_kfold",
-        "cold_target_seqid40": "davis_seqid40_kfold",
-    }
+    if dataset == "davis":
+        splits = DAVIS_KFOLD_SPLITS
+        esm_key_map = {
+            "cold_target": "davis_v2_cold_target_kfold",
+            "cold_drug": "davis_v2_cold_drug_kfold",
+            "cold_target_seqid30": "davis_seqid30_kfold",
+            "cold_target_seqid40": "davis_seqid40_kfold",
+        }
+    else:
+        splits = KIBA_KFOLD_SPLITS
+        esm_key_map = {
+            "cold_target_seqid30": "kiba_seqid30_kfold",
+            "cold_target_seqid40": "kiba_seqid40_kfold",
+        }
 
     report: dict[str, Any] = {
-        "dataset": "davis",
+        "dataset": dataset,
         "protocol": "v2_kfold",
-        "exploratory": True,
+        "exploratory": dataset == "davis",
+        "pre_registered_adr15": dataset == "kiba",
         "n_bootstraps": 1000,
         "seed": 42,
         "reproduction_checks": {},
         "regimes": {},
-        "cold_drug_descriptive_all_models": {},
     }
+    if dataset == "davis":
+        report["cold_drug_descriptive_all_models"] = {}
 
-    for sp in DAVIS_KFOLD_SPLITS:
-        cpu_df = pd.read_csv(oof_dir / f"cpu_baselines_davis_{sp}_oof.csv")
-        p3_df = pd.read_csv(oof_dir / f"physdual_gin_esm_mlp_davis_{sp}_oof.csv")
-        gin_df = pd.read_csv(oof_dir / f"graphdta_gin_davis_{sp}_oof.csv")
-        cnn_df = pd.read_csv(oof_dir / f"graphdta_cnn3_davis_{sp}_oof.csv")
+    for sp in splits:
+        cpu_df = pd.read_csv(oof_dir / f"cpu_baselines_{dataset}_{sp}_oof.csv")
+        p3_df = pd.read_csv(oof_dir / f"physdual_gin_esm_mlp_{dataset}_{sp}_oof.csv")
+        model_dfs: list[tuple[str, pd.DataFrame]] = [("gin_esm_mlp", p3_df)]
+        gin_df: pd.DataFrame | None = None
+        cnn_df: pd.DataFrame | None = None
+        if dataset == "davis":
+            gin_df = pd.read_csv(oof_dir / f"graphdta_gin_{dataset}_{sp}_oof.csv")
+            cnn_df = pd.read_csv(oof_dir / f"graphdta_cnn3_{dataset}_{sp}_oof.csv")
+            model_dfs.extend([("graphdta_gin", gin_df), ("graphdta_cnn3", cnn_df)])
 
-        for name, mdf in (("gin_esm_mlp", p3_df), ("graphdta_gin", gin_df), ("graphdta_cnn3", cnn_df)):
+        for name, mdf in model_dfs:
             if len(mdf) != len(cpu_df):
                 raise ValueError(f"{sp}/{name}: tamanho OOF divergente ({len(mdf)} vs {len(cpu_df)})")
             if not np.array_equal(mdf["fold"].to_numpy(), cpu_df["fold"].to_numpy()):
@@ -96,9 +150,7 @@ def main() -> int:
         )
 
         # Verifica métricas OOF salvas contra recomputadas
-        p3_agg = json.loads((results_dir / f"phase3_physdual_gin_esm_mlp_davis_{sp}_kfold.json").read_text(encoding="utf-8"))
-        gin_agg = json.loads((results_dir / f"baseline_graphdta_gin_davis_{sp}_kfold.json").read_text(encoding="utf-8"))
-        cnn_agg = json.loads((results_dir / f"baseline_graphdta_cnn3_davis_{sp}_kfold.json").read_text(encoding="utf-8"))
+        p3_agg = json.loads((results_dir / f"phase3_physdual_gin_esm_mlp_{dataset}_{sp}_kfold.json").read_text(encoding="utf-8"))
         esm_reg = esm_cpu["regimes"][esm_key_map[sp]]
 
         yt_all = cpu_df["y_true"].to_numpy(dtype=np.float64)
@@ -106,13 +158,20 @@ def main() -> int:
             "oof_y_pred_drug_mean_max_abs_diff": {"val": max_diff_dm},
             "oof_y_pred_target_mean_max_abs_diff": {"val": max_diff_tm},
         }
-        for label, pred_arr, saved_oof in (
+        repro_targets: list[tuple[str, np.ndarray, dict[str, Any]]] = [
             ("gin_esm_mlp", p3_df["y_pred"].to_numpy(dtype=np.float64), p3_agg["global_oof_metrics"]),
-            ("graphdta_gin", gin_df["y_pred"].to_numpy(dtype=np.float64), gin_agg["global_oof_metrics"]),
-            ("graphdta_cnn3", cnn_df["y_pred"].to_numpy(dtype=np.float64), cnn_agg["global_oof_metrics"]),
             ("ridge_esm", cpu_df["y_pred_ridge_esm"].to_numpy(dtype=np.float64), esm_reg["global_oof_metrics"]["ridge_esm"]),
             ("knn_esm_target", cpu_df["y_pred_knn_esm_target"].to_numpy(dtype=np.float64), esm_reg["global_oof_metrics"]["knn_esm_target"]),
-        ):
+        ]
+        if dataset == "davis" and gin_df is not None and cnn_df is not None:
+            gin_agg = json.loads((results_dir / f"baseline_graphdta_gin_{dataset}_{sp}_kfold.json").read_text(encoding="utf-8"))
+            cnn_agg = json.loads((results_dir / f"baseline_graphdta_cnn3_{dataset}_{sp}_kfold.json").read_text(encoding="utf-8"))
+            repro_targets.extend([
+                ("graphdta_gin", gin_df["y_pred"].to_numpy(dtype=np.float64), gin_agg["global_oof_metrics"]),
+                ("graphdta_cnn3", cnn_df["y_pred"].to_numpy(dtype=np.float64), cnn_agg["global_oof_metrics"]),
+            ])
+
+        for label, pred_arr, saved_oof in repro_targets:
             rec = compute_all_metrics(yt_all, pred_arr)
             repro_diffs[label] = {
                 "ci_abs_diff": abs(rec["ci"] - float(saved_oof["ci"])),
@@ -152,7 +211,7 @@ def main() -> int:
             group_vals = cpu_df["sequence"].astype(str).map(s2c).astype(int)
             group_desc = f"cluster BLOSUM62 single-linkage ({sp})"
 
-        oof_bs = pd.DataFrame({
+        oof_bs_dict: dict[str, Any] = {
             "y_true": yt_all,
             group_col: group_vals,
             "y_pred_gin_esm_mlp": p3_df["y_pred"].to_numpy(dtype=np.float64),
@@ -163,9 +222,11 @@ def main() -> int:
             "y_pred_knn_tanimoto_drug": cpu_df["y_pred_knn_tanimoto_drug"].to_numpy(dtype=np.float64),
             "y_pred_drug_mean_predictor": cpu_df["y_pred_drug_mean_predictor"].to_numpy(dtype=np.float64),
             "y_pred_target_mean_predictor": cpu_df["y_pred_target_mean_predictor"].to_numpy(dtype=np.float64),
-            "y_pred_graphdta_cnn3": cnn_df["y_pred"].to_numpy(dtype=np.float64),
-            "y_pred_graphdta_gin": gin_df["y_pred"].to_numpy(dtype=np.float64),
-        })
+        }
+        if dataset == "davis" and cnn_df is not None and gin_df is not None:
+            oof_bs_dict["y_pred_graphdta_cnn3"] = cnn_df["y_pred"].to_numpy(dtype=np.float64)
+            oof_bs_dict["y_pred_graphdta_gin"] = gin_df["y_pred"].to_numpy(dtype=np.float64)
+        oof_bs = pd.DataFrame(oof_bs_dict)
 
         baseline_cols = [c for c in oof_bs.columns if c.startswith("y_pred_") and c != "y_pred_gin_esm_mlp"]
         bs_res = bootstrap_grouped_comparisons(
@@ -185,6 +246,12 @@ def main() -> int:
         }
         best_by_oof_mse = min(per_model_oof.items(), key=lambda kv: kv[1]["mse"])[0]
         best_by_oof_ci = max(per_model_oof.items(), key=lambda kv: kv[1]["ci"])[0]
+        non_esm_cols = [
+            c.replace("y_pred_", "")
+            for c in baseline_cols
+            if "esm" not in c
+        ]
+        best_non_esm_mse = min(non_esm_cols, key=lambda name: per_model_oof[name]["mse"]) if non_esm_cols else None
 
         # Média por dobra vs OOF para gin_esm_mlp e todos os baselines
         per_fold_table: dict[str, list[dict[str, float]]] = {}
@@ -207,22 +274,34 @@ def main() -> int:
             for mname, rows_f in per_fold_table.items()
         }
 
+        paired_map = p3_agg.get("paired_vs_baselines", {})
+        bs_clean = {
+            k.replace("y_pred_", ""): {**v, "exploratory": dataset == "davis"}
+            for k, v in bs_res.items()
+        }
+        adr15_eval: dict[str, Any] = {
+            "vs_ridge_esm": _evaluate_adr15_outcome(paired_map.get("ridge_esm"), bs_clean.get("ridge_esm")),
+        }
+        if best_non_esm_mse is not None:
+            adr15_eval["best_non_esm_baseline"] = best_non_esm_mse
+            adr15_eval["vs_best_non_esm"] = _evaluate_adr15_outcome(
+                paired_map.get(best_non_esm_mse), bs_clean.get(best_non_esm_mse)
+            )
+
         report["regimes"][sp] = {
-            "exploratory": True,
+            "exploratory": dataset == "davis",
             "group_col": group_col,
             "group_description": group_desc,
             "n_clusters": int(group_vals.nunique()),
             "best_baseline_oof_mse": best_by_oof_mse,
             "best_baseline_oof_ci": best_by_oof_ci,
+            "adr15_operational_check": adr15_eval,
             "per_model_summary": per_fold_summary,
             "per_fold_by_model": per_fold_table,
-            "bootstrap_vs_baselines": {
-                k.replace("y_pred_", ""): {**v, "exploratory": True}
-                for k, v in bs_res.items()
-            },
+            "bootstrap_vs_baselines": bs_clean,
         }
 
-        if sp == "cold_drug":
+        if dataset == "davis" and sp == "cold_drug":
             desc_models = {}
             for mname, rows_f in per_fold_table.items():
                 rows_no2 = [r for r in rows_f if r["fold"] != 2]
@@ -256,9 +335,9 @@ def main() -> int:
                 "models": desc_models,
             }
 
-    out_path = results_dir / "phase3_davis_paired_bootstrap.json"
+    out_path = results_dir / f"phase3_{dataset}_paired_bootstrap.json"
     out_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"[OK] Bootstrap pareado Davis salvo em: {out_path}")
+    print(f"[OK] Bootstrap pareado {dataset.upper()} salvo em: {out_path}")
     return 0
 
 

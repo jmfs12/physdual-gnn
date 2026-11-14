@@ -216,11 +216,38 @@ def _aggregate_units(per_unit: list[dict[str, dict[str, Any]]], key_names: list[
     return agg
 
 
+def _build_oof_unit_df(
+    fold_idx: int,
+    test_indices: list[int],
+    te_df: pd.DataFrame,
+    res_u: dict[str, dict[str, Any]],
+    cl_u: dict[str, dict[str, Any]],
+) -> pd.DataFrame:
+    return pd.DataFrame({
+        "row_index": test_indices,
+        "fold": fold_idx,
+        "drug_id": te_df["drug_id"].astype(str).tolist(),
+        "target_id": te_df["target_id"].astype(str).tolist(),
+        "smiles": te_df["smiles"].astype(str).tolist(),
+        "sequence": te_df["sequence"].astype(str).tolist(),
+        "y_true": te_df["affinity"].to_numpy(dtype=np.float64),
+        "y_pred_knn_esm_target": res_u["knn_esm_target"]["y_pred"],
+        "y_pred_ridge_esm_target_only": res_u["ridge_esm_target_only"]["y_pred"],
+        "y_pred_ridge_esm": res_u["ridge_esm"]["y_pred"],
+        "y_pred_mean_predictor": cl_u["mean_predictor"]["y_pred"],
+        "y_pred_drug_mean_predictor": cl_u["drug_mean_predictor"]["y_pred"],
+        "y_pred_target_mean_predictor": cl_u["target_mean_predictor"]["y_pred"],
+        "y_pred_knn_tanimoto_drug": cl_u["knn_tanimoto_drug"]["y_pred"],
+        "y_pred_knn_kmer_target": cl_u["knn_kmer_target"]["y_pred"],
+    })
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Controles baratos em CPU da Fase 3 (Etapa 3.0).")
     parser.add_argument("--classical-seqid-only", action="store_true", help="Roda apenas clássicos (sem ESM/torch) nos splits seqid30/40 do Davis.")
     parser.add_argument("--kiba-classical", action="store_true", help="Calcula marginais e kNN em CPU para KIBA (v1_seeds e seqid30/40).")
     parser.add_argument("--export-davis-oof", action="store_true", help="Exporta OOFs alinhados dos baselines CPU (ESM + clássicos) para Davis kfold.")
+    parser.add_argument("--export-kiba-oof", action="store_true", help="Exporta OOFs alinhados dos baselines CPU (ESM + clássicos) para KIBA seqid30/40 kfold.")
     parser.add_argument("--regimes", type=str, default=None, help="Lista separada por vírgula de regimes a executar e mesclar no JSON existente.")
     parser.add_argument("--esm-model", default="esm2_t33_650M_UR50D")
     parser.add_argument("--esm-dim", type=int, default=1280)
@@ -340,11 +367,15 @@ def main() -> int:
 
     oof_dir = root / "outputs" / "results" / "oof"
     oof_dir.mkdir(parents=True, exist_ok=True)
-    davis_kmer_mat, davis_seq_to_idx, davis_tan_mat, davis_drug_to_idx = None, None, None, None
+    classical_cache: dict[str, tuple[np.ndarray, dict[str, int], np.ndarray, dict[str, int]]] = {}
     if args.export_davis_oof:
-        davis_kmer_mat, davis_seq_to_idx = _build_3mer_norm_matrix(davis_df["sequence"].astype(str).tolist())
-        davis_kmer_mat = davis_kmer_mat @ davis_kmer_mat.T
-        davis_tan_mat, davis_drug_to_idx = _build_tanimoto_sim_matrix(davis_df["smiles"].astype(str).tolist())
+        km, s_idx = _build_3mer_norm_matrix(davis_df["sequence"].astype(str).tolist())
+        tm, d_idx = _build_tanimoto_sim_matrix(davis_df["smiles"].astype(str).tolist())
+        classical_cache["davis"] = (km @ km.T, s_idx, tm, d_idx)
+    if args.export_kiba_oof:
+        km, s_idx = _build_3mer_norm_matrix(kiba_df["sequence"].astype(str).tolist())
+        tm, d_idx = _build_tanimoto_sim_matrix(kiba_df["smiles"].astype(str).tolist())
+        classical_cache["kiba"] = (km @ km.T, s_idx, tm, d_idx)
 
     out_path = root / "outputs" / "results" / "phase3_esm_cpu_baselines.json"
     selected_regimes = {r.strip() for r in args.regimes.split(",") if r.strip()} if args.regimes else None
@@ -395,38 +426,16 @@ def main() -> int:
                 oof_yt.append(te_df["affinity"].to_numpy(dtype=np.float64))
                 for m, d in res_u.items():
                     oof_preds.setdefault(m, []).append(d["y_pred"])
-                if args.export_davis_oof and ds_name == "davis":
-                    assert (
-                        davis_kmer_mat is not None
-                        and davis_seq_to_idx is not None
-                        and davis_tan_mat is not None
-                        and davis_drug_to_idx is not None
-                    )
+                if ds_name in classical_cache:
+                    km_mat, s_idx, tan_mat, d_idx = classical_cache[ds_name]
                     cl_u = _compute_classical_unit(
-                        tr_df, te_df, davis_kmer_mat, davis_seq_to_idx, {}, k=5,
-                        tanimoto_sim_mat=davis_tan_mat, drug_to_idx=davis_drug_to_idx,
+                        tr_df, te_df, km_mat, s_idx, {}, k=5,
+                        tanimoto_sim_mat=tan_mat, drug_to_idx=d_idx,
                     )
-                    df_fold = pd.DataFrame({
-                        "row_index": sp["test"],
-                        "fold": u,
-                        "drug_id": te_df["drug_id"].astype(str).tolist(),
-                        "target_id": te_df["target_id"].astype(str).tolist(),
-                        "smiles": te_df["smiles"].astype(str).tolist(),
-                        "sequence": te_df["sequence"].astype(str).tolist(),
-                        "y_true": te_df["affinity"].to_numpy(dtype=np.float64),
-                        "y_pred_knn_esm_target": res_u["knn_esm_target"]["y_pred"],
-                        "y_pred_ridge_esm_target_only": res_u["ridge_esm_target_only"]["y_pred"],
-                        "y_pred_ridge_esm": res_u["ridge_esm"]["y_pred"],
-                        "y_pred_mean_predictor": cl_u["mean_predictor"]["y_pred"],
-                        "y_pred_drug_mean_predictor": cl_u["drug_mean_predictor"]["y_pred"],
-                        "y_pred_target_mean_predictor": cl_u["target_mean_predictor"]["y_pred"],
-                        "y_pred_knn_tanimoto_drug": cl_u["knn_tanimoto_drug"]["y_pred"],
-                        "y_pred_knn_kmer_target": cl_u["knn_kmer_target"]["y_pred"],
-                    })
-                    oof_rows.append(df_fold)
-        if args.export_davis_oof and ds_name == "davis" and oof_rows:
+                    oof_rows.append(_build_oof_unit_df(u, sp["test"], te_df, res_u, cl_u))
+        if ds_name in classical_cache and oof_rows:
             pd.concat(oof_rows, ignore_index=True).to_csv(
-                oof_dir / f"cpu_baselines_davis_{sp_name}_oof.csv",
+                oof_dir / f"cpu_baselines_{ds_name}_{sp_name}_oof.csv",
                 index=False,
             )
         m_keys = ["knn_esm_target", "ridge_esm_target_only", "ridge_esm"]
