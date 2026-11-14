@@ -302,6 +302,7 @@ def train_model(
     delta: float = 1e-4,
     resume: bool = True,
     optimizer_name: str = "adam",
+    log_every: int = 25,
 ) -> dict[str, Any]:
     """Orquestra o treinamento com parada antecipada, atomicidade e isolamento estrito de teste.
 
@@ -392,7 +393,7 @@ def train_model(
             if saved_epoch >= 1:
                 start_epoch = saved_epoch + 1
                 total_epochs_run = saved_epoch
-                print(f"[RESUME] Retomando treinamento a partir da época {start_epoch} (checkpoint: {last_path})")
+                print(f"[RESUME] Retomando treinamento a partir da época {start_epoch} (checkpoint: {last_path})", flush=True)
                 if best_path.exists():
                     best_ckpt = load_checkpoint(best_path)
                     best_epoch = int(best_ckpt.get("epoch", 0))
@@ -465,7 +466,19 @@ def train_model(
             if drive_last_path is not None:
                 sync_checkpoint_to_drive(last_path, drive_last_path)
 
+        if log_every > 0 and (epoch == start_epoch or epoch % log_every == 0):
+            print(
+                f"  [EPOCH {epoch:4d}/{epochs}] train_loss={train_loss:.4f} | "
+                f"val_mse={val_metrics.get('mse', 0.0):.4f} | val_ci={val_metrics.get('ci', 0.0):.4f} | "
+                f"best_ep={best_epoch}",
+                flush=True,
+            )
+
         if early_stopping.step(current_metric):
+            print(
+                f"  [EARLY-STOP] Época {epoch}/{epochs} | best_ep={best_epoch} | best_{monitor}={best_metric_val:.4f}",
+                flush=True,
+            )
             break
 
     # Verificação de proximidade do teto
@@ -473,7 +486,8 @@ def train_model(
     if near_epoch_ceiling_warn:
         print(
             f"[WARN] best_epoch ({best_epoch}) > 0.8 * epochs ({epochs}): "
-            "possível sub-treinamento ou paciência excessiva; o modelo ainda estava melhorando próximo ao teto."
+            "possível sub-treinamento ou paciência excessiva; o modelo ainda estava melhorando próximo ao teto.",
+            flush=True,
         )
 
     # -------------------------------------------------------------------------
@@ -530,7 +544,8 @@ def train_model(
     if early_memorization_warn:
         print(
             f"[WARN] best_epoch ({best_epoch}) < 15 em '{split_type}': "
-            "sinal de memorização precoce das proteínas de treino; considere aumentar regularização."
+            "sinal de memorização precoce das proteínas de treino; considere aumentar regularização.",
+            flush=True,
         )
 
     return {

@@ -19,19 +19,22 @@
 
 ## 3. Comandos de Execução no Google Colab (GPU L4/T4)
 
-### Passo A — Prova de Conceito no Davis (`v2_kfold` + `seqid30` + `seqid40`)
+### Passo A — Prova de Conceito no Davis (`v2_kfold` + `seqid30` + `seqid40`, teto padrão `1000` épocas)
 ```bash
-# Se o cache ESM-2 estiver em SSD local rápido (ex.: /content/local_cache/esm_embeddings), passe --esm-cache-dir:
-python scripts/run_phase3_physdual.py --protocol kfold --dataset davis --split cold_target --folds 0,1,2,3,4
-python scripts/run_phase3_physdual.py --protocol kfold --dataset davis --split cold_drug --folds 0,1,2,3,4
-python scripts/run_phase3_physdual.py --protocol kfold --dataset davis --split cold_target_seqid30 --folds 0,1,2,3,4
-python scripts/run_phase3_physdual.py --protocol kfold --dataset davis --split cold_target_seqid40 --folds 0,1,2,3,4
+# Se o cache ESM-2 estiver em SSD local rápido (ex.: /content/local_esm_cache), passe --esm-cache-dir:
+python -u scripts/run_phase3_physdual.py --protocol kfold --dataset davis --split cold_target --folds 0,1,2,3,4
+python -u scripts/run_phase3_physdual.py --protocol kfold --dataset davis --split cold_drug --folds 0,1,2,3,4
+python -u scripts/run_phase3_physdual.py --protocol kfold --dataset davis --split cold_target_seqid30 --folds 0,1,2,3,4
+python -u scripts/run_phase3_physdual.py --protocol kfold --dataset davis --split cold_target_seqid40 --folds 0,1,2,3,4
+
+# Caso alguma dobra tenha sido iniciada com teto de 500 e atingido próximo ao teto:
+python -u scripts/run_phase3_physdual.py --protocol kfold --dataset davis --split cold_target --folds 0,1,2,3,4 --epochs 1000 --extend-epochs
 ```
 
 ### Passo B — Extensão para KIBA (`v1_seeds`) e Controle Davis `random` (após aprovar Passo A)
 ```bash
-python scripts/run_phase3_physdual.py --protocol seeds --dataset davis --split random --seeds 0,1,2,3,4
-python scripts/run_phase3_physdual.py --protocol seeds --dataset kiba --split all --seeds 0,1,2,3,4
+python -u scripts/run_phase3_physdual.py --protocol seeds --dataset davis --split random --seeds 0,1,2,3,4
+python -u scripts/run_phase3_physdual.py --protocol seeds --dataset kiba --split all --seeds 0,1,2,3,4
 ```
 
 ### Verificação do Gate da Fase 3

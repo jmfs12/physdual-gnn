@@ -133,7 +133,7 @@ physdual_phase3:
     weight_decay: 0.001
     use_lr_scheduler: false
     batch_size: 512
-    epochs: 500
+    epochs: 1000
     patience: 50
     davis_cold_patience: 80
     monitor: "mse"

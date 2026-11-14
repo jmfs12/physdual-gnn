@@ -125,6 +125,7 @@ def run_single_unit(
     num_workers: int | None = None,
     drive_checkpoint_dir: Path | str | None = None,
     smoke: bool = False,
+    extend_epochs: bool = False,
     model_name: str = PHASE3_MODEL_NAME,
     esm_dropout_in: float | None = None,
     prot_dropout: float | None = None,
@@ -175,6 +176,7 @@ def run_single_unit(
         eff_batch_size = min(eff_batch_size, 32)
         eff_workers = 0
 
+    should_skip = False
     if not force and is_run_completed(
         model=model_name,
         dataset=dataset_name,
@@ -182,8 +184,26 @@ def run_single_unit(
         unit_id=unit_id,
         runs_dir=runs_path,
         protocol=protocol,
+        target_epochs=eff_epochs,
+        extend_epochs=extend_epochs,
     ):
-        print(f"[SKIP] {model_name} | {dataset_name}/{split_type}/{protocol}={unit_id} já concluído.")
+        should_skip = True
+    elif not force and extend_epochs and run_file.exists():
+        try:
+            prev_data = json.loads(run_file.read_text(encoding="utf-8"))
+            prev_eff_ep = int(prev_data.get("effective_config", {}).get("epochs", 0))
+            prev_ran = int(prev_data.get("total_epochs_run", 0))
+            if (
+                prev_eff_ep > 0
+                and prev_ran < prev_eff_ep
+                and not bool(prev_data.get("near_epoch_ceiling_warn", False))
+            ):
+                should_skip = True
+        except Exception:
+            pass
+
+    if should_skip:
+        print(f"[SKIP] {model_name} | {dataset_name}/{split_type}/{protocol}={unit_id} já concluído.", flush=True)
         return json.loads(run_file.read_text(encoding="utf-8"))
 
     # Determinismo estrito
@@ -202,6 +222,11 @@ def run_single_unit(
         ckpt_base = Path(checkpoints_base_dir)
 
     unit_prefix = "fold" if protocol == "kfold" else "seed"
+    print(
+        f"[START] {model_name} | {dataset_name}/{split_type} ({unit_prefix}={unit_id}) | "
+        f"device={target_device} | epochs={eff_epochs} | extend={extend_epochs}",
+        flush=True,
+    )
     run_ckpt_dir = ckpt_base / f"{model_name}_{dataset_name}_{split_type}_{unit_prefix}{unit_id}"
     run_drive_ckpt_dir = (
         Path(drive_checkpoint_dir) / f"{model_name}_{dataset_name}_{split_type}_{unit_prefix}{unit_id}"
@@ -227,6 +252,11 @@ def run_single_unit(
     )
 
     model = build_physdual_phase3_model(cfg)
+    print(
+        f"[TRAIN] DataLoaders + ESM-2 prontos ({len(train_loader.dataset)} treino / "
+        f"{len(val_loader.dataset)} val / {len(test_loader.dataset)} teste). Iniciando épocas...",
+        flush=True,
+    )
 
     t0 = time.time()
     train_result = train_model(
@@ -321,7 +351,8 @@ def run_single_unit(
         f"[OK] {model_name} | {dataset_name}/{split_type} ({unit_prefix}={unit_id}) | "
         f"best_ep={result_payload['best_epoch']}/{total_epochs} | "
         f"CI={result_payload['test_metrics_full']['ci']:.4f} | "
-        f"MSE={result_payload['test_metrics_full']['mse']:.4f}"
+        f"MSE={result_payload['test_metrics_full']['mse']:.4f}",
+        flush=True,
     )
     return result_payload
 
@@ -530,7 +561,7 @@ def aggregate_phase3_kfold_runs(
         "oof_csv_path": str(oof_csv_path),
     }
     save_json_atomic(agg_payload, out_path)
-    print(f"[AGGREGATE-PHASE3-KFOLD] Salvo em: {out_path} ({len(found_runs)}/{len(target_folds)} dobras)")
+    print(f"[AGGREGATE-PHASE3-KFOLD] Salvo em: {out_path} ({len(found_runs)}/{len(target_folds)} dobras)", flush=True)
     return agg_payload
 
 
@@ -600,7 +631,7 @@ def aggregate_phase3_seed_runs(
         "paired_vs_baselines": paired_vs_baselines,
     }
     save_json_atomic(agg_payload, out_path)
-    print(f"[AGGREGATE-PHASE3-SEEDS] Salvo em: {out_path} ({len(found_runs)}/{len(target_seeds)} seeds)")
+    print(f"[AGGREGATE-PHASE3-SEEDS] Salvo em: {out_path} ({len(found_runs)}/{len(target_seeds)} seeds)", flush=True)
     return agg_payload
 
 
@@ -635,6 +666,7 @@ def main() -> None:
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--num-workers", type=int, default=None)
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--extend-epochs", action="store_true")
     parser.add_argument("--aggregate-only", action="store_true")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--config", type=str, default=None)
@@ -701,6 +733,7 @@ def main() -> None:
                 num_workers=args.num_workers,
                 drive_checkpoint_dir=args.drive_checkpoint_dir,
                 smoke=args.smoke,
+                extend_epochs=args.extend_epochs,
                 esm_dropout_in=args.esm_dropout_in,
                 prot_dropout=args.prot_dropout,
                 mlp_dropout=args.mlp_dropout,

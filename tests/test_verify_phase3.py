@@ -325,3 +325,81 @@ def test_verify_phase3_full_rejects_nan_incomplete_and_missing_baselines(tmp_pat
     run0_file.write_text(json.dumps(run0_payload), encoding="utf-8")
     rep_nan = run_phase3_full_verification(root=tmp_path, require_paired_win=False, expected_units=2)
     assert rep_nan["gates"]["gate1_runs_integrity"]["passed"] is False
+
+
+def test_run_phase3_extend_epochs_resumes_only_unconverged_runs(tmp_path: Path, monkeypatch):
+    """Garante que `--extend-epochs` retoma runs no teto via checkpoint e pula runs já convergidos."""
+    from run_phase3_physdual import run_single_unit
+
+    monkeypatch.setenv("PHYSDUAL_ROOT", str(tmp_path))
+    cfg, esm_dir = _create_synthetic_phase3_workspace(tmp_path)
+
+    # Fold 0 treina até teto=2 épocas (salva checkpoint_last.pt na época 2)
+    res0 = run_single_unit(
+        dataset_name="davis",
+        split_type="cold_target_seqid30",
+        protocol="kfold",
+        fold=0,
+        config=cfg,
+        root=tmp_path,
+        esm_cache_dir=esm_dir,
+        device="cpu",
+        epochs=2,
+        patience=5,
+        davis_cold_patience=5,
+        batch_size=4,
+        num_workers=0,
+        smoke=False,
+    )
+    assert res0["total_epochs_run"] == 2
+    assert len(res0["history"]) == 2
+
+    # Fold 1 simula run que já convergiu antes do teto (2 < 5, sem near_epoch_ceiling_warn)
+    run1_file = tmp_path / "outputs" / "results" / "runs" / "physdual_gin_esm_mlp_davis_cold_target_seqid30_fold1.json"
+    res1 = json.loads(json.dumps(res0))
+    res1["fold"] = 1
+    res1["unit_id"] = 1
+    res1["effective_config"]["epochs"] = 5
+    res1["total_epochs_run"] = 2
+    res1["near_epoch_ceiling_warn"] = False
+    run1_file.write_text(json.dumps(res1), encoding="utf-8")
+
+    # Estendendo para 4 épocas: fold 0 deve retomar de 3..4; fold 1 deve ser pulado
+    res0_ext = run_single_unit(
+        dataset_name="davis",
+        split_type="cold_target_seqid30",
+        protocol="kfold",
+        fold=0,
+        config=cfg,
+        root=tmp_path,
+        esm_cache_dir=esm_dir,
+        device="cpu",
+        epochs=4,
+        patience=10,
+        davis_cold_patience=10,
+        batch_size=4,
+        num_workers=0,
+        smoke=False,
+        extend_epochs=True,
+    )
+    assert res0_ext["total_epochs_run"] == 4
+    assert len(res0_ext["history"]) == 4
+
+    res1_ext = run_single_unit(
+        dataset_name="davis",
+        split_type="cold_target_seqid30",
+        protocol="kfold",
+        fold=1,
+        config=cfg,
+        root=tmp_path,
+        esm_cache_dir=esm_dir,
+        device="cpu",
+        epochs=4,
+        patience=10,
+        davis_cold_patience=10,
+        batch_size=4,
+        num_workers=0,
+        smoke=False,
+        extend_epochs=True,
+    )
+    assert res1_ext["total_epochs_run"] == 2
