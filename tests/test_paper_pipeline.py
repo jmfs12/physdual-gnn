@@ -349,3 +349,71 @@ def test_phase3_intragroup_and_colab_scripts_present() -> None:
     pooling_src = (REPO_ROOT / "scripts" / "paper" / "colab_ridge_esm_pooling.py").read_text(encoding="utf-8")
     assert "PHASE4_DECISION_CRITERION" in pooling_src
     assert "100000000.0" in pooling_src
+
+
+def test_colab_kiba_cold_drug_ecfp_summarize_real_schema(tmp_path: Path) -> None:
+    import sys
+
+    paper_scripts = str(REPO_ROOT / "scripts" / "paper")
+    if paper_scripts not in sys.path:
+        sys.path.insert(0, paper_scripts)
+    from colab_kiba_cold_drug_ecfp import parse_args, summarize_diagnostic_comparison
+
+    assert parse_args([]).epochs == 1000
+
+    res_dir = tmp_path / "outputs" / "results"
+    runs_dir = res_dir / "runs"
+    runs_dir.mkdir(parents=True)
+
+    (res_dir / "kiba_cpu_classical_baselines.json").write_text(
+        json.dumps(
+            {
+                "dataset": "kiba",
+                "regimes": {
+                    "cold_drug": {
+                        "protocol": "v1_seeds",
+                        "per_unit": [
+                            {
+                                "seed": 0,
+                                "knn_tanimoto_drug": {
+                                    "metrics": {"ci": 0.78, "mse": 0.36}
+                                },
+                            },
+                            {
+                                "seed": 1,
+                                "knn_tanimoto_drug": {
+                                    "metrics": {"ci": 0.79, "mse": 0.34}
+                                },
+                            },
+                        ],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    for s, ci_val in ((0, 0.76), (1, 0.77)):
+        (runs_dir / f"physdual_ecfp_esm_mlp_kiba_cold_drug_seed{s}.json").write_text(
+            json.dumps(
+                {
+                    "best_epoch": 120,
+                    "effective_config": {"epochs": 1000},
+                    "test_metrics_full": {"ci": ci_val, "mse": 0.39, "rm2": 0.37},
+                }
+            ),
+            encoding="utf-8",
+        )
+        (runs_dir / f"physdual_gin_esm_mlp_kiba_cold_drug_seed{s}.json").write_text(
+            json.dumps({"test_metrics_full": {"ci": 0.75, "mse": 0.41}}),
+            encoding="utf-8",
+        )
+        (runs_dir / f"graphdta_gin_kiba_cold_drug_seed{s}.json").write_text(
+            json.dumps({"test_metrics_full": {"ci": 0.755, "mse": 0.38}}),
+            encoding="utf-8",
+        )
+
+    summary = summarize_diagnostic_comparison(tmp_path, [0, 1])
+    assert summary["wins_ecfp_vs_gin_ci"] == 2
+    assert summary["wins_ecfp_vs_knn_tanimoto_ci"] == 0
+    assert (res_dir / "phase3_colab_kiba_cold_drug_ecfp_diagnostic.json").exists()

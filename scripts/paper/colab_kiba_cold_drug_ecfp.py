@@ -13,7 +13,7 @@ Uso típico no Colab (GPU):
   python scripts/paper/colab_kiba_cold_drug_ecfp.py \\
     --root /content/drive/MyDrive/physdual-gnn \\
     --esm-cache-dir /content/drive/MyDrive/physdual-gnn/cache/esm_embeddings \\
-    --device cuda --epochs 500
+    --device cuda --epochs 1000
 """
 
 from __future__ import annotations
@@ -65,37 +65,61 @@ def build_train_command(args: argparse.Namespace, data_root: Path) -> list[str]:
     return cmd
 
 
+def _extract_test_metrics(run_payload: dict[str, Any]) -> dict[str, Any]:
+    metrics = run_payload.get("test_metrics_full")
+    if isinstance(metrics, dict):
+        return metrics
+    metrics_alt = run_payload.get("test_metrics")
+    if isinstance(metrics_alt, dict):
+        return metrics_alt
+    raise KeyError("Run JSON não contém 'test_metrics_full' nem 'test_metrics'.")
+
+
+def _load_knn_tanimoto_by_seed(res_dir: Path) -> dict[int, dict[str, Any]]:
+    kiba_cls_path = res_dir / "kiba_cpu_classical_baselines.json"
+    if kiba_cls_path.exists():
+        cls_agg = load_json_strict(kiba_cls_path)
+        per_unit = cls_agg["regimes"]["cold_drug"]["per_unit"]
+        return {int(r["seed"]): r["knn_tanimoto_drug"]["metrics"] for r in per_unit}
+    legacy_path = res_dir / "baseline_classical_kiba_cold_drug_seeds.json"
+    if legacy_path.exists():
+        cls_agg = load_json_strict(legacy_path)
+        return {int(r["seed"]): r["test_metrics"] for r in cls_agg["per_seed_results"]["knn_tanimoto_drug"]}
+    raise FileNotFoundError(
+        f"Arquivo de baselines clássicos do KIBA ausente: {kiba_cls_path}"
+    )
+
+
 def summarize_diagnostic_comparison(data_root: Path, seeds: list[int]) -> dict[str, Any]:
     """Lê os artefatos existentes em `outputs/results/` e compara `ecfp_esm_mlp` vs referências."""
     runs_dir = data_root / "outputs" / "results" / "runs"
     res_dir = data_root / "outputs" / "results"
 
-    ecfp_runs: list[dict[str, Any]] = []
-    gin_runs: list[dict[str, Any]] = []
-    gdta_runs: list[dict[str, Any]] = []
+    ecfp_by_seed: dict[int, dict[str, Any]] = {}
+    gin_by_seed: dict[int, dict[str, Any]] = {}
+    gdta_by_seed: dict[int, dict[str, Any]] = {}
 
     for s in seeds:
         ecfp_p = runs_dir / f"physdual_ecfp_esm_mlp_kiba_cold_drug_seed{s}.json"
         if not ecfp_p.exists():
             raise FileNotFoundError(f"Run diagnóstico ausente: {ecfp_p}")
-        ecfp_runs.append(load_json_strict(ecfp_p))
+        ecfp_by_seed[s] = load_json_strict(ecfp_p)
 
         gin_p = runs_dir / f"physdual_gin_esm_mlp_kiba_cold_drug_seed{s}.json"
         if gin_p.exists():
-            gin_runs.append(load_json_strict(gin_p))
+            gin_by_seed[s] = load_json_strict(gin_p)
 
         gdta_p = runs_dir / f"graphdta_gin_kiba_cold_drug_seed{s}.json"
         if gdta_p.exists():
-            gdta_runs.append(load_json_strict(gdta_p))
+            gdta_by_seed[s] = load_json_strict(gdta_p)
 
-    cls_agg = load_json_strict(res_dir / "baseline_classical_kiba_cold_drug_seeds.json")
-    knn_seeds = {int(r["seed"]): r["test_metrics"] for r in cls_agg["per_seed_results"]["knn_tanimoto_drug"]}
+    knn_seeds = _load_knn_tanimoto_by_seed(res_dir)
 
     per_seed_table: list[dict[str, Any]] = []
-    for i, s in enumerate(seeds):
-        er = ecfp_runs[i]
-        em = er["test_metrics"]
-        ep_max = int(er.get("effective_config", {}).get("epochs", 500))
+    for s in seeds:
+        er = ecfp_by_seed[s]
+        em = _extract_test_metrics(er)
+        ep_max = int(er.get("effective_config", {}).get("epochs", 1000))
         b_ep = int(er["best_epoch"])
         row: dict[str, Any] = {
             "seed": s,
@@ -109,14 +133,14 @@ def summarize_diagnostic_comparison(data_root: Path, seeds: list[int]) -> dict[s
             "knn_tanimoto_ci": float(knn_seeds[s]["ci"]),
             "knn_tanimoto_mse": float(knn_seeds[s]["mse"]),
         }
-        if i < len(gin_runs):
-            gm = gin_runs[i]["test_metrics"]
+        if s in gin_by_seed:
+            gm = _extract_test_metrics(gin_by_seed[s])
             row["gin_ci"] = float(gm["ci"])
             row["gin_mse"] = float(gm["mse"])
             row["delta_ecfp_minus_gin_ci"] = float(em["ci"]) - float(gm["ci"])
             row["delta_ecfp_minus_gin_mse"] = float(em["mse"]) - float(gm["mse"])
-        if i < len(gdta_runs):
-            dm = gdta_runs[i]["test_metrics"]
+        if s in gdta_by_seed:
+            dm = _extract_test_metrics(gdta_by_seed[s])
             row["graphdta_gin_ci"] = float(dm["ci"])
             row["graphdta_gin_mse"] = float(dm["mse"])
         per_seed_table.append(row)
@@ -155,7 +179,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--root", type=Path, default=None, help="Raiz de dados/outputs no Drive")
     parser.add_argument("--esm-cache-dir", type=Path, default=None)
     parser.add_argument("--seeds", type=str, default="0,1,2,3,4")
-    parser.add_argument("--epochs", type=int, default=500)
+    parser.add_argument("--epochs", type=int, default=1000)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--extend-epochs", action="store_true")
