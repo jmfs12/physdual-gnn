@@ -12,7 +12,7 @@
 | Runs individuais GraphDTA (Fases 1–2) | `outputs/results/runs/graphdta_*.json` | **85** | `davis` (`cnn3`: `v1_seeds` `random`/`cold_drug`/`cold_target` + `v2_kfold` `cold_drug`/`cold_target`/`seqid40`/`seqid30` = 35; `gin`: idem = 35) + `kiba` (`gin` `v1_seeds` `random`/`cold_drug`/`cold_target` = 15; sem `graphdta_cnn3` no KIBA e sem `graphdta_*` em `kiba/seqid*`). |
 | **Total de runs individuais** | `outputs/results/runs/*.json` | **166** | Chaveamento completo sem ausências nem duplicatas; `drug_in_dim = 78` (featurizer v2 `onehot78_l1norm`), `esm_model = facebook/esm2_t33_650M_UR50D` (`esm_dim = 1280`). |
 | Agregados de modelos (`baseline_*` + `phase3_physdual_*`) | `outputs/results/*.json` | **34** | `17` `baseline_graphdta_*` + `10` `phase3_physdual_gin_esm_mlp_*` (Davis e KIBA) + `7` agregados de controle (`ecfp_esm_mlp` `cold_drug`/`cold_target`, `shuf0/1/2` `cold_target`, `tsoff1000` `cold_target_seqid30` e `cold_drug`). |
-| Auditorias auxiliares em `outputs/results/` | `outputs/results/*.json` | **5** | `phase3_esm_cpu_baselines.json`, `kiba_cpu_classical_baselines.json`, `phase3_seqid_classical_baselines.json`, `phase3_kiba_paired_bootstrap.json`, `phase3_davis_paired_bootstrap.json` (**defasado**, ver Seção 5). |
+| Auditorias auxiliares em `outputs/results/` | `outputs/results/*.json` | **5** | `phase3_esm_cpu_baselines.json`, `kiba_cpu_classical_baselines.json`, `phase3_seqid_classical_baselines.json`, `phase3_kiba_paired_bootstrap.json`, `phase3_davis_paired_bootstrap.json` (**regenerado e sincronizado**, ver Seção 5). |
 | Predições OOF em CSV | `outputs/results/oof/*.csv` | **27** | `6` `cpu_baselines_*_oof.csv`, `8` `graphdta_*_oof.csv` (Davis `v2_kfold`), `13` `physdual_*_oof.csv` (Davis `v2_kfold`, KIBA `seqid30/40` e controles). |
 | Logs / mapas de clusterização `seqid` | `outputs/logs/*.json` | **5** | `davis_seqid_cluster_map.json`, `davis_seqid_splits_summary.json`, `kiba_seqid_cluster_map.json`, `kiba_seqid_splits_summary.json`, `phase1_summary_report.json`. |
 | Cache ESM-2 e grafos processados | `cache/esm_embeddings/esm2_t33_650M_UR50D/`, `data/processed/` | **429 `.pt`**, **60 splits** | `429` tensores `.pt` cobrindo 100% das sequências únicas de Davis (`379`) e KIBA (`229`), considerando as `179` compartilhadas; `60` JSONs em `data/processed/splits/`; `130` checkpoints herdados (`graphdta_*`) em `outputs/checkpoints/`. |
@@ -40,7 +40,11 @@
 - **Proveniência de schema nos runs (`81/81`):**
   - `19` runs prévios ao ADR #15 (`davis` `cold_drug`, `cold_target` folds `0,2,3,4`, `cold_target_seqid40`, `cold_target_seqid30`) **não** possuem as chaves `base_model`, `diagnostic_control` e `run_seed`.
   - **`62/62`** runs pós-ADR #15 — incluindo todos os `25` runs de KIBA (`cold_drug`, `cold_target`, `random`, `seqid40`, `seqid30`), `5` de `davis/random`, `31` de controles (`ecfp_esm_mlp`, `shuf0/1/2`, `tsoff1000`) e a dobra `1` estendida de `davis/cold_target` — possuem as chaves `base_model`, `diagnostic_control` e `run_seed` introduzidas em `46d13f8`.
-- **Ressalva forense explícita:** os arquivos JSON em `outputs/results/runs/` **não** gravam internamente `timestamp_utc` nem `git_commit`. Portanto, a precedência temporal do pré-registro para KIBA, `davis/random` e controles baseia-se no congelamento imutável em `46d13f8` (`2026-11-14 00:32:14 -0300`), na presença obrigatória do schema de `46d13f8` em `62/62` runs e no fato de os splits `kiba_seqid30/40` só terem sido gerados em `46d13f8`. Esse encadeamento suporta tratar os resultados de KIBA e `davis/random` como **pré-registrados** segundo o ADR #15 (enquanto todos os regimes `cold` do Davis permanecem **exploratórios**, e qualquer análise fora dos critérios explícitos de `docs/DECISOES.md` — como comparação 4-folds sem a dobra 2 no `davis/cold_drug` — é **exploratória/post-hoc**).
+- **Auditoria forense dos timestamps de INÍCIO (`run_integrity.start_timestamp_audit`):** Embora os arquivos JSON não gravem `timestamp_utc` internamente e `st_mtime` tenha sido sobrescrito pelo sync do Drive (`~2026-11-14 23:25 -0300`), o `st_ctime` NTFS preservou a criação com offset constante de `-5h` (`UTC-8 PST` Drive/Colab vs `-03:00 BRT` Git), calibrado pelos `19` runs pré-ADR #15 após `1ae2853` e pelo log do Colab (`04:07 UTC = 01:07 BRT`). Estimando `t_início = st_ctime_calibrado - elapsed_sec`, obtém-se:
+  - `19` runs pré-ADR #15 iniciaram entre `2026-11-13 19:33:27 -0300` e encerraram até `21:46:44 -0300`.
+  - Primeiro run pós-ADR #15: `physdual_gin_esm_mlp_davis_cold_target_fold1.json` com início calibrado em **`2026-11-14 00:59:10 -0300`** (`26 min` após o commit `46d13f8` em `00:32:14 -0300`).
+  - Primeiro run KIBA (`kiba_cold_drug_seed0`): **`2026-11-14 03:48:06 -0300`**; primeiro `davis_random`: **`2026-11-14 14:29:36 -0300`**; último término pós-ADR #15: `2026-11-14 19:58:28 -0300`.
+  - **`post_runs_started_before_adr15_count = 0` (`0/62` inícios antes de `46d13f8`)**. Esse encadeamento convergente (timestamps de início calibrados + schema `46d13f8` + splits `kiba_seqid30/40` + `diff = 0`) valida a precedência temporal do pré-registro para os **`2/2` regimes primários** (`kiba/cold_drug`, `kiba/cold_target`) e **`2/2` secundários** (`kiba/cold_target_seqid40`, `kiba/cold_target_seqid30`) no KIBA, mantendo todos os regimes `cold` do Davis como **exploratórios**.
 
 ---
 
@@ -49,9 +53,10 @@
 - **Completude dos agregados (`34/34`):** todos os `33` agregados de `5` unidades possuem exatamente `[0, 1, 2, 3, 4]` seeds/dobras completas; o agregado diagnóstico `phase3_physdual_gin_esm_mlp_tsoff1000_davis_cold_drug.json` possui exatamente `[2]`, como desenhado. Nenhum agregado incompleto (como o antigo incidente de `kiba_random` com 2 seeds) existe atualmente.
 - **Teto de épocas efetivo (`effective_config.epochs`):**
   - `77/81` runs Fase 3 rodaram sob `epochs = 1000`;
-  - Exceção única esperada: os `4` runs de `davis/cold_target` não estendidos (`folds 0, 2, 3, 4`) mantiveram o `epochs = 500` original (pré-`06d1249`; menor convergência máxima observada foi dobra 0/4 dentro do limite com folga: `best_epoch` entre `145` e `288`, `total_epochs_run` entre `225` e `368`). A dobra `1` (que antes atingira `481/500`) foi estendida para `1000` e convergiu em `best_epoch = 525`, encerrando por early stopping na época `605` (`ci=0.8496, mse=0.2971`).
-  - Nos `85` runs de GraphDTA (Fases 1–2): `83/85` com `epochs = 500`; `graphdta_gin` no `kiba/random` possui `epochs = 500` nas seeds `0, 2, 4` (`best_epoch = 286..343`) e `epochs = 1000` nas seeds `1, 3` (`best_epoch = 509, 774`).
-- **Truncamento / teto (`best_epoch > 0,8 × epochs`):** **`0/81`** em `physdual_*` e **`0/85`** em `graphdta_*` (nenhum run truncado nem próximo de 80% do teto).
+  - Exceção única esperada (mistura de tetos `500/1000`): os `4` runs de `davis/cold_target` pré-`06d1249` (`folds 0, 2, 3, 4`) mantiveram `epochs = 500` e convergiram com folga (`best_epoch` entre `145` e `288`, `total_epochs_run` entre `225` e `368`), enquanto a dobra `1` (que antes atingira `481/500`) foi estendida para `epochs = 1000` e convergiu em `best_epoch = 525`, encerrando por *early stopping* na época `605` (`ci=0.8496, mse=0.2971`).
+  - Nos `85` runs de GraphDTA (Fases 1–2): `83/85` com `epochs = 500`; `graphdta_gin` no `kiba/random` possui mistura `500` (`seeds 0, 2, 4`, `best_epoch = 286..343`) e `1000` (`seeds 1, 3`, `best_epoch = 509, 774`).
+- **Truncamento / regra simétrica de `80%` (`best_epoch > 0,8 × epochs`):** verificada **simetricamente sobre todos os modelos neurais**, com **`0/81`** ocorrências em `physdual_*` (`gin_esm_mlp`, `ecfp_esm_mlp` e controles) e **`0/85`** em `graphdta_*` (`graphdta_gin`, `graphdta_cnn3`).
+- **Tamanho da validação em `davis/cold_drug`:** cada dobra retém apenas **`5–6` fármacos únicos na validação** (`dobras 0..2 = 5`, `dobras 3..4 = 6`; `2.210–2.652` pares), explicando ruído de *early stopping* na dobra `2`. Note-se também que `ecfp_esm_mlp` apresentou **`2` colapsos precoces (`best_epoch = 3` nas dobras `3, 4`)** contra **`1` de `gin_esm_mlp` (`best_epoch = 5` na dobra `2`)**.
 - **Isolamento, integridade numérica e tamanhos de split:** **`81/81`** com `test_isolation_verified = True`; **`0/81`** divergências de tamanho entre `oof_predictions` e `splits/*.json`; **`0/81`** ocorrências de `NaN` ou `Inf` em métricas escalares.
 - **Memorização precoce (`best_epoch < 15` em regime `cold`):**
   - **`physdual_*` (`10` ocorrências, todas no Davis):**
@@ -83,10 +88,9 @@
 
 ## 5. Artefatos secundários defasados ou anômalos (reportados sem alteração de `outputs/`)
 
-1. **`outputs/results/phase3_davis_paired_bootstrap.json` — DEFASADO (severidade média; não bloqueia a análise pois `phase3_audits.json` recomputou o bootstrap do zero sobre o OOF vigente):**
-   - `mtime`: `2026-11-14 00:13:05` (anterior à extensão da dobra 1 de `davis/cold_target`).
-   - Distorção observada: dobra 1 registrada como `ci=0.8468, mse=0.3042` (`oof ci=0.8146, mse=0.4385`) vs run vigente `ci=0.8496, mse=0.2971` (`oof ci=0.8149, mse=0.4372`).
-   - **Correção proposta (execução opcional pelo usuário):** `python scripts/run_phase3_paired_bootstrap.py --dataset davis`.
+1. **`outputs/results/phase3_davis_paired_bootstrap.json` — RECONCILIADO (`is_stale = false`):**
+   - Anteriormente defasado (`mtime = 2026-11-14 00:13:05`, `oof ci=0.8146, mse=0.4385`); **regenerado** via `python scripts/run_phase3_paired_bootstrap.py --dataset davis` (`mtime = 2026-11-15 11:42:00`), agora exatamente alinhado ao run estendido da dobra 1 (`oof ci=0.814896, mse=0.437192`).
+   - Status auditado em `phase3_audits.json` (`run_integrity.stale_artifacts.phase3_davis_paired_bootstrap_json.status`): **`"regenerado_sincronizado"`**.
 2. **`outputs/results/runs/physdual_gin_esm_mlp_davis_cold_drug_fold2.json` — metadado de alerta histórico:**
    - Teve `best_epoch = 5 < 15`, mas gravou `early_memorization_warn = False` (run anterior ao ADR #15). Auditado corretamente em `T7` com coluna separada retroativa.
 3. **`outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_fold1.json` — artefato de medição de `sec_per_epoch`:**
@@ -101,6 +105,9 @@
 
 ---
 
-## 6. Veredito operacional do `Passo 0`
+## 6. Veredito operacional do `Passo 0`, gate estrutural e extensões CPU/Colab
 
-**APROVADO PARA ANÁLISE COMPLETA (Passos 1–8), sem bloqueios nos runs primários ou de controle.** Os dados primários no KIBA (`v1_seeds` e `v2_kfold seqid30/40`), a sanidade em `davis/random` e todos os controles diagnósticos no Davis estão íntegros, completos e reproduzidos em CPU dentro de precisão numérica esperada, usando exclusivamente `docs/paper/phase3_audits.json` como base auditada para os intervalos de bootstrap do Davis e do KIBA.
+**APROVADO PARA ANÁLISE COMPLETA (Passos 1–8), sem bloqueios nos runs primários ou de controle.** Os dados primários no KIBA (`2/2` primários + `2/2` secundários), a sanidade em `davis/random` e todos os controles diagnósticos no Davis estão íntegros, completos e reproduzidos em CPU dentro de precisão numérica esperada, usando exclusivamente `docs/paper/phase3_audits.json` e `docs/paper/phase3_intragroup_and_stacking.json` como bases auditadas.
+
+- **Significado do gate (`verify_phase3.py --full --no-require-paired-win`):** sua aprovação valida **exclusivamente integridade estrutural, isolamento de splits e completude técnica** do pipeline; **não** representa sucesso científico sob o ADR #15 (cujo veredito permanece `nao_atendido_negativo` nos `2/2` primários e `2/2` secundários do KIBA).
+- **Novas análises CPU somente leitura (`docs/paper/phase3_intragroup_and_stacking.json`) e diagnósticos Colab:** gerados via `scripts/paper/phase3_intragroup_and_stacking.py` (ranking intragrupo não enviesado por dobra/seed e *residual stacking* sobre OOFs existentes) e scripts diagnósticos prontos para Colab (`scripts/paper/colab_ridge_esm_pooling.py` e `scripts/paper/colab_kiba_cold_drug_ecfp.py`).

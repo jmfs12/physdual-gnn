@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-11-15T03:10:00Z",
+  "generated_at_utc": "2026-11-15T15:31:15Z",
   "bootstrap_config": {
     "n_bootstraps": 1000,
     "seed": 42
@@ -47,9 +47,9 @@
         "subject": "feat(phase3): add KIBA seqid OOF export and --dataset option in paired bootstrap"
       },
       "HEAD": {
-        "commit": "936c32fbc09e83627474251197b4cf87d1982587",
-        "date": "2026-11-14 00:48:39 -0300",
-        "subject": "feat(phase3): add KIBA seqid OOF export and --dataset option in paired bootstrap"
+        "commit": "fcc30463a2e1ec63affd7480a42af63804034848",
+        "date": "2026-11-15 00:44:46 -0300",
+        "subject": "docs(paper): refresh inventory provenance hashes after Phase 3 commits"
       }
     },
     "post_adr15_diff_bytes_configs_decisoes_models": 0,
@@ -66,7 +66,7 @@
       "epochs_amendment_pre_freeze": "500 -> 1000 no commit 06d1249 (anterior ao ADR #15 em 46d13f8)",
       "post_freeze_hyperparam_edits": 0
     },
-    "forensic_caveat": "Os JSONs individuais em outputs/results/runs/ não embutem timestamp_utc nem git_commit; a ordenação pós-ADR #15 (46d13f8, 2026-11-14 00:32:14 -0300, tag phase3-adr15-pre-kiba) é demonstrada por proveniência de schema (62/62 runs KIBA/davis_random/controles/fold1-estendido possuem campos base_model e diagnostic_control introduzidos em 46d13f8, ausentes nos 19 runs anteriores de Davis cold), criação dos splits kiba_seqid30/40 em 46d13f8 e diff=0 em configs/base.yaml, docs/DECISOES.md e src/physdual/models/ após 46d13f8."
+    "forensic_caveat": "Os JSONs individuais em outputs/results/runs/ não embutem started_at_utc nem git_commit; entretanto, a ordenação pós-ADR #15 (46d13f8, 2026-11-14 00:32:14 -0300, tag phase3-adr15-pre-kiba) é corroborada convergentemente por: (a) proveniência de schema (62/62 runs KIBA/davis_random/controles/fold1-estendido possuem campos base_model e diagnostic_control introduzidos em 46d13f8, ausentes nos 19 runs anteriores de Davis cold); (b) criação dos splits kiba_seqid30/40 em 46d13f8; (c) diff=0 em configs/base.yaml, docs/DECISOES.md e src/physdual/models/ após 46d13f8; e (d) auditoria forense dos timestamps de criação NTFS (`st_ctime - elapsed_sec`, registrando em run_integrity.start_timestamp_audit 0/62 inícios anteriores a 46d13f8)."
   },
   "run_integrity": {
     "counts": {
@@ -99,6 +99,21 @@
       "physdual_gin_esm_mlp_davis_cold_target_seqid40_fold3.json",
       "physdual_gin_esm_mlp_davis_cold_target_seqid40_fold4.json"
     ],
+    "start_timestamp_audit": {
+      "adr15_commit": "46d13f8 (2026-11-14 00:32:14 -0300)",
+      "filesystem_clock_offset_note": "st_mtime local foi sobrescrito pela sincronização em lote do Drive (~2026-11-14 23:25 -0300); st_ctime preservou criação com offset constante de -5h (UTC-8 PST Drive/Colab vs -03:00 BRT Git), calibrado pelos 19 runs pré-ADR #15 após commit 1ae2853 (19:03:09 -0300 -> st_ctime_start 14:33:27 +5h = 19:33:27) e log de sessão Colab (04:07 UTC = 01:07 BRT -> shuf0 st_ctime_start 20:06:35 +5h = 01:06:35).",
+      "pre_adr15_min_start_calibrated": "2026-11-13 19:33:27 -0300",
+      "pre_adr15_max_end_calibrated": "2026-11-13 21:46:44 -0300",
+      "post_adr15_earliest_run": "physdual_gin_esm_mlp_davis_cold_target_fold1.json",
+      "post_adr15_earliest_start_raw_ctime": "2026-11-13 19:59:10 -0300",
+      "post_adr15_earliest_start_calibrated": "2026-11-14 00:59:10 -0300",
+      "post_adr15_latest_end_calibrated": "2026-11-14 19:58:28 -0300",
+      "kiba_earliest_run": "physdual_gin_esm_mlp_kiba_cold_drug_seed0.json",
+      "kiba_earliest_start_calibrated": "2026-11-14 03:48:06 -0300",
+      "davis_random_earliest_run": "physdual_gin_esm_mlp_davis_random_seed0.json",
+      "davis_random_earliest_start_calibrated": "2026-11-14 14:29:36 -0300",
+      "post_runs_started_before_adr15_count": 0
+    },
     "config_deviations": [
       {
         "file": "physdual_gin_esm_mlp_davis_cold_target_fold0.json",
@@ -1074,13 +1089,15 @@
     ],
     "stale_artifacts": {
       "phase3_davis_paired_bootstrap_json": {
-        "mtime": "2026-11-14 00:13:05",
-        "stale_cold_target_fold1_mtime_note": "Gerado antes da extensão da dobra 1 (481/500 -> 525/605/1000 épocas)",
-        "stale_oof_ci": 0.8145633022819048,
-        "stale_oof_mse": 0.4384642391497263,
+        "is_stale": false,
+        "status": "regenerado_sincronizado",
+        "mtime": "2026-11-15 11:42:00",
+        "stale_cold_target_fold1_note": "Anteriormente desatualizado; regenerado após extensão da dobra 1 (481/500 -> 525/605/1000 épocas)",
+        "bootstrap_oof_ci": 0.8148957164759715,
+        "bootstrap_oof_mse": 0.43719182209068524,
         "current_oof_ci": 0.8148957164759715,
         "current_oof_mse": 0.437191827598848,
-        "proposed_fix_cmd": "python scripts/run_phase3_paired_bootstrap.py --dataset davis"
+        "regeneration_cmd": "python scripts/run_phase3_paired_bootstrap.py --dataset davis"
       },
       "tsoff1000_seqid30_cluster_col_quirk": "sequence"
     }
@@ -1133,7 +1150,7 @@
       "num_collapsed_target_ids": 81
     }
   },
-  "elapsed_sec": 70.93,
+  "elapsed_sec": 4.28,
   "v2_kfold": {
     "reproduction_checks": {
       "davis/cold_target": {

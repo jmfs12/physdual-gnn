@@ -12,6 +12,7 @@ esperadas existam e não estejam vazios, saindo com código != 0 em caso de falh
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -25,7 +26,7 @@ for p in (str(PAPER_SCRIPTS_DIR), str(SRC_DIR)):
 
 from build_inventory_and_repro import build_inventory_and_repro  # noqa: E402
 from build_tables import build_all_tables  # noqa: E402
-from common import resolve_roots  # noqa: E402
+from common import ensure_paper_dirs, resolve_roots  # noqa: E402
 from make_figures import make_all_figures  # noqa: E402
 
 
@@ -37,6 +38,7 @@ REQUIRED_REPO_INPUTS = [
     "docs/colab_env_snapshot.txt",
     "docs/paper/cpu_audits.json",
     "docs/paper/phase3_audits.json",
+    "docs/paper/phase3_intragroup_and_stacking.json",
 ]
 
 REQUIRED_DATA_INPUTS = [
@@ -70,82 +72,92 @@ def _assert_nonempty_files(paths: list[Path], label: str) -> list[str]:
     return errors
 
 
-def run_pipeline(check_manual_docs: bool = True) -> int:
+def run_pipeline(check_manual_docs: bool = True, output_dir: Path | None = None) -> int:
     repo_root, data_root = resolve_roots()
     results_dir = data_root / "outputs" / "results"
-    paper_dir = repo_root / "docs" / "paper"
+    prev_override = os.environ.get("PHYSDUAL_PAPER_DIR")
+    if output_dir is not None:
+        os.environ["PHYSDUAL_PAPER_DIR"] = str(Path(output_dir).resolve())
+    try:
+        paper_dir = ensure_paper_dirs(repo_root)["paper"]
 
-    missing_inputs = _assert_nonempty_files(
-        [repo_root / rel for rel in REQUIRED_REPO_INPUTS],
-        label="REPO_INPUT",
-    )
-    missing_inputs.extend(
-        _assert_nonempty_files(
-            [data_root / rel for rel in REQUIRED_DATA_INPUTS],
-            label="DATA_INPUT",
+        missing_inputs = _assert_nonempty_files(
+            [repo_root / rel for rel in REQUIRED_REPO_INPUTS],
+            label="REPO_INPUT",
         )
-    )
-    runs_dir = results_dir / "runs"
-    if not runs_dir.exists() or not any(runs_dir.glob("*.json")):
-        missing_inputs.append(f"[INPUT] Nenhum JSON de run encontrado em {runs_dir}")
-    if not any(results_dir.glob("baseline_*.json")):
-        missing_inputs.append(
-            f"[INPUT] Nenhum JSON agregado baseline_*.json em {results_dir}"
-        )
-    if missing_inputs:
-        for msg in missing_inputs:
-            print(msg, file=sys.stderr)
-        return 2
-
-    inv_path, repro_path = build_inventory_and_repro()
-    table_outputs = build_all_tables()
-    figure_outputs = make_all_figures()
-
-    generated_paths: list[Path] = [inv_path, repro_path]
-    for tid in [f"T{i}" for i in range(1, 16)]:
-        if tid not in table_outputs:
-            print(f"[OUTPUT] Tabela {tid} ausente no retorno", file=sys.stderr)
-            return 3
-        for ext in ("csv", "md", "tex"):
-            if ext not in table_outputs[tid]:
-                print(f"[OUTPUT] Formato {ext} ausente para {tid}", file=sys.stderr)
-                return 3
-            generated_paths.append(table_outputs[tid][ext])
-
-    for fid in [f"F{i}" for i in range(1, 12)]:
-        if fid not in figure_outputs:
-            print(f"[OUTPUT] Figura {fid} ausente no retorno", file=sys.stderr)
-            return 3
-        for ext in ("pdf", "png"):
-            if ext not in figure_outputs[fid]:
-                print(f"[OUTPUT] Formato {ext} ausente para {fid}", file=sys.stderr)
-                return 3
-            generated_paths.append(figure_outputs[fid][ext])
-
-    if "CAPTIONS" not in figure_outputs or "md" not in figure_outputs["CAPTIONS"]:
-        print("[OUTPUT] CAPTIONS.md ausente no retorno", file=sys.stderr)
-        return 3
-    generated_paths.append(figure_outputs["CAPTIONS"]["md"])
-
-    missing_outputs = _assert_nonempty_files(generated_paths, label="OUTPUT")
-    if check_manual_docs:
-        missing_outputs.extend(
+        missing_inputs.extend(
             _assert_nonempty_files(
-                [repo_root / rel for rel in MANUAL_PAPER_DOCS],
-                label="PAPER_DOC",
+                [data_root / rel for rel in REQUIRED_DATA_INPUTS],
+                label="DATA_INPUT",
             )
         )
+        runs_dir = results_dir / "runs"
+        if not runs_dir.exists() or not any(runs_dir.glob("*.json")):
+            missing_inputs.append(f"[INPUT] Nenhum JSON de run encontrado em {runs_dir}")
+        if not any(results_dir.glob("baseline_*.json")):
+            missing_inputs.append(
+                f"[INPUT] Nenhum JSON agregado baseline_*.json em {results_dir}"
+            )
+        if missing_inputs:
+            for msg in missing_inputs:
+                print(msg, file=sys.stderr)
+            return 2
 
-    if missing_outputs:
-        for msg in missing_outputs:
-            print(msg, file=sys.stderr)
-        return 4
+        inv_path, repro_path = build_inventory_and_repro()
+        table_outputs = build_all_tables()
+        figure_outputs = make_all_figures()
 
-    print(
-        f"OK: {len(generated_paths)} artefatos gerados e validados em {paper_dir}"
-        + (f" (+ {len(MANUAL_PAPER_DOCS)} docs verificados)" if check_manual_docs else "")
-    )
-    return 0
+        generated_paths: list[Path] = [inv_path, repro_path]
+        for tid in [f"T{i}" for i in range(1, 16)]:
+            if tid not in table_outputs:
+                print(f"[OUTPUT] Tabela {tid} ausente no retorno", file=sys.stderr)
+                return 3
+            for ext in ("csv", "md", "tex"):
+                if ext not in table_outputs[tid]:
+                    print(f"[OUTPUT] Formato {ext} ausente para {tid}", file=sys.stderr)
+                    return 3
+                generated_paths.append(table_outputs[tid][ext])
+
+        for fid in [f"F{i}" for i in range(1, 12)]:
+            if fid not in figure_outputs:
+                print(f"[OUTPUT] Figura {fid} ausente no retorno", file=sys.stderr)
+                return 3
+            for ext in ("pdf", "png"):
+                if ext not in figure_outputs[fid]:
+                    print(f"[OUTPUT] Formato {ext} ausente para {fid}", file=sys.stderr)
+                    return 3
+                generated_paths.append(figure_outputs[fid][ext])
+
+        if "CAPTIONS" not in figure_outputs or "md" not in figure_outputs["CAPTIONS"]:
+            print("[OUTPUT] CAPTIONS.md ausente no retorno", file=sys.stderr)
+            return 3
+        generated_paths.append(figure_outputs["CAPTIONS"]["md"])
+
+        missing_outputs = _assert_nonempty_files(generated_paths, label="OUTPUT")
+        if check_manual_docs:
+            missing_outputs.extend(
+                _assert_nonempty_files(
+                    [repo_root / rel for rel in MANUAL_PAPER_DOCS],
+                    label="PAPER_DOC",
+                )
+            )
+
+        if missing_outputs:
+            for msg in missing_outputs:
+                print(msg, file=sys.stderr)
+            return 4
+
+        print(
+            f"OK: {len(generated_paths)} artefatos gerados e validados em {paper_dir}"
+            + (f" (+ {len(MANUAL_PAPER_DOCS)} docs verificados)" if check_manual_docs else "")
+        )
+        return 0
+    finally:
+        if output_dir is not None:
+            if prev_override is None:
+                os.environ.pop("PHYSDUAL_PAPER_DIR", None)
+            else:
+                os.environ["PHYSDUAL_PAPER_DIR"] = prev_override
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -153,10 +165,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--generated-only",
         action="store_true",
-        help="Verifica apenas artefatos gerados automaticamente (ignora 01..05 manuais)",
+        help="Verifica apenas artefatos gerados automaticamente (ignora 01..06 manuais)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Diretório de saída alternativo (evita sobrescrever docs/paper/ em testes).",
     )
     args = parser.parse_args(argv)
-    return run_pipeline(check_manual_docs=not args.generated_only)
+    return run_pipeline(check_manual_docs=not args.generated_only, output_dir=args.output_dir)
 
 
 if __name__ == "__main__":

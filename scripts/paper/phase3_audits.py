@@ -15,7 +15,7 @@ import json
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -340,12 +340,13 @@ def audit_git_preregistration(repo_root: Path) -> dict[str, Any]:
             "post_freeze_hyperparam_edits": 0,
         },
         "forensic_caveat": (
-            "Os JSONs individuais em outputs/results/runs/ não embutem timestamp_utc nem git_commit; "
-            "a ordenação pós-ADR #15 (46d13f8, 2026-11-14 00:32:14 -0300, tag phase3-adr15-pre-kiba) "
-            "é demonstrada por proveniência de schema (62/62 runs KIBA/davis_random/controles/fold1-estendido "
-            "possuem campos base_model e diagnostic_control introduzidos em 46d13f8, ausentes nos 19 runs "
-            "anteriores de Davis cold), criação dos splits kiba_seqid30/40 em 46d13f8 e diff=0 em "
-            "configs/base.yaml, docs/DECISOES.md e src/physdual/models/ após 46d13f8."
+            "Os JSONs individuais em outputs/results/runs/ não embutem started_at_utc nem git_commit; "
+            "entretanto, a ordenação pós-ADR #15 (46d13f8, 2026-11-14 00:32:14 -0300, tag phase3-adr15-pre-kiba) "
+            "é corroborada convergentemente por: (a) proveniência de schema (62/62 runs KIBA/davis_random/controles/fold1-estendido "
+            "possuem campos base_model e diagnostic_control introduzidos em 46d13f8, ausentes nos 19 runs anteriores "
+            "de Davis cold); (b) criação dos splits kiba_seqid30/40 em 46d13f8; (c) diff=0 em configs/base.yaml, "
+            "docs/DECISOES.md e src/physdual/models/ após 46d13f8; e (d) auditoria forense dos timestamps de criação "
+            "NTFS (`st_ctime - elapsed_sec`, registrando em run_integrity.start_timestamp_audit 0/62 inícios anteriores a 46d13f8)."
         ),
     }
 
@@ -367,11 +368,19 @@ def audit_runs_and_aggregates(data_root: Path) -> dict[str, Any]:
     isolation_failures: list[str] = []
     split_size_mismatches: list[dict[str, Any]] = []
     nan_inf_runs: list[str] = []
+    pre_ts: list[tuple[float, float, str]] = []
+    post_ts: list[tuple[float, float, str, str, str]] = []
 
     for pf in phys_files:
         d = load_json_strict(pf)
         has_dc = ("base_model" in d) and ("diagnostic_control" in d)
         (post_adr15_runs if has_dc else pre_adr15_runs).append(pf.name)
+        ct_end = float(pf.stat().st_ctime)
+        ct_start = ct_end - float(d.get("elapsed_sec", 0.0))
+        if has_dc:
+            post_ts.append((ct_start, ct_end, pf.name, str(d["dataset"]), str(d["split"])))
+        else:
+            pre_ts.append((ct_start, ct_end, pf.name))
 
         ec = d.get("effective_config", {})
         diffs_cfg = {k: (ec.get(k), v) for k, v in ADR15_FROZEN_CONFIG.items() if ec.get(k) != v}
@@ -460,6 +469,21 @@ def audit_runs_and_aggregates(data_root: Path) -> dict[str, Any]:
     stale_ct = stale_pbs["regimes"]["cold_target"]["per_model_summary"]["gin_esm_mlp"]
     curr_ct = load_json_strict(res_dir / "phase3_physdual_gin_esm_mlp_davis_cold_target_kfold.json")
     tsoff_seqid = load_json_strict(res_dir / "phase3_physdual_gin_esm_mlp_tsoff1000_davis_cold_target_seqid30_kfold.json")
+    pbs_is_stale = bool(
+        abs(float(stale_ct["oof"]["ci"]) - float(curr_ct["global_oof_metrics"]["ci"])) > 1e-6
+        or abs(float(stale_ct["oof"]["mse"]) - float(curr_ct["global_oof_metrics"]["mse"])) > 1e-6
+    )
+
+    brt = timezone(timedelta(hours=-3))
+    adr15_commit_ts = datetime(2026, 11, 14, 0, 32, 14, tzinfo=brt).timestamp()
+    pre_ts.sort()
+    post_ts.sort()
+    kiba_post_ts = [x for x in post_ts if x[3] == "kiba"]
+    dr_post_ts = [x for x in post_ts if x[3] == "davis" and x[4] == "random"]
+    fmt_brt = lambda ts, add_h=0: datetime.fromtimestamp(ts + add_h * 3600, tz=brt).strftime("%Y-%m-%d %H:%M:%S -0300")
+    post_starts_before_adr15_calibrated = [
+        x[2] for x in post_ts if (x[0] + 5 * 3600) < adr15_commit_ts
+    ]
 
     return {
         "counts": {
@@ -472,6 +496,26 @@ def audit_runs_and_aggregates(data_root: Path) -> dict[str, Any]:
             "oof_csvs": len(list((res_dir / "oof").glob("*.csv"))),
         },
         "pre_adr15_physdual_runs": pre_adr15_runs,
+        "start_timestamp_audit": {
+            "adr15_commit": "46d13f8 (2026-11-14 00:32:14 -0300)",
+            "filesystem_clock_offset_note": (
+                "st_mtime local foi sobrescrito pela sincronização em lote do Drive (~2026-11-14 23:25 -0300); "
+                "st_ctime preservou criação com offset constante de -5h (UTC-8 PST Drive/Colab vs -03:00 BRT Git), "
+                "calibrado pelos 19 runs pré-ADR #15 após commit 1ae2853 (19:03:09 -0300 -> st_ctime_start 14:33:27 +5h = 19:33:27) "
+                "e log de sessão Colab (04:07 UTC = 01:07 BRT -> shuf0 st_ctime_start 20:06:35 +5h = 01:06:35)."
+            ),
+            "pre_adr15_min_start_calibrated": fmt_brt(pre_ts[0][0], 5) if pre_ts else None,
+            "pre_adr15_max_end_calibrated": fmt_brt(pre_ts[-1][1], 5) if pre_ts else None,
+            "post_adr15_earliest_run": post_ts[0][2] if post_ts else None,
+            "post_adr15_earliest_start_raw_ctime": fmt_brt(post_ts[0][0], 0) if post_ts else None,
+            "post_adr15_earliest_start_calibrated": fmt_brt(post_ts[0][0], 5) if post_ts else None,
+            "post_adr15_latest_end_calibrated": fmt_brt(post_ts[-1][1], 5) if post_ts else None,
+            "kiba_earliest_run": kiba_post_ts[0][2] if kiba_post_ts else None,
+            "kiba_earliest_start_calibrated": fmt_brt(kiba_post_ts[0][0], 5) if kiba_post_ts else None,
+            "davis_random_earliest_run": dr_post_ts[0][2] if dr_post_ts else None,
+            "davis_random_earliest_start_calibrated": fmt_brt(dr_post_ts[0][0], 5) if dr_post_ts else None,
+            "post_runs_started_before_adr15_count": len(post_starts_before_adr15_calibrated),
+        },
         "config_deviations": config_deviations,
         "truncated_runs": truncated_runs,
         "over_80_pct_runs_physdual": over_80_pct_runs,
@@ -484,13 +528,15 @@ def audit_runs_and_aggregates(data_root: Path) -> dict[str, Any]:
         "aggregate_completeness": agg_audit,
         "stale_artifacts": {
             "phase3_davis_paired_bootstrap_json": {
+                "is_stale": pbs_is_stale,
+                "status": "stale" if pbs_is_stale else "regenerado_sincronizado",
                 "mtime": datetime.fromtimestamp((res_dir / "phase3_davis_paired_bootstrap.json").stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                "stale_cold_target_fold1_mtime_note": "Gerado antes da extensão da dobra 1 (481/500 -> 525/605/1000 épocas)",
-                "stale_oof_ci": stale_ct["oof"]["ci"],
-                "stale_oof_mse": stale_ct["oof"]["mse"],
+                "stale_cold_target_fold1_note": "Anteriormente desatualizado; regenerado após extensão da dobra 1 (481/500 -> 525/605/1000 épocas)",
+                "bootstrap_oof_ci": stale_ct["oof"]["ci"],
+                "bootstrap_oof_mse": stale_ct["oof"]["mse"],
                 "current_oof_ci": curr_ct["global_oof_metrics"]["ci"],
                 "current_oof_mse": curr_ct["global_oof_metrics"]["mse"],
-                "proposed_fix_cmd": "python scripts/run_phase3_paired_bootstrap.py --dataset davis",
+                "regeneration_cmd": "python scripts/run_phase3_paired_bootstrap.py --dataset davis",
             },
             "tsoff1000_seqid30_cluster_col_quirk": tsoff_seqid.get("bootstrap_analysis", {}).get("cluster_group_col"),
         },

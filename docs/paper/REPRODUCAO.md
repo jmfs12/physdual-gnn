@@ -1,7 +1,7 @@
 # Reprodutibilidade do Pacote do Artigo (Fases 1, 2 e 3)
 
-- **Gerado em (UTC):** `2026-11-15T03:43:27Z`
-- **Commit HEAD:** `461421b`
+- **Gerado em (UTC):** `2026-11-15T15:37:36Z`
+- **Commit HEAD:** `fcc3046`
 - **Variável de raiz de artefatos:** `PHYSDUAL_ROOT` (padrão local: raiz do repositório Git; no Colab: `/content/drive/MyDrive/physdual-gnn`).
 
 ## 1. Ordem Exata de Execução
@@ -17,17 +17,23 @@ python scripts/paper/cpu_audits.py
 #    (ou fracionado em --step meta, --step v2, --step v1_cold, --step v1_random)
 python scripts/paper/phase3_audits.py --step all
 
-# 3. (Opcional — recomendação Fase 3 para atualizar outputs/results/phase3_davis_paired_bootstrap.json)
-# python scripts/run_phase3_paired_bootstrap.py --dataset davis
+# 3. (CPU, determinístico) Análise intragrupo e baseline de empilhamento residual (somente leitura)
+python scripts/paper/phase3_intragroup_and_stacking.py
 
 # 4. Pipeline completo do pacote do artigo (inventário, T1..T15, figuras F1..F11 e REPRODUCAO.md)
 python scripts/paper/build_all.py
 
-# 5. Validação automatizada de esquema, completude, ausência de NaNs e proteção contra valores-p extremos
+# 5. Gate técnico Fase 3 (verifica INTEGRIDADE estrutural/numérica; NÃO implica sucesso científico ADR #15)
+python scripts/verify_phase3.py --full --no-require-paired-win
+
+# 6. Validação automatizada de esquema, completude, ausência de NaNs e proteção contra valores-p extremos
 pytest tests/test_paper_pipeline.py
 
-# 6. (Opcional Colab Drive) Auditoria física dos .pt do cache ESM-2
+# 7. (Opcional Colab Drive) Auditoria física dos .pt do cache ESM-2 e scripts diagnósticos pós-ADR #15
 PHYSDUAL_ROOT=/content/drive/MyDrive/physdual-gnn python scripts/paper/audit_esm_cache_colab.py
+# Diagnósticos Colab (não confirmatórios):
+# python scripts/paper/colab_ridge_esm_pooling.py --data-root /content/drive/MyDrive/physdual-gnn
+# python scripts/paper/colab_kiba_cold_drug_ecfp.py --root /content/drive/MyDrive/physdual-gnn --device cuda
 ```
 
 Ou invocando os módulos individuais do passo 4 na ordem exata:
@@ -74,7 +80,7 @@ Google Drive       : MONTADO em /content/drive/MyDrive (livre=223.54 GiB / total
 
 ## 3. Checksums SHA-256 dos Artefatos JSON de Entrada
 
-Total de arquivos JSON auditados: **275**.
+Total de arquivos JSON auditados: **276**.
 
 | Arquivo (relativo a `PHYSDUAL_ROOT`) | Tamanho (bytes) | SHA-256 |
 | :--- | :---: | :--- |
@@ -141,7 +147,8 @@ Total de arquivos JSON auditados: **275**.
 | `data/processed/splits/kiba_random_seed3.json` | 1307988 | `427f5e0b0bb1bda6f7395029597be78f495df5aa79fe4f678384dc32cdf18996` |
 | `data/processed/splits/kiba_random_seed4.json` | 1307988 | `24ce643209963321aefa1de970a47b5b2be863c72457b0d548559eb5e0dc24af` |
 | `docs/paper/cpu_audits.json` | 147907 | `b9feb38f606fddb7a4bda1ddcb6105a9f0c7399fa80add2f225b53050d45d211` |
-| `docs/paper/phase3_audits.json` | 648787 | `2f8888d31334583ec5ecbb89336fb70d2018203bbb7815360fb6be75c3c0a09c` |
+| `docs/paper/phase3_audits.json` | 650457 | `00782e0b0b5ddeb20e6295a64ca8a471b80998f1e4281c4282f71697fa986dfc` |
+| `docs/paper/phase3_intragroup_and_stacking.json` | 187420 | `f8804e4578c49d20e54c91a8f48324392fbb61e4d9624694dfb8625584297baa` |
 | `outputs/logs/davis_seqid_cluster_map.json` | 577846 | `93df09eb21f9d546760f640f3aa25a0fa1ec6c454f0da24582507dd04ee81da6` |
 | `outputs/logs/davis_seqid_splits_summary.json` | 5532 | `60f5f828e4466911ab412827b6cbcc2ffa16597cfcc787ef1c9ed184d68e1867` |
 | `outputs/logs/kiba_seqid_cluster_map.json` | 341913 | `de2c01c36a03e29b97b135fc6dac428d181e838a1be27ac66f8bd167f481031b` |
@@ -166,7 +173,7 @@ Total de arquivos JSON auditados: **275**.
 | `outputs/results/baseline_graphdta_gin_kiba_random.json` | 87448 | `23ee01dea5e235fc76b51939fe2d1a7089f288385022864939df66992f82a5db` |
 | `outputs/results/kiba_cpu_classical_baselines.json` | 63074 | `3414df48cb2ba5140a044458941a6b738cd7cd3acf3ff5d50bd1a6c35586fc30` |
 | `outputs/results/phase2_timing_benchmark.json` | 444 | `401f6b684e352779ad24e6553486106b2579c2043071c9baf07dc0d5e1c99213` |
-| `outputs/results/phase3_davis_paired_bootstrap.json` | 101792 | `e975fe2ef24b49c0447a81b004a7f6fab95b297d681df7224c48ed75e3ff0418` |
+| `outputs/results/phase3_davis_paired_bootstrap.json` | 104137 | `14a54f290f5e5f9fdfe6cbfe18b9fe7964337efef3411643b075cca727e3f472` |
 | `outputs/results/phase3_esm_cpu_baselines.json` | 88087 | `c52850af1f80f4ab20a98dc5e1e584a231e7dbaa62f8a0d5eadce71ef7dd0092` |
 | `outputs/results/phase3_kiba_paired_bootstrap.json` | 34397 | `fedcfb78546e6adc9b231f51c1eba538fbe72cdae296e9c13fa27cb3aae681a7` |
 | `outputs/results/phase3_physdual_ecfp_esm_mlp_davis_cold_drug_kfold.json` | 108520 | `c6cfaee4d96451721d185c81aabc1c8852404a5ac28f0cead2708b3db5ed7e18` |

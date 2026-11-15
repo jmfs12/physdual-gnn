@@ -1,0 +1,6098 @@
+{
+  "generated_at_utc": "2026-11-15T15:29:34Z",
+  "elapsed_sec": 72.4,
+  "intragroup_definition": {
+    "cold_target_group": "smiles (por fármaco; mede ordenação de alvos inéditos para o mesmo fármaco)",
+    "cold_drug_group": "sequence (por alvo; mede ordenação de fármacos inéditos contra o mesmo alvo)",
+    "evaluable_filter": "grupos com n >= 2 (e sensibilidade n >= 5) pares de teste e >= 2 valores distintos em y_true",
+    "constant_prediction_convention": "CI = 0.5000 (compute_ci), Spearman = 0.0 (contagem registrada em n_groups_const_pred)"
+  },
+  "intragroup_v2_kfold": {
+    "davis/cold_target": {
+      "protocol": "v2_kfold",
+      "group_axis": "smiles",
+      "n_oof_pairs": 30056,
+      "models": {
+        "gin_esm_mlp": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.714206614471723,
+            "ci_std": 0.07686048725142529,
+            "ci_median": 0.720960146290883,
+            "spearman_mean": 0.3625196751693219,
+            "spearman_std": 0.16843249214790681,
+            "spearman_median": 0.35868161471424354
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.714206614471723,
+            "ci_std": 0.07686048725142529,
+            "ci_median": 0.720960146290883,
+            "spearman_mean": 0.3625196751693219,
+            "spearman_std": 0.16843249214790681,
+            "spearman_median": 0.35868161471424354
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.7189127716830287,
+              0.05354616797402174
+            ],
+            "spearman_mean": [
+              0.3665328585614874,
+              0.06606545141981993
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.8148957164759715,
+            "mse": 0.43719182209068524,
+            "rmse": 0.6612048261247684,
+            "pearson": 0.6821977785358707,
+            "spearman": 0.5762027199697426,
+            "rm2": 0.4215849644538725
+          }
+        },
+        "ridge_esm": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6178889774652043,
+            "ci_std": 0.12088752477122484,
+            "ci_median": 0.6387933089160255,
+            "spearman_mean": 0.2067864153857969,
+            "spearman_std": 0.18872329064446472,
+            "spearman_median": 0.26798920242256
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6178889774652043,
+            "ci_std": 0.12088752477122484,
+            "ci_median": 0.6387933089160255,
+            "spearman_mean": 0.2067864153857969,
+            "spearman_std": 0.18872329064446472,
+            "spearman_median": 0.26798920242256
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.6302115878995327,
+              0.018492026119050223
+            ],
+            "spearman_mean": [
+              0.2221965082124172,
+              0.03776656136056668
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7646689665801858,
+            "mse": 0.5868101977950756,
+            "rmse": 0.7660353763339364,
+            "pearson": 0.5178343391671261,
+            "spearman": 0.4900942712651442,
+            "rm2": 0.26319135022917456
+          }
+        },
+        "knn_esm_target": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6838746609901944,
+            "ci_std": 0.09383083434361021,
+            "ci_median": 0.688497333070567,
+            "spearman_mean": 0.31841586919760423,
+            "spearman_std": 0.13692963954817164,
+            "spearman_median": 0.33769992343440713
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6838746609901944,
+            "ci_std": 0.09383083434361021,
+            "ci_median": 0.688497333070567,
+            "spearman_mean": 0.31841586919760423,
+            "spearman_std": 0.13692963954817164,
+            "spearman_median": 0.33769992343440713
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.6945114890644294,
+              0.038175632398625495
+            ],
+            "spearman_mean": [
+              0.3232431432214137,
+              0.04909368952052815
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              1,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.8011209765641001,
+            "mse": 0.5130245443845172,
+            "rmse": 0.7162573171594948,
+            "pearson": 0.6122808379666682,
+            "spearman": 0.5580097251154088,
+            "rm2": 0.32788776181964213
+          }
+        },
+        "knn_kmer_target": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.7097879924163563,
+            "ci_std": 0.06850735285077941,
+            "ci_median": 0.7147622069997812,
+            "spearman_mean": 0.34835110673698594,
+            "spearman_std": 0.13527155199105428,
+            "spearman_median": 0.3810934448759843
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.7097879924163563,
+            "ci_std": 0.06850735285077941,
+            "ci_median": 0.7147622069997812,
+            "spearman_mean": 0.34835110673698594,
+            "spearman_std": 0.13527155199105428,
+            "spearman_median": 0.3810934448759843
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.7145361806208307,
+              0.040141325102513815
+            ],
+            "spearman_mean": [
+              0.35507725823577707,
+              0.04708092761790439
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              1,
+              1,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.8126581177994494,
+            "mse": 0.46209765433856576,
+            "rmse": 0.6797776506612775,
+            "pearson": 0.6547420317032184,
+            "spearman": 0.5768360095043819,
+            "rm2": 0.3964212309301774
+          }
+        },
+        "knn_tanimoto_drug": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41098907877213287,
+            "ci_std": 0.06199153723947154,
+            "ci_median": 0.4222375952727134,
+            "spearman_mean": -0.12938961341993052,
+            "spearman_std": 0.058844610320261295,
+            "spearman_median": -0.1331273389036055
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41098907877213287,
+            "ci_std": 0.06199153723947154,
+            "ci_median": 0.4222375952727134,
+            "spearman_mean": -0.12938961341993052,
+            "spearman_std": 0.058844610320261295,
+            "spearman_median": -0.1331273389036055
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7444065067383849,
+            "mse": 0.6318842531520328,
+            "rmse": 0.7949114750411097,
+            "pearson": 0.45923325416193217,
+            "spearman": 0.45472085077666874,
+            "rm2": 0.20763060107991363
+          }
+        },
+        "drug_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41098907877213287,
+            "ci_std": 0.06199153723947154,
+            "ci_median": 0.4222375952727134,
+            "spearman_mean": -0.12938961341993052,
+            "spearman_std": 0.058844610320261295,
+            "spearman_median": -0.1331273389036055
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41098907877213287,
+            "ci_std": 0.06199153723947154,
+            "ci_median": 0.4222375952727134,
+            "spearman_mean": -0.12938961341993052,
+            "spearman_std": 0.058844610320261295,
+            "spearman_median": -0.1331273389036055
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7444065067383849,
+            "mse": 0.6318842531520328,
+            "rmse": 0.7949114750411097,
+            "pearson": 0.45923325416193217,
+            "spearman": 0.45472085077666874,
+            "rm2": 0.20763060107991363
+          }
+        },
+        "target_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4596399574006857,
+            "ci_std": 0.06306022578877674,
+            "ci_median": 0.4486508745886955,
+            "spearman_mean": -0.07823175664997185,
+            "spearman_std": 0.09560972697773648,
+            "spearman_median": -0.10436438035873154
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4596399574006857,
+            "ci_std": 0.06306022578877674,
+            "ci_median": 0.4486508745886955,
+            "spearman_mean": -0.07823175664997185,
+            "spearman_std": 0.09560972697773648,
+            "spearman_median": -0.10436438035873154
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ]
+          },
+          "oof_global": {
+            "ci": 0.4628822666418365,
+            "mse": 0.8037219785606544,
+            "rmse": 0.8965054258400528,
+            "pearson": -0.07844489190175888,
+            "spearman": -0.07200171089428299,
+            "rm2": 0.0
+          }
+        },
+        "graphdta_gin": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.48485284620045055,
+            "ci_std": 0.07778095988464548,
+            "ci_median": 0.5008647795062333,
+            "spearman_mean": -0.0070210648259897614,
+            "spearman_std": 0.10789592615099068,
+            "spearman_median": 0.0016685454193270679
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.48485284620045055,
+            "ci_std": 0.07778095988464548,
+            "ci_median": 0.5008647795062333,
+            "spearman_mean": -0.0070210648259897614,
+            "spearman_std": 0.10789592615099068,
+            "spearman_median": 0.0016685454193270679
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5240030025786109,
+              0.02948519140868058
+            ],
+            "spearman_mean": [
+              0.05005821813389984,
+              0.047016348655040216
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.686079086911069,
+            "mse": 0.7647951580280455,
+            "rmse": 0.8745256760256074,
+            "pearson": 0.3876617648599724,
+            "spearman": 0.3486978647304106,
+            "rm2": 0.13271369565594068
+          }
+        },
+        "graphdta_cnn3": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6363693821373138,
+            "ci_std": 0.07334339369683955,
+            "ci_median": 0.6398411842494566,
+            "spearman_mean": 0.2399716599938399,
+            "spearman_std": 0.13035361514857036,
+            "spearman_median": 0.23257292260426038
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6363693821373138,
+            "ci_std": 0.07334339369683955,
+            "ci_median": 0.6398411842494566,
+            "spearman_mean": 0.2399716599938399,
+            "spearman_std": 0.13035361514857036,
+            "spearman_median": 0.23257292260426038
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.6475296551899739,
+              0.038371010733035005
+            ],
+            "spearman_mean": [
+              0.25109214161022714,
+              0.05855917833736017
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7714531291468407,
+            "mse": 0.5407254162428241,
+            "rmse": 0.7353403404157997,
+            "pearson": 0.5831585340579735,
+            "spearman": 0.5014711336339209,
+            "rm2": 0.33844713606863797
+          }
+        },
+        "ecfp_esm_mlp": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.7011530664911314,
+            "ci_std": 0.09251910973340233,
+            "ci_median": 0.7171066168180895,
+            "spearman_mean": 0.3554934031740628,
+            "spearman_std": 0.17685303456705462,
+            "spearman_median": 0.3705318687545485
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.7011530664911314,
+            "ci_std": 0.09251910973340233,
+            "ci_median": 0.7171066168180895,
+            "spearman_mean": 0.3554934031740628,
+            "spearman_std": 0.17685303456705462,
+            "spearman_median": 0.3705318687545485
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.7076817242316541,
+              0.046975657141659785
+            ],
+            "spearman_mean": [
+              0.3536097577523905,
+              0.05751160277282778
+            ],
+            "n_groups_evaluable_per_fold": [
+              66,
+              67,
+              67,
+              67,
+              67
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.8171501176562517,
+            "mse": 0.42508375511256286,
+            "rmse": 0.6519844745947275,
+            "pearson": 0.6895442490663248,
+            "spearman": 0.5803389039663095,
+            "rm2": 0.44660246098020906
+          }
+        }
+      }
+    },
+    "davis/cold_target_seqid40": {
+      "protocol": "v2_kfold",
+      "group_axis": "smiles",
+      "n_oof_pairs": 30056,
+      "models": {
+        "gin_esm_mlp": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.626835614372372,
+            "ci_std": 0.10557887504000629,
+            "ci_median": 0.6342071617984182,
+            "spearman_mean": 0.23290418323790274,
+            "spearman_std": 0.14579949025212177,
+            "spearman_median": 0.2531222464504982
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.626835614372372,
+            "ci_std": 0.10557887504000629,
+            "ci_median": 0.6342071617984182,
+            "spearman_mean": 0.23290418323790274,
+            "spearman_std": 0.14579949025212177,
+            "spearman_median": 0.2531222464504982
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.6482680838507991,
+              0.0357726848800913
+            ],
+            "spearman_mean": [
+              0.2573815175200693,
+              0.0785785915000363
+            ],
+            "n_groups_evaluable_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7743980250238118,
+            "mse": 0.5628894515065642,
+            "rmse": 0.7502595894132672,
+            "pearson": 0.5772645768688633,
+            "spearman": 0.5079193723469185,
+            "rm2": 0.27392280339107883
+          }
+        },
+        "ridge_esm": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5723459403306288,
+            "ci_std": 0.11855524458424171,
+            "ci_median": 0.578262190011857,
+            "spearman_mean": 0.12806473708095367,
+            "spearman_std": 0.15698867596550667,
+            "spearman_median": 0.14151126375679796
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5723459403306288,
+            "ci_std": 0.11855524458424171,
+            "ci_median": 0.578262190011857,
+            "spearman_mean": 0.12806473708095367,
+            "spearman_std": 0.15698867596550667,
+            "spearman_median": 0.14151126375679796
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5917063527192113,
+              0.03887694221349402
+            ],
+            "spearman_mean": [
+              0.1522091020306453,
+              0.07822978419253773
+            ],
+            "n_groups_evaluable_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7446222478746661,
+            "mse": 0.6140114702977884,
+            "rmse": 0.7835888400799161,
+            "pearson": 0.48610476622955834,
+            "spearman": 0.4556108129580581,
+            "rm2": 0.22380175556445675
+          }
+        },
+        "knn_esm_target": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5829520594178585,
+            "ci_std": 0.07576894247725893,
+            "ci_median": 0.5854909022038641,
+            "spearman_mean": 0.15452918454213702,
+            "spearman_std": 0.11594805725580729,
+            "spearman_median": 0.1559478742398906
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5829520594178585,
+            "ci_std": 0.07576894247725893,
+            "ci_median": 0.5854909022038641,
+            "spearman_mean": 0.15452918454213702,
+            "spearman_std": 0.11594805725580729,
+            "spearman_median": 0.1559478742398906
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5927654711574417,
+              0.029544865491560223
+            ],
+            "spearman_mean": [
+              0.16319686631557953,
+              0.05028606753821116
+            ],
+            "n_groups_evaluable_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ],
+            "n_groups_const_pred_per_fold": [
+              4,
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7430484707268974,
+            "mse": 0.6737001338024282,
+            "rmse": 0.8207923816669037,
+            "pearson": 0.4881533033963191,
+            "spearman": 0.456105860363009,
+            "rm2": 0.17207173837564096
+          }
+        },
+        "knn_kmer_target": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5447396971966597,
+            "ci_std": 0.09585760269037355,
+            "ci_median": 0.5550259636982275,
+            "spearman_mean": 0.08337403538977298,
+            "spearman_std": 0.1246319742865222,
+            "spearman_median": 0.1044137655441923
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5447396971966597,
+            "ci_std": 0.09585760269037355,
+            "ci_median": 0.5550259636982275,
+            "spearman_mean": 0.08337403538977298,
+            "spearman_std": 0.1246319742865222,
+            "spearman_median": 0.1044137655441923
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5504268992917375,
+              0.0709988112556565
+            ],
+            "spearman_mean": [
+              0.09473719494643061,
+              0.13625937447830583
+            ],
+            "n_groups_evaluable_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ],
+            "n_groups_const_pred_per_fold": [
+              4,
+              1,
+              1,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7219767390526848,
+            "mse": 0.6550629689487917,
+            "rmse": 0.8093596042234822,
+            "pearson": 0.47624381943695815,
+            "spearman": 0.4149214592497722,
+            "rm2": 0.17870513187897863
+          }
+        },
+        "knn_tanimoto_drug": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4396520372568074,
+            "ci_std": 0.06688198846560235,
+            "ci_median": 0.4574740637678333,
+            "spearman_mean": -0.07746027518833823,
+            "spearman_std": 0.05753153223024133,
+            "spearman_median": -0.07396901288082396
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4396520372568074,
+            "ci_std": 0.06688198846560235,
+            "ci_median": 0.4574740637678333,
+            "spearman_mean": -0.07746027518833823,
+            "spearman_std": 0.05753153223024133,
+            "spearman_median": -0.07396901288082396
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ],
+            "n_groups_const_pred_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7429579028650916,
+            "mse": 0.6306093757748047,
+            "rmse": 0.7941091711942412,
+            "pearson": 0.4610509735297156,
+            "spearman": 0.4520232602593522,
+            "rm2": 0.2086283479898723
+          }
+        },
+        "drug_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4396520372568074,
+            "ci_std": 0.06688198846560235,
+            "ci_median": 0.4574740637678333,
+            "spearman_mean": -0.07746027518833823,
+            "spearman_std": 0.05753153223024133,
+            "spearman_median": -0.07396901288082396
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4396520372568074,
+            "ci_std": 0.06688198846560235,
+            "ci_median": 0.4574740637678333,
+            "spearman_mean": -0.07746027518833823,
+            "spearman_std": 0.05753153223024133,
+            "spearman_median": -0.07396901288082396
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ],
+            "n_groups_const_pred_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7429579028650916,
+            "mse": 0.6306093757748047,
+            "rmse": 0.7941091711942412,
+            "pearson": 0.4610509735297156,
+            "spearman": 0.4520232602593522,
+            "rm2": 0.2086283479898723
+          }
+        },
+        "target_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4834139043666578,
+            "ci_std": 0.08336799028631982,
+            "ci_median": 0.49895294138747454,
+            "spearman_mean": -0.011655380525378569,
+            "spearman_std": 0.08438169350877966,
+            "spearman_median": -0.0023971464731034173
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4834139043666578,
+            "ci_std": 0.08336799028631982,
+            "ci_median": 0.49895294138747454,
+            "spearman_mean": -0.011655380525378569,
+            "spearman_std": 0.08438169350877966,
+            "spearman_median": -0.0023971464731034173
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ],
+            "n_groups_const_pred_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ]
+          },
+          "oof_global": {
+            "ci": 0.4984002230752893,
+            "mse": 0.8007074108714429,
+            "rmse": 0.8948225583161407,
+            "pearson": -0.01224845189376705,
+            "spearman": -0.0030465212307693276,
+            "rm2": 0.0
+          }
+        },
+        "graphdta_gin": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4980832495590356,
+            "ci_std": 0.08659113419707329,
+            "ci_median": 0.5052155113040979,
+            "spearman_mean": -0.0011525303911934194,
+            "spearman_std": 0.08835221562415424,
+            "spearman_median": 0.006003515330780478
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4980832495590356,
+            "ci_std": 0.08659113419707329,
+            "ci_median": 0.5052155113040979,
+            "spearman_mean": -0.0011525303911934194,
+            "spearman_std": 0.08835221562415424,
+            "spearman_median": 0.006003515330780478
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.4911305356681353,
+              0.020452221401699822
+            ],
+            "spearman_mean": [
+              -0.009872619256093049,
+              0.038320244034077966
+            ],
+            "n_groups_evaluable_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6836216163931165,
+            "mse": 0.7560088050928845,
+            "rmse": 0.8694876681660784,
+            "pearson": 0.37418906485817094,
+            "spearman": 0.34462655590733654,
+            "rm2": 0.11702711123845458
+          }
+        },
+        "graphdta_cnn3": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5808790070898933,
+            "ci_std": 0.0762963868265345,
+            "ci_median": 0.5878655753513865,
+            "spearman_mean": 0.14956887349595688,
+            "spearman_std": 0.12333941868239591,
+            "spearman_median": 0.13952691908843312
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5808790070898933,
+            "ci_std": 0.0762963868265345,
+            "ci_median": 0.5878655753513865,
+            "spearman_mean": 0.14956887349595688,
+            "spearman_std": 0.12333941868239591,
+            "spearman_median": 0.13952691908843312
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5905446270344237,
+              0.039933956420922505
+            ],
+            "spearman_mean": [
+              0.17009677591290687,
+              0.0637278689832304
+            ],
+            "n_groups_evaluable_per_fold": [
+              67,
+              67,
+              66,
+              63,
+              65
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7436884847644104,
+            "mse": 0.6388047213886251,
+            "rmse": 0.7992526017402916,
+            "pearson": 0.5072020458275384,
+            "spearman": 0.45455418043009566,
+            "rm2": 0.24460876291130265
+          }
+        }
+      }
+    },
+    "davis/cold_target_seqid30": {
+      "protocol": "v2_kfold",
+      "group_axis": "smiles",
+      "n_oof_pairs": 30056,
+      "models": {
+        "gin_esm_mlp": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5796416490414095,
+            "ci_std": 0.0947374556748,
+            "ci_median": 0.574736743606266,
+            "spearman_mean": 0.13973060656269437,
+            "spearman_std": 0.1394364962041936,
+            "spearman_median": 0.1238132386604873
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5796416490414095,
+            "ci_std": 0.0947374556748,
+            "ci_median": 0.574736743606266,
+            "spearman_mean": 0.13973060656269437,
+            "spearman_std": 0.1394364962041936,
+            "spearman_median": 0.1238132386604873
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5863689570858093,
+              0.03804543105858596
+            ],
+            "spearman_mean": [
+              0.14700095912627928,
+              0.08889006439964159
+            ],
+            "n_groups_evaluable_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7407083724746332,
+            "mse": 0.6354798509787847,
+            "rmse": 0.7971699009488408,
+            "pearson": 0.4999799825667227,
+            "spearman": 0.44937770027687046,
+            "rm2": 0.20147495637987714
+          }
+        },
+        "ridge_esm": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5829581010072935,
+            "ci_std": 0.10551127315128342,
+            "ci_median": 0.5959405075378281,
+            "spearman_mean": 0.14282240009336666,
+            "spearman_std": 0.15906390073185528,
+            "spearman_median": 0.1725317015271736
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5829581010072935,
+            "ci_std": 0.10551127315128342,
+            "ci_median": 0.5959405075378281,
+            "spearman_mean": 0.14282240009336666,
+            "spearman_std": 0.15906390073185528,
+            "spearman_median": 0.1725317015271736
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5819453022426659,
+              0.03821163328524672
+            ],
+            "spearman_mean": [
+              0.15509562120179948,
+              0.08534471057486658
+            ],
+            "n_groups_evaluable_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7443927850522173,
+            "mse": 0.6404523406600559,
+            "rmse": 0.8002826629760611,
+            "pearson": 0.45902930854790525,
+            "spearman": 0.45499638728317726,
+            "rm2": 0.1932880097087944
+          }
+        },
+        "knn_esm_target": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5418513971173985,
+            "ci_std": 0.08913825926937353,
+            "ci_median": 0.5535662266345156,
+            "spearman_mean": 0.08483922508639997,
+            "spearman_std": 0.12198369310222942,
+            "spearman_median": 0.09583881370491235
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5418513971173985,
+            "ci_std": 0.08913825926937353,
+            "ci_median": 0.5535662266345156,
+            "spearman_mean": 0.08483922508639997,
+            "spearman_std": 0.12198369310222942,
+            "spearman_median": 0.09583881370491235
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5546604220239096,
+              0.033229497289191855
+            ],
+            "spearman_mean": [
+              0.09197192682258216,
+              0.04498882192414843
+            ],
+            "n_groups_evaluable_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ],
+            "n_groups_const_pred_per_fold": [
+              1,
+              1,
+              1,
+              1,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7166088339260321,
+            "mse": 0.7382978364817755,
+            "rmse": 0.8592425946621685,
+            "pearson": 0.4107312843225541,
+            "spearman": 0.4092419448431017,
+            "rm2": 0.11782011765787324
+          }
+        },
+        "knn_kmer_target": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 1,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5072404056983659,
+            "ci_std": 0.06962955782126427,
+            "ci_median": 0.5059989174312268,
+            "spearman_mean": 0.013120345035390484,
+            "spearman_std": 0.09219862859722198,
+            "spearman_median": 0.011156770771003934
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 1,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5072404056983659,
+            "ci_std": 0.06962955782126427,
+            "ci_median": 0.5059989174312268,
+            "spearman_mean": 0.013120345035390484,
+            "spearman_std": 0.09219862859722198,
+            "spearman_median": 0.011156770771003934
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5202952274108334,
+              0.043221528762810595
+            ],
+            "spearman_mean": [
+              0.03163181786230377,
+              0.0685993968665679
+            ],
+            "n_groups_evaluable_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ],
+            "n_groups_const_pred_per_fold": [
+              1,
+              2,
+              5,
+              2,
+              1
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7000355907579603,
+            "mse": 0.7378563492635735,
+            "rmse": 0.858985651372346,
+            "pearson": 0.3795587137183041,
+            "spearman": 0.3764317381251464,
+            "rm2": 0.1077254181100611
+          }
+        },
+        "knn_tanimoto_drug": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4202904257892363,
+            "ci_std": 0.057960150344054384,
+            "ci_median": 0.43060755595446853,
+            "spearman_mean": -0.11664434585633592,
+            "spearman_std": 0.07459191493278484,
+            "spearman_median": -0.11132534770627645
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4202904257892363,
+            "ci_std": 0.057960150344054384,
+            "ci_median": 0.43060755595446853,
+            "spearman_mean": -0.11664434585633592,
+            "spearman_std": 0.07459191493278484,
+            "spearman_median": -0.11132534770627645
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ],
+            "n_groups_const_pred_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7288501872414221,
+            "mse": 0.6505159622440344,
+            "rmse": 0.8065456975547228,
+            "pearson": 0.43574421500197685,
+            "spearman": 0.4259010277196387,
+            "rm2": 0.18038006500310785
+          }
+        },
+        "drug_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4202904257892363,
+            "ci_std": 0.057960150344054384,
+            "ci_median": 0.43060755595446853,
+            "spearman_mean": -0.11664434585633592,
+            "spearman_std": 0.07459191493278484,
+            "spearman_median": -0.11132534770627645
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4202904257892363,
+            "ci_std": 0.057960150344054384,
+            "ci_median": 0.43060755595446853,
+            "spearman_mean": -0.11664434585633592,
+            "spearman_std": 0.07459191493278484,
+            "spearman_median": -0.11132534770627645
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ],
+            "n_groups_const_pred_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7288501872414221,
+            "mse": 0.6505159622440344,
+            "rmse": 0.8065456975547228,
+            "pearson": 0.43574421500197685,
+            "spearman": 0.4259010277196387,
+            "rm2": 0.18038006500310785
+          }
+        },
+        "target_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4766597608698602,
+            "ci_std": 0.0749601415417588,
+            "ci_median": 0.4800951949880474,
+            "spearman_mean": -0.0321664794578345,
+            "spearman_std": 0.08640082478725927,
+            "spearman_median": -0.030419419311794323
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4766597608698602,
+            "ci_std": 0.0749601415417588,
+            "ci_median": 0.4800951949880474,
+            "spearman_mean": -0.0321664794578345,
+            "spearman_std": 0.08640082478725927,
+            "spearman_median": -0.030419419311794323
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ],
+            "n_groups_const_pred_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ]
+          },
+          "oof_global": {
+            "ci": 0.4882643977449104,
+            "mse": 0.8063067817043299,
+            "rmse": 0.8979458679142802,
+            "pearson": -0.06384381607563759,
+            "spearman": -0.022914960514671665,
+            "rm2": 0.0
+          }
+        },
+        "graphdta_gin": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4720652817016068,
+            "ci_std": 0.09609644121828928,
+            "ci_median": 0.48740071508841054,
+            "spearman_mean": -0.022190152635580933,
+            "spearman_std": 0.11851878904232789,
+            "spearman_median": -0.026544884779834868
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4720652817016068,
+            "ci_std": 0.09609644121828928,
+            "ci_median": 0.48740071508841054,
+            "spearman_mean": -0.022190152635580933,
+            "spearman_std": 0.11851878904232789,
+            "spearman_median": -0.026544884779834868
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.49197008389426766,
+              0.029805311656277367
+            ],
+            "spearman_mean": [
+              -0.02378475175344898,
+              0.07447754789737587
+            ],
+            "n_groups_evaluable_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6893046749599752,
+            "mse": 0.8624454080616356,
+            "rmse": 0.9286793892736264,
+            "pearson": 0.3843701798739244,
+            "spearman": 0.3536045327681007,
+            "rm2": 0.12723404428824453
+          }
+        },
+        "graphdta_cnn3": {
+          "min_pairs_2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5454967728755318,
+            "ci_std": 0.08818485233552183,
+            "ci_median": 0.5458743765948966,
+            "spearman_mean": 0.08087633078777008,
+            "spearman_std": 0.14381777967053938,
+            "spearman_median": 0.0686485086097684
+          },
+          "min_pairs_5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5454967728755318,
+            "ci_std": 0.08818485233552183,
+            "ci_median": 0.5458743765948966,
+            "spearman_mean": 0.08087633078777008,
+            "spearman_std": 0.14381777967053938,
+            "spearman_median": 0.0686485086097684
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5462500477083767,
+              0.03965649860827574
+            ],
+            "spearman_mean": [
+              0.08519182898395801,
+              0.08132178840781921
+            ],
+            "n_groups_evaluable_per_fold": [
+              64,
+              65,
+              67,
+              66,
+              64
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.724141615804491,
+            "mse": 0.7181662580905593,
+            "rmse": 0.8474469057649331,
+            "pearson": 0.4501406229470848,
+            "spearman": 0.4200907308806967,
+            "rm2": 0.18139800881336077
+          }
+        }
+      }
+    },
+    "davis/cold_drug": {
+      "protocol": "v2_kfold",
+      "group_axis": "sequence",
+      "n_oof_pairs": 30056,
+      "models": {
+        "gin_esm_mlp": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5607523831919907,
+            "ci_std": 0.09036974185239391,
+            "ci_median": 0.5736434108527132,
+            "spearman_mean": 0.12400581541689217,
+            "spearman_std": 0.1560690788762257,
+            "spearman_median": 0.12427350543098205
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5607523831919907,
+            "ci_std": 0.09036974185239391,
+            "ci_median": 0.5736434108527132,
+            "spearman_mean": 0.12400581541689217,
+            "spearman_std": 0.1560690788762257,
+            "spearman_median": 0.12427350543098205
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5832668521747991,
+              0.09795656447996812
+            ],
+            "spearman_mean": [
+              0.15034557705173532,
+              0.14420898018784298
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6451215361025351,
+            "mse": 0.8462213803800586,
+            "rmse": 0.919902918997466,
+            "pearson": 0.3548418256477091,
+            "spearman": 0.27418540215156045,
+            "rm2": 0.0826080203772381
+          }
+        },
+        "ridge_esm": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5389901789489203,
+            "ci_std": 0.09801742921438955,
+            "ci_median": 0.5484472049689441,
+            "spearman_mean": 0.06981476637585002,
+            "spearman_std": 0.16137244059333616,
+            "spearman_median": 0.0855008389303983
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5389901789489203,
+            "ci_std": 0.09801742921438955,
+            "ci_median": 0.5484472049689441,
+            "spearman_mean": 0.06981476637585002,
+            "spearman_std": 0.16137244059333616,
+            "spearman_median": 0.0855008389303983
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5717646096564694,
+              0.08751679667018458
+            ],
+            "spearman_mean": [
+              0.10782220848778695,
+              0.13749314824020065
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6591333333103849,
+            "mse": 0.7565611230860522,
+            "rmse": 0.8698052213490398,
+            "pearson": 0.2827431171433612,
+            "spearman": 0.29992360716355887,
+            "rm2": 0.06746353254597669
+          }
+        },
+        "knn_esm_target": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.3766548450361205,
+            "ci_std": 0.06945340032790658,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19990325488397243,
+            "spearman_std": 0.08181608838262637,
+            "spearman_median": -0.20085044639915622
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.3766548450361205,
+            "ci_std": 0.06945340032790658,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19990325488397243,
+            "spearman_std": 0.08181608838262637,
+            "spearman_median": -0.20085044639915622
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6522387927084793,
+            "mse": 0.7310541309283131,
+            "rmse": 0.8550170354608808,
+            "pearson": 0.30057512786779506,
+            "spearman": 0.2854768697595316,
+            "rm2": 0.0849529306239573
+          }
+        },
+        "knn_kmer_target": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.3766548450361205,
+            "ci_std": 0.06945340032790658,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19990325488397243,
+            "spearman_std": 0.08181608838262637,
+            "spearman_median": -0.20085044639915622
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.3766548450361205,
+            "ci_std": 0.06945340032790658,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19990325488397243,
+            "spearman_std": 0.08181608838262637,
+            "spearman_median": -0.20085044639915622
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6522387927084793,
+            "mse": 0.7310541309283131,
+            "rmse": 0.8550170354608808,
+            "pearson": 0.30057512786779506,
+            "spearman": 0.2854768697595316,
+            "rm2": 0.0849529306239573
+          }
+        },
+        "knn_tanimoto_drug": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.617789135745131,
+            "ci_std": 0.11232880624155615,
+            "ci_median": 0.6137566137566137,
+            "spearman_mean": 0.21500109949346802,
+            "spearman_std": 0.1768797023161239,
+            "spearman_median": 0.2194679315587739
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.617789135745131,
+            "ci_std": 0.11232880624155615,
+            "ci_median": 0.6137566137566137,
+            "spearman_mean": 0.21500109949346802,
+            "spearman_std": 0.1768797023161239,
+            "spearman_median": 0.2194679315587739
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.6436084636850122,
+              0.06087785489187664
+            ],
+            "spearman_mean": [
+              0.2508559146158108,
+              0.09137202745468784
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              1,
+              0,
+              2,
+              5,
+              5
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6980874663046334,
+            "mse": 0.7564764950165203,
+            "rmse": 0.8697565722755536,
+            "pearson": 0.4199688626082334,
+            "spearman": 0.3732295963949774,
+            "rm2": 0.11539193621407937
+          }
+        },
+        "drug_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41162055731390335,
+            "ci_std": 0.07271971965231663,
+            "ci_median": 0.41833333333333333,
+            "spearman_mean": -0.14772958037315986,
+            "spearman_std": 0.0930396538299065,
+            "spearman_median": -0.15085822597201576
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41162055731390335,
+            "ci_std": 0.07271971965231663,
+            "ci_median": 0.41833333333333333,
+            "spearman_mean": -0.14772958037315986,
+            "spearman_std": 0.0930396538299065,
+            "spearman_median": -0.15085822597201576
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ]
+          },
+          "oof_global": {
+            "ci": 0.4364849136321187,
+            "mse": 0.8094432484382036,
+            "rmse": 0.8996906404082481,
+            "pearson": -0.13082887291197406,
+            "spearman": -0.12251446998191069,
+            "rm2": 0.0
+          }
+        },
+        "target_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.3766548450361205,
+            "ci_std": 0.06945340032790658,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19990325488397243,
+            "spearman_std": 0.08181608838262637,
+            "spearman_median": -0.20085044639915622
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.3766548450361205,
+            "ci_std": 0.06945340032790658,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19990325488397243,
+            "spearman_std": 0.08181608838262637,
+            "spearman_median": -0.20085044639915622
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6522387927084793,
+            "mse": 0.7310541309283131,
+            "rmse": 0.8550170354608808,
+            "pearson": 0.30057512786779506,
+            "spearman": 0.2854768697595316,
+            "rm2": 0.0849529306239573
+          }
+        },
+        "graphdta_gin": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5589377782703362,
+            "ci_std": 0.08985460834552289,
+            "ci_median": 0.5667718191377498,
+            "spearman_mean": 0.10895090300557529,
+            "spearman_std": 0.15085890306826658,
+            "spearman_median": 0.11513626117934499
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5589377782703362,
+            "ci_std": 0.08985460834552289,
+            "ci_median": 0.5667718191377498,
+            "spearman_mean": 0.10895090300557529,
+            "spearman_std": 0.15085890306826658,
+            "spearman_median": 0.11513626117934499
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5835761662434841,
+              0.08621366623509596
+            ],
+            "spearman_mean": [
+              0.1503045102880785,
+              0.1230122927280579
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6424366057238493,
+            "mse": 0.771603027002403,
+            "rmse": 0.8784093732437075,
+            "pearson": 0.35960039402011734,
+            "spearman": 0.26820977760124004,
+            "rm2": 0.09233453793738206
+          }
+        },
+        "graphdta_cnn3": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5676538773637807,
+            "ci_std": 0.10237249577786056,
+            "ci_median": 0.5714285714285714,
+            "spearman_mean": 0.1190504417637342,
+            "spearman_std": 0.15910060975596824,
+            "spearman_median": 0.12385359704948219
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5676538773637807,
+            "ci_std": 0.10237249577786056,
+            "ci_median": 0.5714285714285714,
+            "spearman_mean": 0.1190504417637342,
+            "spearman_std": 0.15910060975596824,
+            "spearman_median": 0.12385359704948219
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5606557281578037,
+              0.13006124994195095
+            ],
+            "spearman_mean": [
+              0.11552140712077533,
+              0.21751527665586814
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6519227249194771,
+            "mse": 0.7605377031328636,
+            "rmse": 0.8720881280770101,
+            "pearson": 0.34351450637888487,
+            "spearman": 0.28699107155367465,
+            "rm2": 0.09111768171135005
+          }
+        },
+        "ecfp_esm_mlp": {
+          "min_pairs_2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6025664519993907,
+            "ci_std": 0.10412284238922086,
+            "ci_median": 0.6103404791929382,
+            "spearman_mean": 0.1747974628108398,
+            "spearman_std": 0.1656550454156118,
+            "spearman_median": 0.1978808781467702
+          },
+          "min_pairs_5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6025664519993907,
+            "ci_std": 0.10412284238922086,
+            "ci_median": 0.6103404791929382,
+            "spearman_mean": 0.1747974628108398,
+            "spearman_std": 0.1656550454156118,
+            "spearman_median": 0.1978808781467702
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.6226724628952502,
+              0.10738913990813073
+            ],
+            "spearman_mean": [
+              0.2068024810926746,
+              0.16591933474023945
+            ],
+            "n_groups_evaluable_per_fold": [
+              339,
+              362,
+              374,
+              362,
+              345
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6548402204522915,
+            "mse": 0.8193481769997099,
+            "rmse": 0.9051785332185633,
+            "pearson": 0.2923329529127442,
+            "spearman": 0.2927666814253884,
+            "rm2": 0.05812737813607136
+          }
+        }
+      }
+    },
+    "kiba/cold_target_seqid40": {
+      "protocol": "v2_kfold",
+      "group_axis": "smiles",
+      "n_oof_pairs": 118254,
+      "models": {
+        "gin_esm_mlp": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.5068110805899538,
+            "ci_std": 0.14606893120334824,
+            "ci_median": 0.514090968672172,
+            "spearman_mean": 0.03193174408323552,
+            "spearman_std": 0.2843337266425774,
+            "spearman_median": 0.032992385352701964
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.5068110805899538,
+            "ci_std": 0.14606893120334824,
+            "ci_median": 0.514090968672172,
+            "spearman_mean": 0.03193174408323552,
+            "spearman_std": 0.2843337266425774,
+            "spearman_median": 0.032992385352701964
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5431831647006349,
+              0.04048938329821007
+            ],
+            "spearman_mean": [
+              0.10424933961349306,
+              0.09834467235613496
+            ],
+            "n_groups_evaluable_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6731821513789166,
+            "mse": 0.5072229452877569,
+            "rmse": 0.712195861605329,
+            "pearson": 0.5521642485307394,
+            "spearman": 0.4585343082788471,
+            "rm2": 0.25486139532515223
+          }
+        },
+        "ridge_esm": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.5207990928424546,
+            "ci_std": 0.15506003263889379,
+            "ci_median": 0.5385802469135802,
+            "spearman_mean": 0.06243670361676397,
+            "spearman_std": 0.2669148707719684,
+            "spearman_median": 0.1048951048951049
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.5207990928424546,
+            "ci_std": 0.15506003263889379,
+            "ci_median": 0.5385802469135802,
+            "spearman_mean": 0.06243670361676397,
+            "spearman_std": 0.2669148707719684,
+            "spearman_median": 0.1048951048951049
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5404565388318419,
+              0.0425272790185893
+            ],
+            "spearman_mean": [
+              0.09996388515088239,
+              0.1039455280145819
+            ],
+            "n_groups_evaluable_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6613483784425207,
+            "mse": 0.5418943856363007,
+            "rmse": 0.7361347605135222,
+            "pearson": 0.48810704336444943,
+            "spearman": 0.4365534471514003,
+            "rm2": 0.21283917390640275
+          }
+        },
+        "knn_esm_target": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 8,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4614358574187428,
+            "ci_std": 0.12671691122980464,
+            "ci_median": 0.49259512417407153,
+            "spearman_mean": -0.06384705192040521,
+            "spearman_std": 0.2536684042066046,
+            "spearman_median": -0.020227556702380807
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 8,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4614358574187428,
+            "ci_std": 0.12671691122980464,
+            "ci_median": 0.49259512417407153,
+            "spearman_mean": -0.06384705192040521,
+            "spearman_std": 0.2536684042066046,
+            "spearman_median": -0.020227556702380807
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5346918669039904,
+              0.02184619083269188
+            ],
+            "spearman_mean": [
+              0.08689630157829441,
+              0.046960253443339116
+            ],
+            "n_groups_evaluable_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ],
+            "n_groups_const_pred_per_fold": [
+              57,
+              23,
+              24,
+              64,
+              15
+            ]
+          },
+          "oof_global": {
+            "ci": 0.681648432062134,
+            "mse": 0.5099982079259562,
+            "rmse": 0.7141415881503864,
+            "pearson": 0.5611670002485853,
+            "spearman": 0.4772820814170348,
+            "rm2": 0.2496217301704452
+          }
+        },
+        "knn_kmer_target": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 7,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.48378228131989776,
+            "ci_std": 0.13657797812839545,
+            "ci_median": 0.5133928571428571,
+            "spearman_mean": -0.00836602432836843,
+            "spearman_std": 0.2783399673119094,
+            "spearman_median": 0.029706485798125903
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 7,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.48378228131989776,
+            "ci_std": 0.13657797812839545,
+            "ci_median": 0.5133928571428571,
+            "spearman_mean": -0.00836602432836843,
+            "spearman_std": 0.2783399673119094,
+            "spearman_median": 0.029706485798125903
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5650335795066952,
+              0.024422179702663166
+            ],
+            "spearman_mean": [
+              0.15386244886547448,
+              0.054910039208455975
+            ],
+            "n_groups_evaluable_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ],
+            "n_groups_const_pred_per_fold": [
+              61,
+              21,
+              32,
+              61,
+              9
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7004893728568418,
+            "mse": 0.49734673341934293,
+            "rmse": 0.7052281428157436,
+            "pearson": 0.5868610683407935,
+            "spearman": 0.52207432419524,
+            "rm2": 0.27190696907974204
+          }
+        },
+        "knn_tanimoto_drug": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 4,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.3958936442316006,
+            "ci_std": 0.11890490561804644,
+            "ci_median": 0.4383561643835616,
+            "spearman_mean": -0.2215683575334959,
+            "spearman_std": 0.20757992058163294,
+            "spearman_median": -0.16374109553167437
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 4,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.3958936442316006,
+            "ci_std": 0.11890490561804644,
+            "ci_median": 0.4383561643835616,
+            "spearman_mean": -0.2215683575334959,
+            "spearman_std": 0.20757992058163294,
+            "spearman_median": -0.16374109553167437
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ],
+            "n_groups_const_pred_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6954162936724007,
+            "mse": 0.45534056458312855,
+            "rmse": 0.6747892742057542,
+            "pearson": 0.5952789375683283,
+            "spearman": 0.5117050415857834,
+            "rm2": 0.33084202240434607
+          }
+        },
+        "drug_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 4,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.3958936442316006,
+            "ci_std": 0.11890490561804644,
+            "ci_median": 0.4383561643835616,
+            "spearman_mean": -0.2215683575334959,
+            "spearman_std": 0.20757992058163294,
+            "spearman_median": -0.16374109553167437
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 4,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.3958936442316006,
+            "ci_std": 0.11890490561804644,
+            "ci_median": 0.4383561643835616,
+            "spearman_mean": -0.2215683575334959,
+            "spearman_std": 0.20757992058163294,
+            "spearman_median": -0.16374109553167437
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ],
+            "n_groups_const_pred_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6954162936724007,
+            "mse": 0.45534056458312855,
+            "rmse": 0.6747892742057542,
+            "pearson": 0.5952789375683283,
+            "spearman": 0.5117050415857834,
+            "rm2": 0.33084202240434607
+          }
+        },
+        "target_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4404807244960061,
+            "ci_std": 0.13993471327389417,
+            "ci_median": 0.4492500364059997,
+            "spearman_mean": -0.1289683075140155,
+            "spearman_std": 0.2522141672561063,
+            "spearman_median": -0.13529225678335854
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4404807244960061,
+            "ci_std": 0.13993471327389417,
+            "ci_median": 0.4492500364059997,
+            "spearman_mean": -0.1289683075140155,
+            "spearman_std": 0.2522141672561063,
+            "spearman_median": -0.13529225678335854
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ],
+            "n_groups_const_pred_per_fold": [
+              1622,
+              1427,
+              1515,
+              1637,
+              1326
+            ]
+          },
+          "oof_global": {
+            "ci": 0.4642987261564035,
+            "mse": 0.7034262841072972,
+            "rmse": 0.8387051234535874,
+            "pearson": -0.04869233859690149,
+            "spearman": -0.10566801976722028,
+            "rm2": 0.0
+          }
+        }
+      }
+    },
+    "kiba/cold_target_seqid30": {
+      "protocol": "v2_kfold",
+      "group_axis": "smiles",
+      "n_oof_pairs": 118254,
+      "models": {
+        "gin_esm_mlp": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.49751300612066574,
+            "ci_std": 0.15347967820954397,
+            "ci_median": 0.513202042304887,
+            "spearman_mean": 0.008724731666939222,
+            "spearman_std": 0.2729575314459508,
+            "spearman_median": 0.03455370201723593
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.49751300612066574,
+            "ci_std": 0.15347967820954397,
+            "ci_median": 0.513202042304887,
+            "spearman_mean": 0.008724731666939222,
+            "spearman_std": 0.2729575314459508,
+            "spearman_median": 0.03455370201723593
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5322717808302873,
+              0.03173462282843743
+            ],
+            "spearman_mean": [
+              0.08212381066545445,
+              0.07475851514226939
+            ],
+            "n_groups_evaluable_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              0,
+              0,
+              1,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6649362527644774,
+            "mse": 0.5077593206081422,
+            "rmse": 0.7125723265803565,
+            "pearson": 0.538974170734025,
+            "spearman": 0.44032251571865794,
+            "rm2": 0.25488452746344464
+          }
+        },
+        "ridge_esm": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.5032065110444285,
+            "ci_std": 0.14130725221845117,
+            "ci_median": 0.4996357676197414,
+            "spearman_mean": -0.003704996742541217,
+            "spearman_std": 0.24484817078974816,
+            "spearman_median": -0.0010599853310286572
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.5032065110444285,
+            "ci_std": 0.14130725221845117,
+            "ci_median": 0.4996357676197414,
+            "spearman_mean": -0.003704996742541217,
+            "spearman_std": 0.24484817078974816,
+            "spearman_median": -0.0010599853310286572
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5004610026748412,
+              0.03713503803007735
+            ],
+            "spearman_mean": [
+              0.006419950525221866,
+              0.09527145334007034
+            ],
+            "n_groups_evaluable_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ],
+            "n_groups_const_pred_per_fold": [
+              0,
+              1,
+              0,
+              1,
+              0
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6307429085542461,
+            "mse": 0.6015354496159611,
+            "rmse": 0.7755871644218727,
+            "pearson": 0.42115831119529695,
+            "spearman": 0.3570331174265035,
+            "rm2": 0.1453963424175418
+          }
+        },
+        "knn_esm_target": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 56,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4513312249269359,
+            "ci_std": 0.11835785262161012,
+            "ci_median": 0.4769190187285677,
+            "spearman_mean": -0.09604941214514984,
+            "spearman_std": 0.23697475851089622,
+            "spearman_median": -0.05609749803954943
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 56,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4513312249269359,
+            "ci_std": 0.11835785262161012,
+            "ci_median": 0.4769190187285677,
+            "spearman_mean": -0.09604941214514984,
+            "spearman_std": 0.23697475851089622,
+            "spearman_median": -0.05609749803954943
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5137446328541289,
+              0.027938398395884727
+            ],
+            "spearman_mean": [
+              0.039043286572302785,
+              0.0689246682051422
+            ],
+            "n_groups_evaluable_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ],
+            "n_groups_const_pred_per_fold": [
+              119,
+              87,
+              11,
+              7,
+              40
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6676247406640945,
+            "mse": 0.5546948421919013,
+            "rmse": 0.7447783846164585,
+            "pearson": 0.5165573591580178,
+            "spearman": 0.4423738967976007,
+            "rm2": 0.20217424487096336
+          }
+        },
+        "knn_kmer_target": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 18,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4688851451412263,
+            "ci_std": 0.12758276841103455,
+            "ci_median": 0.5002140716426431,
+            "spearman_mean": -0.044275575446330005,
+            "spearman_std": 0.262215844227787,
+            "spearman_median": 0.0
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 18,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4688851451412263,
+            "ci_std": 0.12758276841103455,
+            "ci_median": 0.5002140716426431,
+            "spearman_mean": -0.044275575446330005,
+            "spearman_std": 0.262215844227787,
+            "spearman_median": 0.0
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5260226296602954,
+              0.02953324526550077
+            ],
+            "spearman_mean": [
+              0.0666861469505767,
+              0.07061273148814709
+            ],
+            "n_groups_evaluable_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ],
+            "n_groups_const_pred_per_fold": [
+              122,
+              79,
+              8,
+              8,
+              43
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6885172629581838,
+            "mse": 0.5379767233828905,
+            "rmse": 0.733468965521303,
+            "pearson": 0.5528116194174328,
+            "spearman": 0.4937069120744274,
+            "rm2": 0.23039718479196689
+          }
+        },
+        "knn_tanimoto_drug": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 11,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4067565062851359,
+            "ci_std": 0.0946711207487134,
+            "ci_median": 0.4255164034021871,
+            "spearman_mean": -0.22004467186112242,
+            "spearman_std": 0.18603015415359697,
+            "spearman_median": -0.1946934130498563
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 11,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4067565062851359,
+            "ci_std": 0.0946711207487134,
+            "ci_median": 0.4255164034021871,
+            "spearman_mean": -0.22004467186112242,
+            "spearman_std": 0.18603015415359697,
+            "spearman_median": -0.1946934130498563
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ],
+            "n_groups_const_pred_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6845326558771843,
+            "mse": 0.4891569144266923,
+            "rmse": 0.6993975367605267,
+            "pearson": 0.5599056772164389,
+            "spearman": 0.4847291276387849,
+            "rm2": 0.2794271318317403
+          }
+        },
+        "drug_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 11,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4067565062851359,
+            "ci_std": 0.0946711207487134,
+            "ci_median": 0.4255164034021871,
+            "spearman_mean": -0.22004467186112242,
+            "spearman_std": 0.18603015415359697,
+            "spearman_median": -0.1946934130498563
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 11,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4067565062851359,
+            "ci_std": 0.0946711207487134,
+            "ci_median": 0.4255164034021871,
+            "spearman_mean": -0.22004467186112242,
+            "spearman_std": 0.18603015415359697,
+            "spearman_median": -0.1946934130498563
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ],
+            "n_groups_const_pred_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6845326558771843,
+            "mse": 0.4891569144266923,
+            "rmse": 0.6993975367605267,
+            "pearson": 0.5599056772164389,
+            "spearman": 0.4847291276387849,
+            "rm2": 0.2794271318317403
+          }
+        },
+        "target_mean_predictor": {
+          "min_pairs_2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 7,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.458850033492868,
+            "ci_std": 0.14165355197560342,
+            "ci_median": 0.45768025078369906,
+            "spearman_mean": -0.11731628475522721,
+            "spearman_std": 0.2641456400508451,
+            "spearman_median": -0.12109283691671409
+          },
+          "min_pairs_5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 7,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.458850033492868,
+            "ci_std": 0.14165355197560342,
+            "ci_median": 0.45768025078369906,
+            "spearman_mean": -0.11731628475522721,
+            "spearman_std": 0.2641456400508451,
+            "spearman_median": -0.12109283691671409
+          },
+          "per_fold_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ],
+            "n_groups_const_pred_per_fold": [
+              1462,
+              1581,
+              1471,
+              1291,
+              1445
+            ]
+          },
+          "oof_global": {
+            "ci": 0.4523002935906489,
+            "mse": 0.7139811255724549,
+            "rmse": 0.8449740384014498,
+            "pearson": -0.10593338275415055,
+            "spearman": -0.14156159286437978,
+            "rm2": 0.0
+          }
+        }
+      }
+    }
+  },
+  "intragroup_v1_seeds": {
+    "kiba/cold_target": {
+      "protocol": "v1_seeds",
+      "group_axis": "smiles",
+      "note_graphdta_gin": "não disponível (runs v1_seeds de graphdta_gin não salvaram oof_predictions)",
+      "models": {
+        "gin_esm_mlp": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.6224252406451318,
+              0.021833989977909026
+            ],
+            "spearman_mean": [
+              0.28075370254289245,
+              0.04441293803815371
+            ],
+            "n_groups_evaluable_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ],
+            "n_groups_const_pred_per_seed": [
+              5,
+              6,
+              2,
+              3,
+              12
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.6101951677510391,
+              0.03092267509464355
+            ],
+            "spearman_mean": [
+              0.2718412923742661,
+              0.06942348197038958
+            ],
+            "n_groups_evaluable_per_seed": [
+              719,
+              958,
+              872,
+              1019,
+              895
+            ]
+          }
+        },
+        "ridge_esm": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.5664518307038154,
+              0.038119217378545824
+            ],
+            "spearman_mean": [
+              0.15876294576186567,
+              0.0772162774065265
+            ],
+            "n_groups_evaluable_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ],
+            "n_groups_const_pred_per_seed": [
+              7,
+              7,
+              4,
+              4,
+              13
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.5741496727736957,
+              0.042184530944890594
+            ],
+            "spearman_mean": [
+              0.18547325276915702,
+              0.09198034371825663
+            ],
+            "n_groups_evaluable_per_seed": [
+              719,
+              958,
+              872,
+              1019,
+              895
+            ]
+          }
+        },
+        "knn_esm_target": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.6060326821006758,
+              0.023682969796572573
+            ],
+            "spearman_mean": [
+              0.2463465250169986,
+              0.05092434127984415
+            ],
+            "n_groups_evaluable_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ],
+            "n_groups_const_pred_per_seed": [
+              10,
+              12,
+              23,
+              8,
+              16
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.6001772557441666,
+              0.026236602148408783
+            ],
+            "spearman_mean": [
+              0.2507298615740287,
+              0.059641487390388825
+            ],
+            "n_groups_evaluable_per_seed": [
+              719,
+              958,
+              872,
+              1019,
+              895
+            ]
+          }
+        },
+        "knn_kmer_target": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.6206148318627691,
+              0.03108109124626541
+            ],
+            "spearman_mean": [
+              0.28509751122766125,
+              0.06626792579613452
+            ],
+            "n_groups_evaluable_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ],
+            "n_groups_const_pred_per_seed": [
+              9,
+              12,
+              18,
+              9,
+              15
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.6166007562279434,
+              0.014181623220779004
+            ],
+            "spearman_mean": [
+              0.2948761410469537,
+              0.03745232762874713
+            ],
+            "n_groups_evaluable_per_seed": [
+              719,
+              958,
+              872,
+              1019,
+              895
+            ]
+          }
+        },
+        "knn_tanimoto_drug": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ],
+            "n_groups_const_pred_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              719,
+              958,
+              872,
+              1019,
+              895
+            ]
+          }
+        },
+        "drug_mean_predictor": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ],
+            "n_groups_const_pred_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              719,
+              958,
+              872,
+              1019,
+              895
+            ]
+          }
+        },
+        "target_mean_predictor": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ],
+            "n_groups_const_pred_per_seed": [
+              1156,
+              1188,
+              1478,
+              1560,
+              1189
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              719,
+              958,
+              872,
+              1019,
+              895
+            ]
+          }
+        }
+      }
+    },
+    "kiba/cold_drug": {
+      "protocol": "v1_seeds",
+      "group_axis": "sequence",
+      "note_graphdta_gin": "não disponível (runs v1_seeds de graphdta_gin não salvaram oof_predictions)",
+      "models": {
+        "gin_esm_mlp": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.7005227173487456,
+              0.012095260422011839
+            ],
+            "spearman_mean": [
+              0.4236387875345241,
+              0.02163672063650331
+            ],
+            "n_groups_evaluable_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ],
+            "n_groups_const_pred_per_seed": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.7015608071361531,
+              0.014581727615645858
+            ],
+            "spearman_mean": [
+              0.4272224596932685,
+              0.025842419600630627
+            ],
+            "n_groups_evaluable_per_seed": [
+              202,
+              197,
+              195,
+              197,
+              187
+            ]
+          }
+        },
+        "ridge_esm": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.4998027626208145,
+              0.0004480075038678491
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ],
+            "n_groups_const_pred_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.49977960836455515,
+              0.0004957782208560391
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              202,
+              197,
+              195,
+              197,
+              187
+            ]
+          }
+        },
+        "knn_esm_target": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ],
+            "n_groups_const_pred_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              202,
+              197,
+              195,
+              197,
+              187
+            ]
+          }
+        },
+        "knn_kmer_target": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ],
+            "n_groups_const_pred_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              202,
+              197,
+              195,
+              197,
+              187
+            ]
+          }
+        },
+        "knn_tanimoto_drug": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.7271344488092342,
+              0.013832725730178855
+            ],
+            "spearman_mean": [
+              0.47375371716662024,
+              0.021470373571655623
+            ],
+            "n_groups_evaluable_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ],
+            "n_groups_const_pred_per_seed": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.7353657682616047,
+              0.014993757429931556
+            ],
+            "spearman_mean": [
+              0.4897476941980516,
+              0.02655924790546214
+            ],
+            "n_groups_evaluable_per_seed": [
+              202,
+              197,
+              195,
+              197,
+              187
+            ]
+          }
+        },
+        "drug_mean_predictor": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ],
+            "n_groups_const_pred_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              202,
+              197,
+              195,
+              197,
+              187
+            ]
+          }
+        },
+        "target_mean_predictor": {
+          "min_pairs_2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ],
+            "n_groups_const_pred_per_seed": [
+              217,
+              208,
+              212,
+              216,
+              208
+            ]
+          },
+          "min_pairs_5": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ],
+            "n_groups_evaluable_per_seed": [
+              202,
+              197,
+              195,
+              197,
+              187
+            ]
+          }
+        }
+      }
+    }
+  },
+  "residual_stacking": {
+    "davis/cold_target": {
+      "protocol": "v2_kfold",
+      "residual_target": "y_true - smiles_mean_train",
+      "intragroup_axis": "smiles",
+      "variants": {
+        "bias_only": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7487645203512707,
+              0.01501267412947022
+            ],
+            "mse": [
+              0.6253390901057412,
+              0.12628487007833486
+            ],
+            "rm2": [
+              0.20805502551646127,
+              0.04141368915540777
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7444065067383849,
+            "mse": 0.6318842531520329,
+            "rmse": 0.7949114750411098,
+            "pearson": 0.45923325416193234,
+            "spearman": 0.45472085077666874,
+            "rm2": 0.2076306010799128
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41098907877213287,
+            "ci_std": 0.06199153723947154,
+            "ci_median": 0.4222375952727134,
+            "spearman_mean": -0.12938961341993052,
+            "spearman_std": 0.058844610320261295,
+            "spearman_median": -0.1331273389036055
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41098907877213287,
+            "ci_std": 0.06199153723947154,
+            "ci_median": 0.4222375952727134,
+            "spearman_mean": -0.12938961341993052,
+            "spearman_std": 0.058844610320261295,
+            "spearman_median": -0.1331273389036055
+          },
+          "chosen_alphas": []
+        },
+        "res_esm": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7664849288965315,
+              0.013145700652747882
+            ],
+            "mse": [
+              0.5792614030445066,
+              0.1121245721990089
+            ],
+            "rm2": [
+              0.25240356760475824,
+              0.049854018236914675
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7663352134352562,
+            "mse": 0.5851617670322156,
+            "rmse": 0.7649586701464436,
+            "pearson": 0.5200943097160858,
+            "spearman": 0.4930408941986757,
+            "rm2": 0.26257763550721536
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6205692558676879,
+            "ci_std": 0.1246239262448244,
+            "ci_median": 0.6413269321025825,
+            "spearman_mean": 0.21131920318884903,
+            "spearman_std": 0.19426913282604105,
+            "spearman_median": 0.275154403259026
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.6317534855604082,
+              0.017329942565718615
+            ],
+            "spearman_mean": [
+              0.22495037368420323,
+              0.03786901825078249
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6205692558676879,
+            "ci_std": 0.1246239262448244,
+            "ci_median": 0.6413269321025825,
+            "spearman_mean": 0.21131920318884903,
+            "spearman_std": 0.19426913282604105,
+            "spearman_median": 0.275154403259026
+          },
+          "chosen_alphas": [
+            10000.0,
+            10000.0,
+            10000.0,
+            1000.0,
+            50000.0
+          ]
+        },
+        "res_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7487645203512707,
+              0.01501267412947022
+            ],
+            "mse": [
+              0.6253390901210462,
+              0.12628487084555876
+            ],
+            "rm2": [
+              0.2080550255481773,
+              0.04141368876706536
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7444065067383849,
+            "mse": 0.6318842531880292,
+            "rmse": 0.7949114750637515,
+            "pearson": 0.45923325408940363,
+            "spearman": 0.45472085077666874,
+            "rm2": 0.20763060115875848
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41098907877213287,
+            "ci_std": 0.06199153723947154,
+            "ci_median": 0.4222375952727134,
+            "spearman_mean": -0.12938961341993052,
+            "spearman_std": 0.058844610320261295,
+            "spearman_median": -0.1331273389036055
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.41098907877213287,
+            "ci_std": 0.06199153723947154,
+            "ci_median": 0.4222375952727134,
+            "spearman_mean": -0.12938961341993052,
+            "spearman_std": 0.058844610320261295,
+            "spearman_median": -0.1331273389036055
+          },
+          "chosen_alphas": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "res_esm_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.766484940885841,
+              0.01314571169466304
+            ],
+            "mse": [
+              0.5792614045632929,
+              0.11212457236925338
+            ],
+            "rm2": [
+              0.25240356367773537,
+              0.049854011792072384
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7663352263437098,
+            "mse": 0.5851617685009219,
+            "rmse": 0.7649586711064343,
+            "pearson": 0.5200943091894027,
+            "spearman": 0.49304092171626446,
+            "rm2": 0.2625776315813067
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6205694677985475,
+            "ci_std": 0.12462400159021009,
+            "ci_median": 0.6413269321025825,
+            "spearman_mean": 0.21131954985299656,
+            "spearman_std": 0.19426942309704373,
+            "spearman_median": 0.275154403259026
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.6317534855604082,
+              0.017329942565718615
+            ],
+            "spearman_mean": [
+              0.22495037368420323,
+              0.03786901825078249
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6205694677985475,
+            "ci_std": 0.12462400159021009,
+            "ci_median": 0.6413269321025825,
+            "spearman_mean": 0.21131954985299656,
+            "spearman_std": 0.19426942309704373,
+            "spearman_median": 0.275154403259026
+          },
+          "chosen_alphas": [
+            10000.0,
+            10000.0,
+            10000.0,
+            1000.0,
+            50000.0
+          ]
+        },
+        "res_esm_ecfp_inter": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7772431294624231,
+              0.012541457441951577
+            ],
+            "mse": [
+              0.5537949036311448,
+              0.10825019364456596
+            ],
+            "rm2": [
+              0.2832512378743688,
+              0.050272311085990555
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7770927098905949,
+            "mse": 0.5595180789345373,
+            "rmse": 0.7480094109932958,
+            "pearson": 0.5499958769751996,
+            "spearman": 0.5124634384932805,
+            "rm2": 0.29658065862959354
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6366794047620503,
+            "ci_std": 0.11476491201957459,
+            "ci_median": 0.6406160624406138,
+            "spearman_mean": 0.23652700712932148,
+            "spearman_std": 0.1745568193777322,
+            "spearman_median": 0.28092245467210536
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.6509733905816364,
+              0.013893306560959799
+            ],
+            "spearman_mean": [
+              0.2485664029492187,
+              0.03302720910697619
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.6366794047620503,
+            "ci_std": 0.11476491201957459,
+            "ci_median": 0.6406160624406138,
+            "spearman_mean": 0.23652700712932148,
+            "spearman_std": 0.1745568193777322,
+            "spearman_median": 0.28092245467210536
+          },
+          "chosen_alphas": [
+            50000.0,
+            10000.0,
+            10000.0,
+            10000.0,
+            10000.0
+          ]
+        }
+      }
+    },
+    "davis/cold_target_seqid40": {
+      "protocol": "v2_kfold",
+      "residual_target": "y_true - smiles_mean_train",
+      "intragroup_axis": "smiles",
+      "variants": {
+        "bias_only": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7443225719089497,
+              0.020438560175566334
+            ],
+            "mse": [
+              0.6303153534932968,
+              0.1000482383044227
+            ],
+            "rm2": [
+              0.20859061626286018,
+              0.05333364099203589
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7429579028650916,
+            "mse": 0.6306093757748047,
+            "rmse": 0.7941091711942412,
+            "pearson": 0.4610509735297156,
+            "spearman": 0.4520232602593522,
+            "rm2": 0.2086283479898723
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4396520372568074,
+            "ci_std": 0.06688198846560235,
+            "ci_median": 0.4574740637678333,
+            "spearman_mean": -0.07746027518833823,
+            "spearman_std": 0.05753153223024133,
+            "spearman_median": -0.07396901288082396
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4396520372568074,
+            "ci_std": 0.06688198846560235,
+            "ci_median": 0.4574740637678333,
+            "spearman_mean": -0.07746027518833823,
+            "spearman_std": 0.05753153223024133,
+            "spearman_median": -0.07396901288082396
+          },
+          "chosen_alphas": []
+        },
+        "res_esm": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.753422030948893,
+              0.015950669172389517
+            ],
+            "mse": [
+              0.6062957110229531,
+              0.0810930341553359
+            ],
+            "rm2": [
+              0.23739152881840836,
+              0.04867769859836585
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7512058216781472,
+            "mse": 0.6065783990373642,
+            "rmse": 0.7788314317215017,
+            "pearson": 0.49481772742795727,
+            "spearman": 0.46742062692854475,
+            "rm2": 0.23335568766821627
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5777709884522125,
+            "ci_std": 0.12984239242430495,
+            "ci_median": 0.5872549571789117,
+            "spearman_mean": 0.1382267647154904,
+            "spearman_std": 0.17751857468624638,
+            "spearman_median": 0.16677813058138005
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5958800510073136,
+              0.02802278792492252
+            ],
+            "spearman_mean": [
+              0.1582874482201398,
+              0.06556165669119653
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5777709884522125,
+            "ci_std": 0.12984239242430495,
+            "ci_median": 0.5872549571789117,
+            "spearman_mean": 0.1382267647154904,
+            "spearman_std": 0.17751857468624638,
+            "spearman_median": 0.16677813058138005
+          },
+          "chosen_alphas": [
+            50000.0,
+            10000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7443225719089497,
+              0.020438560175566334
+            ],
+            "mse": [
+              0.6303153533073131,
+              0.10004823828230595
+            ],
+            "rm2": [
+              0.20859061651170166,
+              0.05333364077233501
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7429571412663296,
+            "mse": 0.6306093755885717,
+            "rmse": 0.7941091710769821,
+            "pearson": 0.4610509737581202,
+            "spearman": 0.452021331281922,
+            "rm2": 0.20862834832261543
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4381630457557701,
+            "ci_std": 0.07313908711064201,
+            "ci_median": 0.4574740637678333,
+            "spearman_mean": -0.07787993932205675,
+            "spearman_std": 0.05784883951833883,
+            "spearman_median": -0.07396901288082396
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4381630457557701,
+            "ci_std": 0.07313908711064201,
+            "ci_median": 0.4574740637678333,
+            "spearman_mean": -0.07787993932205675,
+            "spearman_std": 0.05784883951833883,
+            "spearman_median": -0.07396901288082396
+          },
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "res_esm_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.753422030948893,
+              0.015950669172389517
+            ],
+            "mse": [
+              0.6062957101704485,
+              0.0810930330173885
+            ],
+            "rm2": [
+              0.23739152978385708,
+              0.048677696932858026
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7512058173753293,
+            "mse": 0.6065783981805531,
+            "rmse": 0.7788314311714398,
+            "pearson": 0.4948177281327252,
+            "spearman": 0.46742061973014964,
+            "rm2": 0.2333556889579385
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5777709884522125,
+            "ci_std": 0.12984239242430495,
+            "ci_median": 0.5872549571789117,
+            "spearman_mean": 0.1382267647154904,
+            "spearman_std": 0.17751857468624638,
+            "spearman_median": 0.16677813058138005
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5958800510073136,
+              0.02802278792492252
+            ],
+            "spearman_mean": [
+              0.1582874482201398,
+              0.06556165669119653
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5777709884522125,
+            "ci_std": 0.12984239242430495,
+            "ci_median": 0.5872549571789117,
+            "spearman_mean": 0.1382267647154904,
+            "spearman_std": 0.17751857468624638,
+            "spearman_median": 0.16677813058138005
+          },
+          "chosen_alphas": [
+            50000.0,
+            10000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_esm_ecfp_inter": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7579546946548666,
+              0.016386796181803928
+            ],
+            "mse": [
+              0.5981965602081427,
+              0.07798984502714602
+            ],
+            "rm2": [
+              0.2449120196977194,
+              0.0509536640236192
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7555903156306227,
+            "mse": 0.5984744642016876,
+            "rmse": 0.7736113133878586,
+            "pearson": 0.5057381272566556,
+            "spearman": 0.47506655011800036,
+            "rm2": 0.241664108180979
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.584138347008693,
+            "ci_std": 0.12613871975998298,
+            "ci_median": 0.5823862060304557,
+            "spearman_mean": 0.15285354788734215,
+            "spearman_std": 0.17566581955734736,
+            "spearman_median": 0.16737366289587147
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.6027565391252533,
+              0.03222466402549283
+            ],
+            "spearman_mean": [
+              0.17720961602104235,
+              0.058795318097155665
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.584138347008693,
+            "ci_std": 0.12613871975998298,
+            "ci_median": 0.5823862060304557,
+            "spearman_mean": 0.15285354788734215,
+            "spearman_std": 0.17566581955734736,
+            "spearman_median": 0.16737366289587147
+          },
+          "chosen_alphas": [
+            50000.0,
+            10000.0,
+            50000.0,
+            10000.0,
+            50000.0
+          ]
+        }
+      }
+    },
+    "davis/cold_target_seqid30": {
+      "protocol": "v2_kfold",
+      "residual_target": "y_true - smiles_mean_train",
+      "intragroup_axis": "smiles",
+      "variants": {
+        "bias_only": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7359909278984693,
+              0.02913742931922364
+            ],
+            "mse": [
+              0.6564683410346098,
+              0.2047790573113838
+            ],
+            "rm2": [
+              0.1901293351151771,
+              0.07725854120091788
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7288501872414221,
+            "mse": 0.6505159622440344,
+            "rmse": 0.8065456975547228,
+            "pearson": 0.435744215001977,
+            "spearman": 0.4259010277196387,
+            "rm2": 0.18038006500310794
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4202904257892363,
+            "ci_std": 0.057960150344054384,
+            "ci_median": 0.43060755595446853,
+            "spearman_mean": -0.11664434585633592,
+            "spearman_std": 0.07459191493278484,
+            "spearman_median": -0.11132534770627645
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4202904257892363,
+            "ci_std": 0.057960150344054384,
+            "ci_median": 0.43060755595446853,
+            "spearman_mean": -0.11664434585633592,
+            "spearman_std": 0.07459191493278484,
+            "spearman_median": -0.11132534770627645
+          },
+          "chosen_alphas": []
+        },
+        "res_esm": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7417698317763317,
+              0.030758873535559405
+            ],
+            "mse": [
+              0.6426868414720175,
+              0.16010896923562268
+            ],
+            "rm2": [
+              0.19450672687361087,
+              0.09753768123857487
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7451139609916859,
+            "mse": 0.6383723161951801,
+            "rmse": 0.7989820499830895,
+            "pearson": 0.4616019588609863,
+            "spearman": 0.4563148625057632,
+            "rm2": 0.19395188445820175
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.576958317300279,
+            "ci_std": 0.10765095043038288,
+            "ci_median": 0.5848520966510504,
+            "spearman_mean": 0.13322787293904947,
+            "spearman_std": 0.1611616920800198,
+            "spearman_median": 0.16195161636750166
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5834982930051743,
+              0.036982445297102866
+            ],
+            "spearman_mean": [
+              0.1573967637132113,
+              0.08412343222116744
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.576958317300279,
+            "ci_std": 0.10765095043038288,
+            "ci_median": 0.5848520966510504,
+            "spearman_mean": 0.13322787293904947,
+            "spearman_std": 0.1611616920800198,
+            "spearman_median": 0.16195161636750166
+          },
+          "chosen_alphas": [
+            100.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7359909278984693,
+              0.02913742931922364
+            ],
+            "mse": [
+              0.6564683407675352,
+              0.20477905717697045
+            ],
+            "rm2": [
+              0.19012933505571866,
+              0.07725854169848799
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7288507423049266,
+            "mse": 0.6505159620023326,
+            "rmse": 0.8065456974048852,
+            "pearson": 0.4357442151619395,
+            "spearman": 0.4259018687101509,
+            "rm2": 0.18038006544257543
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4202956686328767,
+            "ci_std": 0.06018680080646068,
+            "ci_median": 0.43060755595446853,
+            "spearman_mean": -0.11641222487963827,
+            "spearman_std": 0.07482892818725342,
+            "spearman_median": -0.11132534770627645
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.4202956686328767,
+            "ci_std": 0.06018680080646068,
+            "ci_median": 0.43060755595446853,
+            "spearman_mean": -0.11641222487963827,
+            "spearman_std": 0.07482892818725342,
+            "spearman_median": -0.11132534770627645
+          },
+          "chosen_alphas": [
+            1.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            100.0
+          ]
+        },
+        "res_esm_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.741769830619762,
+              0.030758942625464695
+            ],
+            "mse": [
+              0.6426868389747218,
+              0.1601089711426589
+            ],
+            "rm2": [
+              0.19450672795939025,
+              0.09753768139308518
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7451139739001396,
+            "mse": 0.6383723135302806,
+            "rmse": 0.7989820483154052,
+            "pearson": 0.46160195983117636,
+            "spearman": 0.4563148829658889,
+            "rm2": 0.19395188692932447
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5769585119255087,
+            "ci_std": 0.10765085596542297,
+            "ci_median": 0.5848520966510504,
+            "spearman_mean": 0.13322822521332453,
+            "spearman_std": 0.161161535046323,
+            "spearman_median": 0.16195161636750166
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5834982930051743,
+              0.036982445297102866
+            ],
+            "spearman_mean": [
+              0.1573967637132113,
+              0.08412343222116744
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5769585119255087,
+            "ci_std": 0.10765085596542297,
+            "ci_median": 0.5848520966510504,
+            "spearman_mean": 0.13322822521332453,
+            "spearman_std": 0.161161535046323,
+            "spearman_median": 0.16195161636750166
+          },
+          "chosen_alphas": [
+            100.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_esm_ecfp_inter": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7471521929697253,
+              0.029937661841805182
+            ],
+            "mse": [
+              0.640072998542986,
+              0.15327292456534503
+            ],
+            "rm2": [
+              0.20158566556941232,
+              0.10340504942299453
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7491436790056567,
+            "mse": 0.6363180216848987,
+            "rmse": 0.797695444192142,
+            "pearson": 0.468156203808769,
+            "spearman": 0.4639069771974245,
+            "rm2": 0.19511925796717944
+          },
+          "intragroup_min2": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5813176593850354,
+            "ci_std": 0.1077643263770066,
+            "ci_median": 0.5899053778435642,
+            "spearman_mean": 0.1379866283534845,
+            "spearman_std": 0.1642606780889211,
+            "spearman_median": 0.15971392250082334
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5876092148199072,
+              0.03846664984115344
+            ],
+            "spearman_mean": [
+              0.15762216898333478,
+              0.08406386099654906
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 68,
+            "n_groups_evaluable": 68,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5813176593850354,
+            "ci_std": 0.1077643263770066,
+            "ci_median": 0.5899053778435642,
+            "spearman_mean": 0.1379866283534845,
+            "spearman_std": 0.1642606780889211,
+            "spearman_median": 0.15971392250082334
+          },
+          "chosen_alphas": [
+            100.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        }
+      }
+    },
+    "davis/cold_drug": {
+      "protocol": "v2_kfold",
+      "residual_target": "y_true - sequence_mean_train",
+      "intragroup_axis": "sequence",
+      "variants": {
+        "bias_only": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6690234468768868,
+              0.03260603969802279
+            ],
+            "mse": [
+              0.7309567091038021,
+              0.2188952948302047
+            ],
+            "rm2": [
+              0.10040960706065272,
+              0.032440212861516764
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6522387927084793,
+            "mse": 0.7310541309283131,
+            "rmse": 0.8550170354608808,
+            "pearson": 0.30057512786779506,
+            "spearman": 0.2854768697595316,
+            "rm2": 0.0849529306239573
+          },
+          "intragroup_min2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.3766548450361205,
+            "ci_std": 0.06945340032790658,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19990325488397243,
+            "spearman_std": 0.08181608838262637,
+            "spearman_median": -0.20085044639915622
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.3766548450361205,
+            "ci_std": 0.06945340032790658,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19990325488397243,
+            "spearman_std": 0.08181608838262637,
+            "spearman_median": -0.20085044639915622
+          },
+          "chosen_alphas": []
+        },
+        "res_esm": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6690233450620456,
+              0.032606210082743885
+            ],
+            "mse": [
+              0.7309566788748288,
+              0.21889532006915216
+            ],
+            "rm2": [
+              0.10040960822094266,
+              0.032440215099465756
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6522389519127403,
+            "mse": 0.7310541001017101,
+            "rmse": 0.8550170174339866,
+            "pearson": 0.3005751761383437,
+            "spearman": 0.28547710391783127,
+            "rm2": 0.08495296426855914
+          },
+          "intragroup_min2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.37651031164301746,
+            "ci_std": 0.06957390170397731,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19814705314163958,
+            "spearman_std": 0.07992533140118899,
+            "spearman_median": -0.2002074240052672
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.37651031164301746,
+            "ci_std": 0.06957390170397731,
+            "ci_median": 0.38996655518394646,
+            "spearman_mean": -0.19814705314163958,
+            "spearman_std": 0.07992533140118899,
+            "spearman_median": -0.2002074240052672
+          },
+          "chosen_alphas": [
+            1.0,
+            50000.0,
+            50000.0,
+            10.0,
+            50000.0
+          ]
+        },
+        "res_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6717080723104469,
+              0.043377249245877075
+            ],
+            "mse": [
+              0.7507223357925107,
+              0.18351688948430986
+            ],
+            "rm2": [
+              0.08752526903210818,
+              0.017728175983281226
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6600974807689859,
+            "mse": 0.7502986791234927,
+            "rmse": 0.866197829091884,
+            "pearson": 0.2908624048718883,
+            "spearman": 0.3015032069684757,
+            "rm2": 0.07213134331508678
+          },
+          "intragroup_min2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5255926570548375,
+            "ci_std": 0.10175653644584258,
+            "ci_median": 0.5351170568561873,
+            "spearman_mean": 0.04292306952475681,
+            "spearman_std": 0.15738361232464074,
+            "spearman_median": 0.0622098556891291
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5620096128362204,
+              0.1142738288230835
+            ],
+            "spearman_mean": [
+              0.09160232147385934,
+              0.18847537030680714
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5255926570548375,
+            "ci_std": 0.10175653644584258,
+            "ci_median": 0.5351170568561873,
+            "spearman_mean": 0.04292306952475681,
+            "spearman_std": 0.15738361232464074,
+            "spearman_median": 0.0622098556891291
+          },
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            1.0,
+            50000.0,
+            1.0
+          ]
+        },
+        "res_esm_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6717144901714176,
+              0.04337265105662328
+            ],
+            "mse": [
+              0.7507165474024582,
+              0.18351207709929507
+            ],
+            "rm2": [
+              0.08753195925918943,
+              0.01772892419013213
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6601027151469171,
+            "mse": 0.750293009815789,
+            "rmse": 0.8661945565609316,
+            "pearson": 0.29086891064016696,
+            "spearman": 0.30151353675832526,
+            "rm2": 0.07213549153339566
+          },
+          "intragroup_min2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5256011414210873,
+            "ci_std": 0.10175374487577611,
+            "ci_median": 0.5351170568561873,
+            "spearman_mean": 0.04293120605311018,
+            "spearman_std": 0.1573845180304289,
+            "spearman_median": 0.0622098556891291
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5620096128362204,
+              0.1142738288230835
+            ],
+            "spearman_mean": [
+              0.09160232147385934,
+              0.18847537030680714
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5256011414210873,
+            "ci_std": 0.10175374487577611,
+            "ci_median": 0.5351170568561873,
+            "spearman_mean": 0.04293120605311018,
+            "spearman_std": 0.1573845180304289,
+            "spearman_median": 0.0622098556891291
+          },
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            1.0,
+            50000.0,
+            1.0
+          ]
+        },
+        "res_esm_ecfp_inter": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6876543095221301,
+              0.04679081501970705
+            ],
+            "mse": [
+              0.7305385848807731,
+              0.18244891863655113
+            ],
+            "rm2": [
+              0.11012849400889572,
+              0.02691298971007069
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6772598098223349,
+            "mse": 0.7306710362346297,
+            "rmse": 0.854792978582902,
+            "pearson": 0.32276124485621616,
+            "spearman": 0.3333386415371517,
+            "rm2": 0.09084111650217148
+          },
+          "intragroup_min2": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5586967974256309,
+            "ci_std": 0.10632265874377676,
+            "ci_median": 0.5658951346244686,
+            "spearman_mean": 0.09824738498105161,
+            "spearman_std": 0.1700816257135256,
+            "spearman_median": 0.11379028725077146
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5926389195297165,
+              0.08126445551359722
+            ],
+            "spearman_mean": [
+              0.14546488087998116,
+              0.12195259889141502
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 379,
+            "n_groups_evaluable": 379,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 30056,
+            "ci_mean": 0.5586967974256309,
+            "ci_std": 0.10632265874377676,
+            "ci_median": 0.5658951346244686,
+            "spearman_mean": 0.09824738498105161,
+            "spearman_std": 0.1700816257135256,
+            "spearman_median": 0.11379028725077146
+          },
+          "chosen_alphas": [
+            10000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        }
+      }
+    },
+    "kiba/cold_target_seqid40": {
+      "protocol": "v2_kfold",
+      "residual_target": "y_true - smiles_mean_train",
+      "intragroup_axis": "smiles",
+      "variants": {
+        "bias_only": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6985808269504945,
+              0.023879029382969624
+            ],
+            "mse": [
+              0.4553404707225254,
+              0.10127473044278716
+            ],
+            "rm2": [
+              0.33919360527490633,
+              0.10128522445118647
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6954162936724007,
+            "mse": 0.45534056458312866,
+            "rmse": 0.6747892742057543,
+            "pearson": 0.5952789375683283,
+            "spearman": 0.5117050415844876,
+            "rm2": 0.33084202240434607
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 4,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.3958936442316006,
+            "ci_std": 0.11890490561804644,
+            "ci_median": 0.4383561643835616,
+            "spearman_mean": -0.2215683575334959,
+            "spearman_std": 0.20757992058163294,
+            "spearman_median": -0.16374109553167437
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 4,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.3958936442316006,
+            "ci_std": 0.11890490561804644,
+            "ci_median": 0.4383561643835616,
+            "spearman_mean": -0.2215683575334959,
+            "spearman_std": 0.20757992058163294,
+            "spearman_median": -0.16374109553167437
+          },
+          "chosen_alphas": []
+        },
+        "res_esm": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6929785443807236,
+              0.03011466690972977
+            ],
+            "mse": [
+              0.4596684406641908,
+              0.09716170157140665
+            ],
+            "rm2": [
+              0.3115342424482292,
+              0.10267036061589627
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7005994565292142,
+            "mse": 0.4596689435978696,
+            "rmse": 0.6779888963676836,
+            "pearson": 0.597094928559794,
+            "spearman": 0.5273694537431943,
+            "rm2": 0.31664935241333036
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.48739184422100507,
+            "ci_std": 0.15665577224741917,
+            "ci_median": 0.5159027577592006,
+            "spearman_mean": -0.020849749044381635,
+            "spearman_std": 0.29297723870482295,
+            "spearman_median": 0.044462278478706777
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5354112361200676,
+              0.04032109614116238
+            ],
+            "spearman_mean": [
+              0.08446379342048778,
+              0.09420880440729217
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.48739184422100507,
+            "ci_std": 0.15665577224741917,
+            "ci_median": 0.5159027577592006,
+            "spearman_mean": -0.020849749044381635,
+            "spearman_std": 0.29297723870482295,
+            "spearman_median": 0.044462278478706777
+          },
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6985812538651079,
+              0.023878912567467606
+            ],
+            "mse": [
+              0.45534047040356357,
+              0.10127473053812552
+            ],
+            "rm2": [
+              0.3391936058906028,
+              0.1012852239114722
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6954164448502388,
+            "mse": 0.4553405642641715,
+            "rmse": 0.674789273969416,
+            "pearson": 0.5952789378515735,
+            "spearman": 0.5117044158319914,
+            "rm2": 0.33084202303447835
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.39627029815203596,
+            "ci_std": 0.12296288944367556,
+            "ci_median": 0.43866066404051773,
+            "spearman_mean": -0.2208110581463174,
+            "spearman_std": 0.21037661819251285,
+            "spearman_median": -0.15973500768205412
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.39627029815203596,
+            "ci_std": 0.12296288944367556,
+            "ci_median": 0.43866066404051773,
+            "spearman_mean": -0.2208110581463174,
+            "spearman_std": 0.21037661819251285,
+            "spearman_median": -0.15973500768205412
+          },
+          "chosen_alphas": [
+            50000.0,
+            1.0,
+            1.0,
+            10000.0,
+            1.0
+          ]
+        },
+        "res_esm_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6921875098599204,
+              0.031203165390739373
+            ],
+            "mse": [
+              0.45925336298411734,
+              0.0998286855814424
+            ],
+            "rm2": [
+              0.3141373562789188,
+              0.10839923791284625
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7001722556037675,
+            "mse": 0.45925389693172064,
+            "rmse": 0.6776827406181455,
+            "pearson": 0.5964169962621678,
+            "spearman": 0.5263217054935312,
+            "rm2": 0.31827779567185926
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.48908193221523183,
+            "ci_std": 0.16196935020469347,
+            "ci_median": 0.5183673469387755,
+            "spearman_mean": -0.015995765514505798,
+            "spearman_std": 0.30218163207960547,
+            "spearman_median": 0.04642148094176713
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5360352089300208,
+              0.03935138979185235
+            ],
+            "spearman_mean": [
+              0.08584774663541402,
+              0.09293593144366481
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.48908193221523183,
+            "ci_std": 0.16196935020469347,
+            "ci_median": 0.5183673469387755,
+            "spearman_mean": -0.015995765514505798,
+            "spearman_std": 0.30218163207960547,
+            "spearman_median": 0.04642148094176713
+          },
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_esm_ecfp_inter": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6932437539501416,
+              0.03215520646321282
+            ],
+            "mse": [
+              0.4488029793802674,
+              0.10336461383734168
+            ],
+            "rm2": [
+              0.327726276388956,
+              0.11614185986682071
+            ]
+          },
+          "oof_global": {
+            "ci": 0.7016364299323763,
+            "mse": 0.44880387732934995,
+            "rmse": 0.6699282628232294,
+            "pearson": 0.6087600106915854,
+            "spearman": 0.5292836737012077,
+            "rm2": 0.33146928371597445
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.49096929120312527,
+            "ci_std": 0.15640549983538055,
+            "ci_median": 0.5159391858754291,
+            "spearman_mean": -0.004268447962264653,
+            "spearman_std": 0.28627498260866935,
+            "spearman_median": 0.04162579080740243
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.537889290100548,
+              0.03989793688040948
+            ],
+            "spearman_mean": [
+              0.09072890883313878,
+              0.09291665930073978
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.49096929120312527,
+            "ci_std": 0.15640549983538055,
+            "ci_median": 0.5159391858754291,
+            "spearman_mean": -0.004268447962264653,
+            "spearman_std": 0.28627498260866935,
+            "spearman_median": 0.04162579080740243
+          },
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        }
+      }
+    },
+    "kiba/cold_target_seqid30": {
+      "protocol": "v2_kfold",
+      "residual_target": "y_true - smiles_mean_train",
+      "intragroup_axis": "smiles",
+      "variants": {
+        "bias_only": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6880279527158741,
+              0.01933033017616658
+            ],
+            "mse": [
+              0.4928675759776801,
+              0.159484152311069
+            ],
+            "rm2": [
+              0.28418486763163525,
+              0.032394929513025576
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6845325574904048,
+            "mse": 0.48915691442669235,
+            "rmse": 0.6993975367605267,
+            "pearson": 0.5599056772164389,
+            "spearman": 0.48472874453579246,
+            "rm2": 0.27942713183174045
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 11,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4067565062851359,
+            "ci_std": 0.0946711207487134,
+            "ci_median": 0.4255164034021871,
+            "spearman_mean": -0.22004467186112242,
+            "spearman_std": 0.18603015415359697,
+            "spearman_median": -0.1946934130498563
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 11,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4067565062851359,
+            "ci_std": 0.0946711207487134,
+            "ci_median": 0.4255164034021871,
+            "spearman_mean": -0.22004467186112242,
+            "spearman_std": 0.18603015415359697,
+            "spearman_median": -0.1946934130498563
+          },
+          "chosen_alphas": []
+        },
+        "res_esm": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6674735452467749,
+              0.024080809292676173
+            ],
+            "mse": [
+              0.5138797411008479,
+              0.13716317956329252
+            ],
+            "rm2": [
+              0.2427788066311969,
+              0.0582755122468057
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6748777374720376,
+            "mse": 0.5078157338997257,
+            "rmse": 0.7126119097374992,
+            "pearson": 0.5475739293887985,
+            "spearman": 0.46352089965083615,
+            "rm2": 0.25326120262941154
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.46138287854589566,
+            "ci_std": 0.13163796511111686,
+            "ci_median": 0.47870107420669217,
+            "spearman_mean": -0.09211788764682453,
+            "spearman_std": 0.24154604469419097,
+            "spearman_median": -0.056455204140813904
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5007641967057028,
+              0.04134964376462765
+            ],
+            "spearman_mean": [
+              0.0022050444638197246,
+              0.1023172063785351
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.46138287854589566,
+            "ci_std": 0.13163796511111686,
+            "ci_median": 0.47870107420669217,
+            "spearman_mean": -0.09211788764682453,
+            "spearman_std": 0.24154604469419097,
+            "spearman_median": -0.056455204140813904
+          },
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6880302881561641,
+              0.019333434743127008
+            ],
+            "mse": [
+              0.49286757574377266,
+              0.1594841524396427
+            ],
+            "rm2": [
+              0.28418486777888036,
+              0.03239492929745112
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6845352649067392,
+            "mse": 0.48915691418191887,
+            "rmse": 0.6993975365855379,
+            "pearson": 0.5599056776212604,
+            "spearman": 0.48473854380750125,
+            "rm2": 0.279427132084321
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 7,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4118032351553358,
+            "ci_std": 0.11232269376788835,
+            "ci_median": 0.42832235567609456,
+            "spearman_mean": -0.21370905253853548,
+            "spearman_std": 0.20229621025414604,
+            "spearman_median": -0.1946934130498563
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 7,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4118032351553358,
+            "ci_std": 0.11232269376788835,
+            "ci_median": 0.42832235567609456,
+            "spearman_mean": -0.21370905253853548,
+            "spearman_std": 0.20229621025414604,
+            "spearman_median": -0.1946934130498563
+          },
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            1000.0,
+            1000.0,
+            10000.0
+          ]
+        },
+        "res_esm_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6650136638953174,
+              0.024760217874729196
+            ],
+            "mse": [
+              0.516720994555596,
+              0.13897438172829965
+            ],
+            "rm2": [
+              0.240850153456032,
+              0.06004112637519395
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6721460414920535,
+            "mse": 0.510202937454012,
+            "rmse": 0.7142849133602165,
+            "pearson": 0.5437578155257863,
+            "spearman": 0.45664729702779205,
+            "rm2": 0.2505129341358165
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4643686996576332,
+            "ci_std": 0.13033554014880475,
+            "ci_median": 0.4793502895995971,
+            "spearman_mean": -0.08748030728585265,
+            "spearman_std": 0.2422661823977149,
+            "spearman_median": -0.052894868987871414
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5031059288619144,
+              0.04162887170287372
+            ],
+            "spearman_mean": [
+              0.004994622012152257,
+              0.09839691640419015
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.4643686996576332,
+            "ci_std": 0.13033554014880475,
+            "ci_median": 0.4793502895995971,
+            "spearman_mean": -0.08748030728585265,
+            "spearman_std": 0.2422661823977149,
+            "spearman_median": -0.052894868987871414
+          },
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_esm_ecfp_inter": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6680448065165168,
+              0.0255861907106804
+            ],
+            "mse": [
+              0.5043576336687027,
+              0.12416763929602678
+            ],
+            "rm2": [
+              0.2569431686025667,
+              0.06979877522957711
+            ]
+          },
+          "oof_global": {
+            "ci": 0.6758048258698963,
+            "mse": 0.49916687655515996,
+            "rmse": 0.7065174283449489,
+            "pearson": 0.5595154555059284,
+            "spearman": 0.465977355328476,
+            "rm2": 0.26462003505451287
+          },
+          "intragroup_min2": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.47412338456256603,
+            "ci_std": 0.12838250452713137,
+            "ci_median": 0.4889807162534435,
+            "spearman_mean": -0.06281791548632021,
+            "spearman_std": 0.25179506733674895,
+            "spearman_median": -0.02764315282984717
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5033350807636695,
+              0.041659296578776595
+            ],
+            "spearman_mean": [
+              0.009629019052599792,
+              0.09887636148818264
+            ]
+          },
+          "intragroup_min5": {
+            "n_groups_total": 2065,
+            "n_groups_evaluable": 1893,
+            "n_groups_const_pred": 0,
+            "n_pairs_covered": 116179,
+            "ci_mean": 0.47412338456256603,
+            "ci_std": 0.12838250452713137,
+            "ci_median": 0.4889807162534435,
+            "spearman_mean": -0.06281791548632021,
+            "spearman_std": 0.25179506733674895,
+            "spearman_median": -0.02764315282984717
+          },
+          "chosen_alphas": [
+            10000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        }
+      }
+    },
+    "kiba/cold_target": {
+      "protocol": "v1_seeds",
+      "residual_target": "y_true - smiles_mean_train",
+      "intragroup_axis": "smiles",
+      "variants": {
+        "bias_only": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.696359597185035,
+              0.012188242696762072
+            ],
+            "mse": [
+              0.4464851210096022,
+              0.08434167182839661
+            ],
+            "rm2": [
+              0.33479751360220095,
+              0.03863199257897087
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": []
+        },
+        "res_esm": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.711887277106649,
+              0.025838809684719327
+            ],
+            "mse": [
+              0.4405871119914401,
+              0.07030819170887569
+            ],
+            "rm2": [
+              0.3285489093839249,
+              0.06025943600517464
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.5738768445136951,
+              0.03807259717864343
+            ],
+            "spearman_mean": [
+              0.17492445390249525,
+              0.07353655984954513
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5738768445136951,
+              0.03807259717864343
+            ],
+            "spearman_mean": [
+              0.17492445390249525,
+              0.07353655984954513
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6963597264216206,
+              0.01218847195672362
+            ],
+            "mse": [
+              0.446485121259431,
+              0.08434167187595529
+            ],
+            "rm2": [
+              0.33479751307304545,
+              0.038631991655497994
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": [
+            10000.0,
+            50000.0,
+            50000.0,
+            1.0,
+            50000.0
+          ]
+        },
+        "res_esm_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7053454170758785,
+              0.02001593937668645
+            ],
+            "mse": [
+              0.44873064174156735,
+              0.07027025525169368
+            ],
+            "rm2": [
+              0.3168211104761635,
+              0.06507251429882603
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.566466671443806,
+              0.03259312071063536
+            ],
+            "spearman_mean": [
+              0.1600565955919967,
+              0.06656317468304021
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.566466671443806,
+              0.03259312071063536
+            ],
+            "spearman_mean": [
+              0.1600565955919967,
+              0.06656317468304021
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": [
+            1000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_esm_ecfp_inter": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7091330932414277,
+              0.021273118278193434
+            ],
+            "mse": [
+              0.4306052994748486,
+              0.06005263912616087
+            ],
+            "rm2": [
+              0.34345634136122255,
+              0.08330455853934099
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.5787675075828506,
+              0.031032371694663063
+            ],
+            "spearman_mean": [
+              0.18723936308157768,
+              0.06549453504466078
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5787675075828506,
+              0.031032371694663063
+            ],
+            "spearman_mean": [
+              0.18723936308157768,
+              0.06549453504466078
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": [
+            1000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        }
+      }
+    },
+    "kiba/cold_drug": {
+      "protocol": "v1_seeds",
+      "residual_target": "y_true - sequence_mean_train",
+      "intragroup_axis": "sequence",
+      "variants": {
+        "bias_only": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6869378005371063,
+              0.004793547223013054
+            ],
+            "mse": [
+              0.573215542104431,
+              0.058508952938939464
+            ],
+            "rm2": [
+              0.14840441190424195,
+              0.00910936782325242
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": []
+        },
+        "res_esm": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.6869389483925693,
+              0.004793723273477324
+            ],
+            "mse": [
+              0.573215364176624,
+              0.058509029721554875
+            ],
+            "rm2": [
+              0.14840442848460839,
+              0.009109402528021646
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.5,
+              0.0
+            ],
+            "spearman_mean": [
+              0.0,
+              0.0
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": [
+            50000.0,
+            1.0,
+            1.0,
+            100.0,
+            100.0
+          ]
+        },
+        "res_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7060204333871353,
+              0.0032988710633950038
+            ],
+            "mse": [
+              0.506412525215738,
+              0.058078033791116146
+            ],
+            "rm2": [
+              0.238554372715127,
+              0.01665307123845067
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.6358967423688634,
+              0.011428220564254242
+            ],
+            "spearman_mean": [
+              0.2952974422918451,
+              0.024332208466329164
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.6358967423688634,
+              0.011428220564254242
+            ],
+            "spearman_mean": [
+              0.2952974422918451,
+              0.024332208466329164
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_esm_ecfp": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7049837021088009,
+              0.0038905375986867836
+            ],
+            "mse": [
+              0.5059741553468838,
+              0.05898287618330461
+            ],
+            "rm2": [
+              0.2406875455970238,
+              0.01754599272105774
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.6348256359810612,
+              0.01048327426308663
+            ],
+            "spearman_mean": [
+              0.2930475609235556,
+              0.022508668382398747
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.6348256359810612,
+              0.01048327426308663
+            ],
+            "spearman_mean": [
+              0.2930475609235556,
+              0.022508668382398747
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        },
+        "res_esm_ecfp_inter": {
+          "per_unit_mean_std": {
+            "ci": [
+              0.7132126526846487,
+              0.0024736918691753485
+            ],
+            "mse": [
+              0.47577069400660116,
+              0.055498905579801965
+            ],
+            "rm2": [
+              0.2863952073719401,
+              0.014576843331787106
+            ]
+          },
+          "oof_global": null,
+          "intragroup_min2": {
+            "ci_mean": [
+              0.6444950145914298,
+              0.012250539851578143
+            ],
+            "spearman_mean": [
+              0.3140116488851514,
+              0.026154424287512957
+            ]
+          },
+          "intragroup_per_unit_min2": {
+            "ci_mean": [
+              0.6444950145914298,
+              0.012250539851578143
+            ],
+            "spearman_mean": [
+              0.3140116488851514,
+              0.026154424287512957
+            ]
+          },
+          "intragroup_min5": null,
+          "chosen_alphas": [
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0,
+            50000.0
+          ]
+        }
+      }
+    }
+  }
+}

@@ -38,8 +38,9 @@ def resolve_roots() -> tuple[Path, Path]:
 
 
 def ensure_paper_dirs(repo_root: Path | None = None) -> dict[str, Path]:
-    """Garante os diretórios de saída em `docs/paper/`."""
-    base = (repo_root or REPO_ROOT) / "docs" / "paper"
+    """Garante os diretórios de saída em `docs/paper/` (ou `PHYSDUAL_PAPER_DIR` se definido)."""
+    override = os.environ.get("PHYSDUAL_PAPER_DIR", "").strip()
+    base = Path(override).resolve() if override else ((repo_root or REPO_ROOT) / "docs" / "paper")
     tables = base / "tables"
     figures = base / "figures"
     for d in (base, tables, figures):

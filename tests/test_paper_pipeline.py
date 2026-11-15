@@ -126,15 +126,24 @@ EXPECTED_FIGURES = [
 ]
 
 
-def test_build_all_orchestrator_runs_cleanly() -> None:
+def test_build_all_orchestrator_runs_cleanly(tmp_path: Path) -> None:
     proc = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "scripts" / "paper" / "build_all.py")],
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "paper" / "build_all.py"),
+            "--output-dir",
+            str(tmp_path),
+        ],
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
         check=False,
     )
     assert proc.returncode == 0, f"build_all.py falhou ({proc.returncode}):\n{proc.stderr}\n{proc.stdout}"
+    assert (tmp_path / "00_INVENTARIO.md").exists() and (tmp_path / "REPRODUCAO.md").exists()
+    assert (tmp_path / "tables" / "T1_dataset_stats.csv").exists()
+    assert (tmp_path / "tables" / "T15_phase3_configuration.csv").exists()
+    assert (tmp_path / "figures" / "F11_train_val_gap_and_best_epoch.png").exists()
 
 
 def test_all_expected_paper_markdown_docs_exist_and_nonempty() -> None:
@@ -292,3 +301,17 @@ def test_phase3_audits_json_complete_aggregates() -> None:
     assert len(aggs) == 34, f"Total esperado de agregados é 34, encontrado {len(aggs)}"
     incomplete = [a["file"] for a in aggs if not a.get("complete")]
     assert not incomplete, f"Agregados incompletos: {incomplete}"
+    assert ri["start_timestamp_audit"]["post_runs_started_before_adr15_count"] == 0
+    assert ri["stale_artifacts"]["phase3_davis_paired_bootstrap_json"]["is_stale"] is False
+
+
+def test_phase3_intragroup_and_colab_scripts_present() -> None:
+    ig_path = PAPER_DIR / "phase3_intragroup_and_stacking.json"
+    assert ig_path.exists() and ig_path.stat().st_size > 1000
+    ig = json.loads(ig_path.read_text(encoding="utf-8"))
+    for k in ("intragroup_v2_kfold", "intragroup_v1_seeds", "residual_stacking"):
+        assert k in ig and len(ig[k]) > 0, f"Chave '{k}' ausente/vazia em phase3_intragroup_and_stacking.json"
+
+    for sname in ("colab_ridge_esm_pooling.py", "colab_kiba_cold_drug_ecfp.py"):
+        sp = REPO_ROOT / "scripts" / "paper" / sname
+        assert sp.exists() and sp.stat().st_size > 500, f"Script Colab ausente: {sp}"
