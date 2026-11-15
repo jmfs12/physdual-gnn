@@ -1,7 +1,7 @@
 # Reprodutibilidade do Pacote do Artigo (Fases 1, 2 e 3)
 
-- **Gerado em (UTC):** `2026-11-15T03:41:11Z`
-- **Commit HEAD:** `936c32f`
+- **Gerado em (UTC):** `2026-11-15T03:43:27Z`
+- **Commit HEAD:** `461421b`
 - **Variável de raiz de artefatos:** `PHYSDUAL_ROOT` (padrão local: raiz do repositório Git; no Colab: `/content/drive/MyDrive/physdual-gnn`).
 
 ## 1. Ordem Exata de Execução

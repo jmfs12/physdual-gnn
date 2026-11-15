@@ -1,7 +1,7 @@
 # Passo 0 — Inventário e Auditoria de Proveniência (Fases 1, 2 e 3)
 
 - **Gerado automaticamente por:** `scripts/paper/build_inventory_and_repro.py`
-- **Commit HEAD do repositório:** `936c32f`
+- **Commit HEAD do repositório:** `461421b`
 - **Auditoria detalhada da Fase 3:** ver [`docs/paper/06_AUDITORIA_FASE3.md`](06_AUDITORIA_FASE3.md) e [`docs/paper/phase3_audits.json`](phase3_audits.json).
 - **Versões de pipeline identificadas:**
   - **Featurizador molecular:** `['v2_onehot78_l1norm']` (`configs/base.yaml`: `v2_onehot78_l1norm`)
@@ -30,7 +30,7 @@
 | `cache/esm_embeddings/` | Fase 1–3 | `esm2_t33_650M_UR50D`, `esm_dim=1280` | `gitignored` | completo (429 `.pt` locais + Drive validado: 429/429 .pt fp16, dim=1280) |
 | `scripts/paper/audit_esm_cache_colab.py` | Fase 1/2 (auditoria) | Colab / Drive (`esm2_t33_650M_UR50D/*.pt`, `fp16`, `NaN/Inf=0`, `dim=1280`) | `bd5feaf` | executado no Drive (`all_checks_passed: true`, 429/429 válidos, 0 resíduos) |
 | `scripts/paper/cpu_audits.py` + `docs/paper/cpu_audits.json` | Fase 1/2 (auditoria CPU) | Noise floor, `pKd>5`, marginais/kNN `v1`, timing limpo, seq-id Davis | `64cae10` | completo (recomputado em CPU) |
-| `scripts/paper/phase3_audits.py` + `docs/paper/phase3_audits.json` | Fase 3 (auditoria CPU) | Pré-registro Git, integridade 166 runs, OOFs, KIBA v1/v2 & bootstrap `n=1000` | `gitignored (local)` | completo (recomputado em CPU a partir de cache `.pt` + CSVs) |
+| `scripts/paper/phase3_audits.py` + `docs/paper/phase3_audits.json` | Fase 3 (auditoria CPU) | Pré-registro Git, integridade 166 runs, OOFs, KIBA v1/v2 & bootstrap `n=1000` | `d6d225f` | completo (recomputado em CPU a partir de cache `.pt` + CSVs) |
 | `outputs/logs/phase1_summary_report.json` | Fase 1 | datasets=['davis', 'kiba'], `windowed_sequences=112` | `gitignored (local)` | completo (davis, kiba; janelas=112) |
 | `outputs/results/phase2_timing_benchmark.json` | Fase 2 | NVIDIA L4, 3 épocas | `gitignored (local)` | completo |
 | `outputs/results/baseline_graphdta_cnn3_davis_cold_drug.json` | Fase 2 | v1_seeds | `gitignored (local)` | completo (5 unidades; marginais/kNN em `cpu_audits.json`) |
@@ -177,6 +177,10 @@
 
 | Hash | Data e Mensagem |
 | :--- | :--- |
+| `461421b` | 2026-11-15 — docs(paper): update drafts 02-05 and pipeline tests with Phase 3 ADR #15 evaluation |
+| `815e016` | 2026-11-15 — docs(paper): regenerate Phase 3 tables, figures, captions, inventory and reproduction guide |
+| `06d2132` | 2026-11-15 — feat(paper): extend tables T7/T9-T15, figures F7-F11 and inventory/repro builders for Phase 3 |
+| `d6d225f` | 2026-11-15 — feat(paper): add Phase 3 CPU integrity audit, bootstrap recomputation and 06_AUDITORIA_FASE3 |
 | `936c32f` | 2026-11-14 — feat(phase3): add KIBA seqid OOF export and --dataset option in paired bootstrap |
 | `9a60916` | 2026-11-14 — fix(phase3): support KIBA seqid30/40 baselines, Gate 6 dataset scoping and diagnostic --aggregate-only |
 | `46d13f8` | 2026-11-14 — docs(phase3): ADR #15 exploratory reclassification, KIBA pre-registered criteria & diagnostic controls |
@@ -193,7 +197,3 @@
 | `0db79f8` | 2026-11-13 — docs(paper): registrar auditoria do cache ESM-2 no Drive (429/429 validos, 83/83 windowed) |
 | `c8ddd87` | 2026-11-13 — fix(paper): corrigir auditor ESM-2 para subpasta do modelo e contagem global 83 |
 | `64cae10` | 2026-11-13 — docs(paper): consolidar pacote cientifico rastreavel das Fases 1 e 2 (T1-T8, F1-F6 e auditorias CPU) |
-| `f3c0b0e` | 2026-11-13 — feat(paper): adicionar auditorias em CPU, scripts do pacote cientifico e validacoes pytest |
-| `1eb1be4` | 2026-11-13 — docs(phase2): sincronizar FASE2_BASELINE e ADRs #12/#13 com auditoria CPU e teto efetivo 1000 |
-| `c2b7afe` | 2026-11-13 — fix(phase1,phase2): corrigir sumario fase 1, remover oof de agregados e registrar test_isolation_verified |
-| `09a9ac5` | 2026-11-13 — perf(phase2): acelerar bootstrap por piso yt_min/T compartilhado, enxugar JSON agregado e corrigir parser --aggregate-only |
