@@ -1,7 +1,8 @@
-"""Testes de esquema, integridade e ausência de NaNs do pacote científico (Fases 1 e 2)."""
+"""Testes de esquema, integridade e ausência de NaNs do pacote científico (Fases 1, 2 e 3)."""
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ EXPECTED_DOCS = [
     PAPER_DIR / "03_LIMITACOES_E_AMEACAS_A_VALIDADE.md",
     PAPER_DIR / "04_REGISTRO_DE_AFIRMACOES.md",
     PAPER_DIR / "05_LACUNAS.md",
+    PAPER_DIR / "06_AUDITORIA_FASE3.md",
     PAPER_DIR / "REPRODUCAO.md",
     FIGURES_DIR / "CAPTIONS.md",
 ]
@@ -35,8 +37,78 @@ EXPECTED_TABLES = {
     ),
     "T5_uncensored_davis": (10, ["protocolo", "modelo", "split", "ci_pkd_gt_5", "mse_pkd_gt_5"]),
     "T6_seq_length": (26, ["protocolo", "modelo", "dataset", "split", "faixa_comprimento", "ci", "mse"]),
-    "T7_training_diagnostics": (65, ["protocolo", "modelo", "dataset", "split", "unidade", "best_epoch"]),
+    "T7_training_diagnostics": (
+        166,
+        [
+            "protocolo",
+            "modelo",
+            "dataset",
+            "split",
+            "unidade",
+            "best_epoch",
+            "train_loss_at_best",
+            "train_val_mse_gap_at_best",
+            "flag_cold_best_ep_lt_15",
+            "is_diagnostic_control",
+        ],
+    ),
     "T8_configuration": (13, ["protocolo", "modelo", "dataset", "split", "n_runs", "featurizer"]),
+    "T9_phase3_decision_adr15": (
+        10,
+        ["protocolo", "papel_no_estudo", "dataset", "split", "veredito_combinado_adr15", "fonte"],
+    ),
+    "T10_phase3_results_summary": (
+        103,
+        ["protocolo", "papel_no_estudo", "dataset", "split", "modelo", "n_unidades", "ci_media_dp", "mse_media_dp", "rm2_media_dp"],
+    ),
+    "T11_phase3_global_oof_and_binary": (
+        63,
+        ["protocolo", "dataset", "split", "modelo", "n_pares_oof", "oof_ci", "oof_mse", "oof_rm2"],
+    ),
+    "T12_phase3_per_fold_or_seed": (
+        109,
+        ["protocolo", "dataset", "split", "modelo", "u0_ci", "u0_mse", "media_ci", "media_mse"],
+    ),
+    "T13_phase3_paired_and_generalization": (
+        83,
+        [
+            "protocolo",
+            "papel_no_estudo",
+            "dataset",
+            "split",
+            "baseline_comparado",
+            "n_clusters_bootstrap",
+            "boot_delta_mse_ic95",
+            "boot_frac_favoravel_mse",
+        ],
+    ),
+    "T14_phase3_diagnostic_controls": (
+        22,
+        [
+            "dataset",
+            "split",
+            "controle_ou_modelo",
+            "tipo_analise",
+            "n_unidades",
+            "ci_media_dp",
+            "mse_media_dp",
+            "boot_dMSE_vs_gin_ic95",
+        ],
+    ),
+    "T15_phase3_configuration": (
+        17,
+        [
+            "protocolo",
+            "modelo",
+            "dataset",
+            "split",
+            "n_runs",
+            "drug_esm_featurizer",
+            "epochs_cfg",
+            "patience_efetiva",
+            "sec_per_epoch_medio",
+        ],
+    ),
 }
 
 EXPECTED_FIGURES = [
@@ -46,6 +118,11 @@ EXPECTED_FIGURES = [
     "F4_learning_curves_davis_cold_target",
     "F5_best_epoch_distribution",
     "F6_seq_length_stratification",
+    "F7_generalization_curve",
+    "F8_paired_deltas_by_unit",
+    "F9_diagnostic_controls_cold_target",
+    "F10_cold_drug_per_fold",
+    "F11_train_val_gap_and_best_epoch",
 ]
 
 
@@ -88,10 +165,27 @@ def test_table_formats_schema_and_zero_nans(stem: str, spec: tuple[int, list[str
 
 
 def test_protocols_v1_and_v2_are_strictly_separated() -> None:
-    for stem in ("T2_splits", "T3_main_results", "T4_marginal_and_paired", "T5_uncensored_davis", "T6_seq_length", "T7_training_diagnostics", "T8_configuration"):
+    for stem in (
+        "T2_splits",
+        "T3_main_results",
+        "T4_marginal_and_paired",
+        "T5_uncensored_davis",
+        "T6_seq_length",
+        "T7_training_diagnostics",
+        "T8_configuration",
+        "T9_phase3_decision_adr15",
+        "T10_phase3_results_summary",
+        "T12_phase3_per_fold_or_seed",
+        "T13_phase3_paired_and_generalization",
+        "T15_phase3_configuration",
+    ):
         df = pd.read_csv(TABLES_DIR / f"{stem}.csv", dtype=str, keep_default_na=False)
         protocols = set(df["protocolo"].unique())
         assert protocols == {"v1_seeds", "v2_kfold"}, f"Protocolos inesperados em {stem}: {protocols}"
+
+    df_t11 = pd.read_csv(TABLES_DIR / "T11_phase3_global_oof_and_binary.csv", dtype=str, keep_default_na=False)
+    protocols_t11 = set(df_t11["protocolo"].unique())
+    assert protocols_t11 == {"v1_seeds (média 5 seeds)", "v2_kfold"}, f"Protocolos inesperados em T11: {protocols_t11}"
 
 
 @pytest.mark.parametrize("stem", EXPECTED_FIGURES)
@@ -147,8 +241,6 @@ def test_t4_and_t5_have_full_cpu_audit_coverage() -> None:
 
 
 def test_cpu_audits_json_and_esm_audit_script_exist() -> None:
-    import json
-
     ca_path = PAPER_DIR / "cpu_audits.json"
     assert ca_path.exists() and ca_path.stat().st_size > 1000
     ca = json.loads(ca_path.read_text(encoding="utf-8"))
@@ -163,3 +255,40 @@ def test_cpu_audits_json_and_esm_audit_script_exist() -> None:
 
     esm_audit_script = REPO_ROOT / "scripts" / "paper" / "audit_esm_cache_colab.py"
     assert esm_audit_script.exists() and esm_audit_script.stat().st_size > 200
+
+
+def test_phase3_model_nomenclature_adr15() -> None:
+    for stem, col in (
+        ("T7_training_diagnostics", "modelo"),
+        ("T10_phase3_results_summary", "modelo"),
+        ("T11_phase3_global_oof_and_binary", "modelo"),
+        ("T12_phase3_per_fold_or_seed", "modelo"),
+        ("T14_phase3_diagnostic_controls", "controle_ou_modelo"),
+        ("T15_phase3_configuration", "modelo"),
+    ):
+        df = pd.read_csv(TABLES_DIR / f"{stem}.csv", dtype=str, keep_default_na=False)
+        bad = [v for v in df[col].unique() if "physdual" in str(v).lower()]
+        assert not bad, f"Nomenclatura proibida por ADR #15 em {stem}.{col}: {bad}"
+
+
+def test_phase3_audits_json_complete_aggregates() -> None:
+    p3_path = PAPER_DIR / "phase3_audits.json"
+    assert p3_path.exists() and p3_path.stat().st_size > 10_000
+    p3 = json.loads(p3_path.read_text(encoding="utf-8"))
+    for key in (
+        "git_preregistration",
+        "run_integrity",
+        "dataset_overlap_and_units",
+        "v2_kfold",
+        "v1_seeds",
+    ):
+        assert key in p3, f"Chave '{key}' ausente em phase3_audits.json"
+
+    ri = p3["run_integrity"]
+    assert ri["isolation_failures"] == [], f"Falhas de isolamento detectadas: {ri['isolation_failures']}"
+    assert ri["split_size_mismatches"] == [], f"Divergências de tamanho de split: {ri['split_size_mismatches']}"
+    assert ri["nan_inf_runs"] == [], f"Runs com NaN/Inf detectados: {ri['nan_inf_runs']}"
+    aggs = ri["aggregate_completeness"]
+    assert len(aggs) == 34, f"Total esperado de agregados é 34, encontrado {len(aggs)}"
+    incomplete = [a["file"] for a in aggs if not a.get("complete")]
+    assert not incomplete, f"Agregados incompletos: {incomplete}"

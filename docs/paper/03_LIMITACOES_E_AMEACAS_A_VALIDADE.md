@@ -1,6 +1,6 @@
-# Rascunho 03 — Limitações, Divergências Auditadas e Ameaças à Validade
+# Rascunho 03 — Limitações, Divergências Auditadas e Ameaças à Validade (Fases 1, 2 e 3)
 
-> **Objetivo:** Registrar com rigor científico todas as ameaças à validade experimental identificadas nas Fases 1 e 2, bem como todas as divergências entre artefatos encontradas na auditoria de proveniência (`00_INVENTARIO.md`), sem correções silenciosas.
+> **Objetivo:** Registrar com rigor científico todas as ameaças à validade experimental identificadas nas Fases 1, 2 e 3, bem como todas as divergências entre artefatos encontradas nas auditorias de proveniência (`00_INVENTARIO.md` e `06_AUDITORIA_FASE3.md`), sem correções silenciosas.
 
 ---
 
@@ -46,8 +46,37 @@
 1. **Baixo número efetivo de fármacos no Davis (`68` moléculas únicas) e natureza exploratória do bootstrap:**
    - Em `v1_seeds cold_drug`, o teste tem apenas `7` fármacos por seed; mesmo no `v2_kfold` são apenas `13..14` fármacos por dobra (`T2`). Os ICs 95% e frações favoráveis (`wins/1000`) do bootstrap agrupado por cluster em `v2_kfold` são reportados estritamente como **comparações exploratórias** (substituindo valores-p `0.000/1.000`) e exibem intervalos largos em `cold_drug` (`ΔMSE ∈ [-0.0487, 0.1369]` para GIN; `[-0.0431, 0.1021]` para CNN3, `T4`).
 
-2. **Adiamento de `GraphDTACNN3` e do Protocolo `v2_kfold` no KIBA:**
-   - Apenas `GraphDTAGIN` sob `v1_seeds` foi treinado no KIBA (`T3`, `00_INVENTARIO.md`). Ambos os complementos no KIBA (`CNN3` e `v2_kfold`) foram adiados até os resultados iniciais da Fase 3, de modo que a superioridade de `CNN3` observada em Davis `cold_target` ainda não foi testada no espaço químico maior do KIBA (`2.065` fármacos).
+2. **Adiamento de `GraphDTACNN3` e do Protocolo `v2_kfold` no KIBA (Fases 1–2):**
+   - Apenas `GraphDTAGIN` sob `v1_seeds` foi treinado no KIBA (`T3`, `00_INVENTARIO.md`). Na Fase 3, esse cenário persistiu: não há `GraphDTACNN3` no KIBA nem execuções GraphDTA em `kiba/cold_target_seqid30` e `seqid40` (ver Seção 4).
 
 3. **Ausência de controle de variância por inicialização dentro da dobra (`v2_kfold`):**
-   - Cada dobra do `v2_kfold` executou uma única seed de pesos (`split_seed = 0`), de modo que a dispersão reportada nas tabelas `v2_kfold` reflete variabilidade entre dobras de validação cruzada agrupada.
+   - Cada dobra do `v2_kfold` executou uma única seed de pesos (`split_seed = 0`), exceto a sensibilização diagnóstica `--train-seed-offset 1000` em `davis/cold_target_seqid30` e na dobra 2 de `davis/cold_drug` (`T14`). Assim, a dispersão nas tabelas `v2_kfold` reflete variabilidade entre dobras de validação cruzada agrupada.
+
+---
+
+## 4. Limitações Específicas e Ameaças à Validade da Fase 3 (`gin_esm_mlp`)
+
+1. **Sobreposição massiva de sequências proteicas entre Davis e KIBA (`78,17%` do KIBA):**
+   - De acordo com `phase3_audits.json` (`dataset_overlap_and_units`), o KIBA possui `229` sequências únicas de proteínas e o Davis `379`, compartilhando **`179` sequências exatas (`78,17%` de `229`)**. Portanto, embora o KIBA expanda drasticamente o espaço químico (`2.068` / `2.065` fármacos únicos vs. `68` no Davis), os dois datasets **não representam validações independentes no domínio proteico**; ganhos ou falhas de `gin_esm_mlp` em `kiba/cold_target` refletem parcialmente o mesmo universo de quinases já presente no Davis.
+
+2. **Ausência de `GraphDTACNN3` no KIBA, ausência de GraphDTA em `kiba/seqid*` e fraqueza de `GraphDTAGIN` em `cold_target`:**
+   - No KIBA (`v1_seeds` e `v2_kfold`), `GraphDTACNN3` não foi executado (`não disponível`), e no KIBA `seqid30/40` não há nenhum baseline neural GraphDTA (`T10`). Embora `GraphDTAGIN` exista em `kiba/cold_target`, ele reproduz o colapso de codificação posicional (`CI = 0.6579 ± 0.0437 / MSE = 0.5137 ± 0.0888`), inferior ao baseline não neural `knn_kmer_target` (`0.7320 / 0.3730`). Consequentemente, no KIBA não há comparação neural não-ESM forte em alvos novos — lacuna parcialmente compensada pelo critério do **ADR #15**, que usou `knn_kmer_target` e `knn_tanimoto_drug` como melhores comparadores sem ESM.
+
+3. **Amostragem reduzida de clusters únicos em `kiba/cold_target` e `davis/cold_drug`:**
+   - Em `kiba/cold_target` (`v1_seeds`, `phase3_audits.json`), cada seed testa apenas **`23` sequências únicas de alvo** (`93` clusters únicos no pool das 5 seeds; `8.264` a `14.469` pares/seed), e em `kiba/cold_drug` apenas `206` SMILES por seed (`836` no pool). Em `davis/cold_drug` (`v2_kfold`), os `68` compostos totais deixam apenas **`13–14` fármacos únicos no conjunto de teste de cada dobra**, produzindo intervalos amplos (`MSE = 0.8467 ± 0.3258`) e extrema sensibilidade à composição da dobra 2 (`MSE = 1.3670`).
+
+4. **Dependência entre treinos nas dobras `v2_kfold` e baixo poder de testes com `n = 5`:**
+   - As `5` dobras do `v2_kfold` compartilham `~80%` dos dados de treino entre si, e `v1_seeds` reamostra o mesmo conjunto KIBA/Davis (`n = 5` unidades), conferindo baixo poder para comparações pareadas em nível de unidade. O bootstrap pareado em bloco (`n=1000, seed=42`, `T13`) mitiga a pseudorreplicação por par ao reamostrar **clusters únicos** (`68` a `836`), mas não elimina a sobreposição entre conjuntos de treinamento das dobras/seeds.
+
+5. **Emenda do teto de épocas (`500 -> 1000`), assimetria residual em `davis/cold_target` e orçamento de ajuste:**
+   - Conforme `06_AUDITORIA_FASE3.md`, os `19` runs iniciais do Davis (`commit` pré-`46d13f8`) incluíam `epochs = 500` nos `4` folds `0,2,3,4` de `davis/cold_target`, ao passo que a dobra 1 foi estendida via `--extend-epochs` para `1000` épocas (convergindo em `best_epoch = 525`, total `605`, e distorcendo o `sec_per_epoch` registrado para `0.260 s/época` pela retomada do checkpoint). Todos os `62` runs pós-ADR #15 (KIBA, `davis/random` e controles) utilizaram a **mesma configuração única congelada (`epochs = 1000`, `0` ajustes de hiperparâmetros pós-congelamento)**, atendendo `over_80_pct_runs_physdual = []`. Ainda assim, resta apenas `1` ponto de configuração avaliado na Fase 3 (ausência de busca extensiva de regularização/arquitetura sobre o KIBA para não violar o pré-registro).
+
+6. **Múltiplas comparações exploratórias sem ajuste de multiplicidade:**
+   - O **ADR #15** confinou o teste confirmatório estritamente aos regimes do KIBA (`2` comparadores primários por regime). Todas as demais comparações em `T10`–`T14` (Davis cold, comparação contra médias marginais/GraphDTA adicionais, subconjuntos não censurados e classificação binária com limiares a verificar) são exploratórias e não passaram por correção de múltiplos testes (Bonferroni/FDR).
+
+7. **Natureza estritamente diagnóstica dos controles e ocorrência de memorização precoce (`best_epoch < 15`):**
+   - Os controles `--shuffle-esm` (`shuf0/1/2` em `davis/cold_target`), `ecfp_esm_mlp` (`davis/cold_target` e `davis/cold_drug`), `--train-seed-offset 1000` (`davis/cold_target_seqid30` e dobra 2 de `davis/cold_drug`) e a análise *post-hoc* sem a dobra 2 (`T14`, `phase3_audits.json`) são testes mecanísticos/sensibilidade e **não** conferem evidência confirmatória. Ademais, `10/81` runs `cold` da Fase 3 apresentaram `best_epoch < 15` (`7` shuffled, `2` `ecfp_esm_mlp` em `davis/cold_drug` dobras `3,4` e `1` `gin_esm_mlp` em `davis/cold_drug` dobra `2`; `0/30` no KIBA), comparável a `19/85` runs retrospectivos do `GraphDTAGIN` em Davis (`early_cold_runs_graphdta`).
+
+8. **Mutantes colapsados em `davis/random` e artefato obsoleto `phase3_davis_paired_bootstrap.json`:**
+   - O dataset Davis contém **`81` IDs de alvo colapsados em apenas `18` sequências exatas idênticas** (`dataset_overlap_and_units.davis_collapsed_mutants`). No split `davis/random`, as mesmas proteínas e sequências idênticas aparecem simultaneamente em treino e teste, explicando parte do desempenho elevado de `gin_esm_mlp` (`CI = 0.9057`) e `knn_kmer_target` (`0.8481`) sem implicar capacidade de generalização.
+   - **Divergência / artefato obsoleto identificado na auditoria:** `outputs/results/phase3_davis_paired_bootstrap.json` possui `mtime = 2026-11-14 00:13:05` (anterior à extensão da dobra 1 de `davis/cold_target`), registrando `OOF CI/MSE = 0.8146 / 0.4385` contra os OOF atuais `0.8149 / 0.4372` (`T11`, `phase3_audits.json`). Esse JSON **não** foi utilizado em `T9`–`T15` (recalculados em CPU via `phase3_audits.py`), permanecendo intocado conforme regra de não alteração de artefatos; **correção proposta ao usuário:** reexecutar `python scripts/run_phase3_paired_bootstrap.py --dataset davis`.
