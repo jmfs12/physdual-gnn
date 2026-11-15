@@ -64,7 +64,24 @@ from run_phase3_esm_cpu_baselines import (  # noqa: E402
     _compute_classical_unit,
 )
 
-RESIDUAL_ALPHAS: tuple[float, ...] = (1.0, 10.0, 100.0, 1000.0, 10000.0, 50000.0)
+RESIDUAL_ALPHAS: tuple[float, ...] = (
+    0.001,
+    0.01,
+    0.1,
+    1.0,
+    10.0,
+    100.0,
+    1000.0,
+    10000.0,
+    50000.0,
+    100000.0,
+    250000.0,
+    1000000.0,
+    5000000.0,
+    25000000.0,
+    100000000.0,
+)
+PREVIOUS_ALPHA_CEILING: float = 50000.0
 
 
 def _fast_ci(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -266,28 +283,36 @@ def compute_intragroup_v2_kfold(data_root: Path) -> dict[str, Any]:
         yt = cpu_df["y_true"].to_numpy(dtype=np.float64)
         grp = cpu_df[gcol].astype(str).to_numpy()
         folds_arr = cpu_df["fold"].to_numpy(dtype=np.int64)
-        tot2, elig2 = _prepare_group_indices(grp, yt, min_pairs=2)
-        tot5, elig5 = _prepare_group_indices(grp, yt, min_pairs=5)
         fold_preps = []
+        tot5_preps = []
         for f in range(5):
             f_mask = folds_arr == f
             f_idx = np.flatnonzero(f_mask)
             f_tot2, f_elig2 = _prepare_group_indices(grp[f_idx], yt[f_idx], min_pairs=2)
+            f_tot5, f_elig5 = _prepare_group_indices(grp[f_idx], yt[f_idx], min_pairs=5)
             fold_preps.append((f_idx, f_tot2, f_elig2))
+            tot5_preps.append((f_idx, f_tot5, f_elig5))
         models_out: dict[str, Any] = {}
         for mname, yp in preds.items():
             f_res = [
                 _intragroup_from_prepared(yt[f_idx], yp[f_idx], f_tot2, f_elig2)
                 for f_idx, f_tot2, f_elig2 in fold_preps
             ]
+            f_res5 = [
+                _intragroup_from_prepared(yt[f_idx], yp[f_idx], f_tot5, f_elig5)
+                for f_idx, f_tot5, f_elig5 in tot5_preps
+            ]
             models_out[mname] = {
-                "min_pairs_2": _intragroup_from_prepared(yt, yp, tot2, elig2),
-                "min_pairs_5": _intragroup_from_prepared(yt, yp, tot5, elig5),
                 "per_fold_min2": {
                     "ci_mean": sample_mean_std([x["ci_mean"] for x in f_res if x["ci_mean"] is not None]),
                     "spearman_mean": sample_mean_std([x["spearman_mean"] for x in f_res if x["spearman_mean"] is not None]),
                     "n_groups_evaluable_per_fold": [x["n_groups_evaluable"] for x in f_res],
                     "n_groups_const_pred_per_fold": [x["n_groups_const_pred"] for x in f_res],
+                },
+                "per_fold_min5": {
+                    "ci_mean": sample_mean_std([x["ci_mean"] for x in f_res5 if x["ci_mean"] is not None]),
+                    "spearman_mean": sample_mean_std([x["spearman_mean"] for x in f_res5 if x["spearman_mean"] is not None]),
+                    "n_groups_evaluable_per_fold": [x["n_groups_evaluable"] for x in f_res5],
                 },
                 "oof_global": _fast_all_metrics(yt, yp),
             }
@@ -610,25 +635,40 @@ def compute_residual_stacking(
                 per_unit_metrics[vname].append(_fast_all_metrics(y_te, yp_te))
 
         yt_oof = np.concatenate(oof_y_true_all)
-        grp_oof = np.concatenate(oof_grp_all)
-        tot2_oof, elig2_oof = _prepare_group_indices(grp_oof, yt_oof, min_pairs=2) if proto == "kfold" else (0, [])
-        tot5_oof, elig5_oof = _prepare_group_indices(grp_oof, yt_oof, min_pairs=5) if proto == "kfold" else (0, [])
-        unit_preps = [_prepare_group_indices(oof_grp_all[i], oof_y_true_all[i], min_pairs=2) for i in range(5)]
+        unit_preps2 = [_prepare_group_indices(oof_grp_all[i], oof_y_true_all[i], min_pairs=2) for i in range(5)]
+        unit_preps5 = [_prepare_group_indices(oof_grp_all[i], oof_y_true_all[i], min_pairs=5) for i in range(5)]
         variant_summaries: dict[str, Any] = {}
         for vname, ulist in per_unit_metrics.items():
             yp_oof = np.concatenate(oof_preds_by_variant[vname])
-            intra2 = _intragroup_from_prepared(yt_oof, yp_oof, tot2_oof, elig2_oof) if proto == "kfold" else None
-            intra5 = _intragroup_from_prepared(yt_oof, yp_oof, tot5_oof, elig5_oof) if proto == "kfold" else None
             u_intra2 = [
-                _intragroup_from_prepared(oof_y_true_all[i], oof_preds_by_variant[vname][i], unit_preps[i][0], unit_preps[i][1])
+                _intragroup_from_prepared(oof_y_true_all[i], oof_preds_by_variant[vname][i], unit_preps2[i][0], unit_preps2[i][1])
+                for i in range(5)
+            ]
+            u_intra5 = [
+                _intragroup_from_prepared(oof_y_true_all[i], oof_preds_by_variant[vname][i], unit_preps5[i][0], unit_preps5[i][1])
                 for i in range(5)
             ]
             per_unit_intra2 = {
                 "ci_mean": sample_mean_std([x["ci_mean"] for x in u_intra2 if x["ci_mean"] is not None]),
                 "spearman_mean": sample_mean_std([x["spearman_mean"] for x in u_intra2 if x["spearman_mean"] is not None]),
             }
-            if proto == "seeds":
-                intra2 = per_unit_intra2
+            per_unit_intra5 = {
+                "ci_mean": sample_mean_std([x["ci_mean"] for x in u_intra5 if x["ci_mean"] is not None]),
+                "spearman_mean": sample_mean_std([x["spearman_mean"] for x in u_intra5 if x["spearman_mean"] is not None]),
+            }
+            alphas_list = chosen_alphas.get(vname, [])
+            per_unit_records = [
+                {
+                    "unit": i,
+                    "alpha": float(alphas_list[i]) if i < len(alphas_list) else None,
+                    "ci": float(ulist[i]["ci"]),
+                    "mse": float(ulist[i]["mse"]),
+                    "rm2": float(ulist[i]["rm2"]),
+                    "intra_ci_min2": u_intra2[i]["ci_mean"],
+                    "intra_spearman_min2": u_intra2[i]["spearman_mean"],
+                }
+                for i in range(5)
+            ]
             variant_summaries[vname] = {
                 "per_unit_mean_std": {
                     "ci": sample_mean_std([x["ci"] for x in ulist]),
@@ -636,16 +676,25 @@ def compute_residual_stacking(
                     "rm2": sample_mean_std([x["rm2"] for x in ulist]),
                 },
                 "oof_global": _fast_all_metrics(yt_oof, yp_oof) if proto == "kfold" else None,
-                "intragroup_min2": intra2,
                 "intragroup_per_unit_min2": per_unit_intra2,
-                "intragroup_min5": intra5,
-                "chosen_alphas": chosen_alphas.get(vname, []),
+                "intragroup_per_unit_min5": per_unit_intra5,
+                "chosen_alphas": alphas_list,
+                "alpha_hit_floor_count": sum(1 for a in alphas_list if float(a) == float(RESIDUAL_ALPHAS[0])),
+                "alpha_hit_ceiling_count": sum(1 for a in alphas_list if float(a) == float(RESIDUAL_ALPHAS[-1])),
+                "alpha_above_prev_50000_count": sum(1 for a in alphas_list if float(a) > PREVIOUS_ALPHA_CEILING),
+                "per_unit": per_unit_records,
             }
 
         stack_out[reg_key] = {
             "protocol": "v2_kfold" if proto == "kfold" else "v1_seeds",
             "residual_target": f"y_true - {bias_col}_mean_train",
             "intragroup_axis": intra_gcol,
+            "alpha_grid": [float(a) for a in RESIDUAL_ALPHAS],
+            "alpha_grid_previous_ceiling": PREVIOUS_ALPHA_CEILING,
+            "standardization": (
+                "z-score por coluna ajustado estritamente em train (mu=mean(Z_tr), sd=std(Z_tr, ddof=0), "
+                "piso sd<1e-8->1.0); residuo centrado em mean(r_tr); SVD bilinear n_comp<=16 em entidades unicas de train"
+            ),
             "variants": variant_summaries,
         }
 

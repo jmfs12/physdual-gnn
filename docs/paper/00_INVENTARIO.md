@@ -1,7 +1,7 @@
 # Passo 0 — Inventário e Auditoria de Proveniência (Fases 1, 2 e 3)
 
 - **Gerado automaticamente por:** `scripts/paper/build_inventory_and_repro.py`
-- **Commit HEAD do repositório:** `fcc3046`
+- **Commit HEAD do repositório:** `2fe4f45`
 - **Auditoria detalhada da Fase 3:** ver [`docs/paper/06_AUDITORIA_FASE3.md`](06_AUDITORIA_FASE3.md) e [`docs/paper/phase3_audits.json`](phase3_audits.json).
 - **Versões de pipeline identificadas:**
   - **Featurizador molecular:** `['v2_onehot78_l1norm']` (`configs/base.yaml`: `v2_onehot78_l1norm`)
@@ -30,7 +30,7 @@
 | `cache/esm_embeddings/` | Fase 1–3 | `esm2_t33_650M_UR50D`, `esm_dim=1280` | `gitignored` | completo (429 `.pt` locais + Drive validado: 429/429 .pt fp16, dim=1280) |
 | `scripts/paper/audit_esm_cache_colab.py` | Fase 1/2 (auditoria) | Colab / Drive (`esm2_t33_650M_UR50D/*.pt`, `fp16`, `NaN/Inf=0`, `dim=1280`) | `bd5feaf` | executado no Drive (`all_checks_passed: true`, 429/429 válidos, 0 resíduos) |
 | `scripts/paper/cpu_audits.py` + `docs/paper/cpu_audits.json` | Fase 1/2 (auditoria CPU) | Noise floor, `pKd>5`, marginais/kNN `v1`, timing limpo, seq-id Davis | `64cae10` | completo (recomputado em CPU) |
-| `scripts/paper/phase3_audits.py` + `docs/paper/phase3_audits.json` | Fase 3 (auditoria CPU) | Pré-registro Git, integridade 166 runs, OOFs, KIBA v1/v2 & bootstrap `n=1000` | `d6d225f` | completo (recomputado em CPU a partir de cache `.pt` + CSVs) |
+| `scripts/paper/phase3_audits.py` + `docs/paper/phase3_audits.json` | Fase 3 (auditoria CPU) | Pré-registro Git, integridade 166 runs, OOFs, KIBA v1/v2 & bootstrap `n=1000` | `2fe4f45` | completo (recomputado em CPU a partir de cache `.pt` + CSVs) |
 | `outputs/logs/phase1_summary_report.json` | Fase 1 | datasets=['davis', 'kiba'], `windowed_sequences=112` | `gitignored (local)` | completo (davis, kiba; janelas=112) |
 | `outputs/results/phase2_timing_benchmark.json` | Fase 2 | NVIDIA L4, 3 épocas | `gitignored (local)` | completo |
 | `outputs/results/baseline_graphdta_cnn3_davis_cold_drug.json` | Fase 2 | v1_seeds | `gitignored (local)` | completo (5 unidades; marginais/kNN em `cpu_audits.json`) |
@@ -172,13 +172,14 @@
 7. **Limpeza de inchaço, regeneração do bootstrap e significado do gate de integridade (`outputs/results/`):**
    - Removido `oof_predictions` de `baseline_graphdta_gin_kiba_random.json` (reduzido para `87,448 bytes`).
    - **Bootstrap do Davis regenerado e sincronizado:** `outputs/results/phase3_davis_paired_bootstrap.json` foi regenerado via `python scripts/run_phase3_paired_bootstrap.py --dataset davis` após a extensão da dobra `1` de `davis/cold_target` (`525/605/1000` épocas), convergindo exatamente com `docs/paper/phase3_audits.json` (`CI = 0.8149`, `MSE = 0.4372`).
-   - **Análises pós-auditoria em CPU e scripts Colab:** `scripts/paper/phase3_intragroup_and_stacking.py` gerou `docs/paper/phase3_intragroup_and_stacking.json` (ranking intragrupo e stacking residual em CPU, somente leitura); `scripts/paper/colab_ridge_esm_pooling.py` e `scripts/paper/colab_kiba_cold_drug_ecfp.py` foram gerados para diagnóstico no Colab sem execução local.
+   - **Análises pós-auditoria em CPU e scripts Colab:** `scripts/paper/phase3_intragroup_and_stacking.py` gerou `docs/paper/phase3_intragroup_and_stacking.json` (ranking intragrupo por dobra e stacking residual com grade `1e-3..1e8` em CPU, somente leitura) e `scripts/paper/seqid_identity_audit.py` gerou `docs/paper/seqid_identity_audit.json` (auditoria BLOSUM62 global `min(len)`/`max(len)` e Smith-Waterman por dobra); `scripts/paper/colab_ridge_esm_pooling.py` e `scripts/paper/colab_kiba_cold_drug_ecfp.py` foram gerados para diagnóstico no Colab sem execução local.
    - **Escopo do gate `verify_phase3.py --full --no-require-paired-win`:** aprovação (`EXIT: 0`) significa **apenas integridade estrutural, numérica e de contratos** (esquema, isolamento, completude e ausência de NaNs), **NÃO sucesso científico** (o veredito negativo do ADR #15 permanece registrado em `T9` e `06_AUDITORIA_FASE3.md`).
 
 ## 4. Histórico Recente de Commits (`git log`)
 
 | Hash | Data e Mensagem |
 | :--- | :--- |
+| `2fe4f45` | 2026-11-15 — docs(paper): apply 9 Phase 3 review adjustments, CPU intragroup/stacking analyses, and Colab diagnostics |
 | `fcc3046` | 2026-11-15 — docs(paper): refresh inventory provenance hashes after Phase 3 commits |
 | `461421b` | 2026-11-15 — docs(paper): update drafts 02-05 and pipeline tests with Phase 3 ADR #15 evaluation |
 | `815e016` | 2026-11-15 — docs(paper): regenerate Phase 3 tables, figures, captions, inventory and reproduction guide |
@@ -198,4 +199,3 @@
 | `4a12e48` | 2026-11-13 — docs(paper): atualizar inventario e reproducao apos endurecimento do auditor ESM-2 |
 | `bd5feaf` | 2026-11-13 — feat(paper): validar fp16, finitude NaN/Inf, dim 1280 e seq_len vs CSV no auditor ESM-2 |
 | `0db79f8` | 2026-11-13 — docs(paper): registrar auditoria do cache ESM-2 no Drive (429/429 validos, 83/83 windowed) |
-| `c8ddd87` | 2026-11-13 — fix(paper): corrigir auditor ESM-2 para subpasta do modelo e contagem global 83 |

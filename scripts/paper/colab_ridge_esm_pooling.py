@@ -61,7 +61,29 @@ from physdual.eval.metrics import (  # noqa: E402
 )
 
 POOLING_MODES: tuple[str, ...] = ("mean", "max", "mean_std")
-RIDGE_ALPHAS: tuple[float, ...] = (1e-2, 1e-1, 1.0, 10.0, 100.0, 1000.0, 10000.0, 50000.0)
+RIDGE_ALPHAS: tuple[float, ...] = (
+    0.001,
+    0.01,
+    0.1,
+    1.0,
+    10.0,
+    100.0,
+    1000.0,
+    10000.0,
+    50000.0,
+    100000.0,
+    250000.0,
+    1000000.0,
+    5000000.0,
+    25000000.0,
+    100000000.0,
+)
+PHASE4_DECISION_CRITERION: str = (
+    "Critério pré-definido (Fase 4): só prosseguir para nova arquitetura pesada (ex.: L x 1280 + atenção cruzada) "
+    "se `max` ou `mean_std` sobre os tensores [L, 1280] recuperar sinal intragrupo no KIBA `cold_target_seqid30` "
+    "acima do Ridge `mean` atual (intragroup fold_CI e/ou residual stacking acima de `res_esm` com `mean`). "
+    "Caso contrário, o bloqueio não está apenas no pooling da proteína congelada."
+)
 
 
 def load_esm_pooling_variants(
@@ -345,6 +367,9 @@ def main(argv: list[str] | None = None) -> int:
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "elapsed_sec": round(time.perf_counter() - t0, 2),
         "pooling_modes": list(POOLING_MODES),
+        "alpha_grid": [float(a) for a in RIDGE_ALPHAS],
+        "standardization": "z-score por coluna ajustado estritamente em train (ddof=0, piso sd<1e-8->1.0)",
+        "phase4_decision_criterion": PHASE4_DECISION_CRITERION,
         "results": results,
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)

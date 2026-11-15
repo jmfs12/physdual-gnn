@@ -39,6 +39,7 @@ REQUIRED_REPO_INPUTS = [
     "docs/paper/cpu_audits.json",
     "docs/paper/phase3_audits.json",
     "docs/paper/phase3_intragroup_and_stacking.json",
+    "docs/paper/seqid_identity_audit.json",
 ]
 
 REQUIRED_DATA_INPUTS = [

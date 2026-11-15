@@ -306,12 +306,46 @@ def test_phase3_audits_json_complete_aggregates() -> None:
 
 
 def test_phase3_intragroup_and_colab_scripts_present() -> None:
+    import py_compile
+
     ig_path = PAPER_DIR / "phase3_intragroup_and_stacking.json"
     assert ig_path.exists() and ig_path.stat().st_size > 1000
     ig = json.loads(ig_path.read_text(encoding="utf-8"))
     for k in ("intragroup_v2_kfold", "intragroup_v1_seeds", "residual_stacking"):
         assert k in ig and len(ig[k]) > 0, f"Chave '{k}' ausente/vazia em phase3_intragroup_and_stacking.json"
 
+    for reg_data in ig["intragroup_v2_kfold"].values():
+        for m_data in reg_data["models"].values():
+            assert "per_fold_min2" in m_data and "per_fold_min5" in m_data
+            assert "min_pairs_2" not in m_data and "min_pairs_5" not in m_data
+
+    for reg_data in ig["residual_stacking"].values():
+        assert reg_data["alpha_grid"][-1] == 100_000_000.0
+        assert "standardization" in reg_data
+        assert len(reg_data["variants"]["res_esm"]["chosen_alphas"]) == 5
+        for v_data in reg_data["variants"].values():
+            assert "intragroup_per_unit_min2" in v_data and "intragroup_per_unit_min5" in v_data
+            assert "intragroup_min2" not in v_data and "intragroup_min5" not in v_data
+
+    sw_path = PAPER_DIR / "seqid_identity_audit.json"
+    assert sw_path.exists() and sw_path.stat().st_size > 1000
+    sw = json.loads(sw_path.read_text(encoding="utf-8"))
+    for ds in ("davis", "kiba"):
+        for reg in ("cold_target_seqid30", "cold_target_seqid40"):
+            r = sw["datasets"][ds]["regimes"][reg]
+            assert len(r["folds"]) == 5
+            overall = r["across_all_units_test_proteins"]
+            if reg.endswith("30"):
+                assert overall["global_id_max"]["count_gt_30"] == 0
+            else:
+                assert overall["global_id_max"]["count_gt_40"] == 0
+            assert "sw_id_aln_len_ge150aa" in overall
+
     for sname in ("colab_ridge_esm_pooling.py", "colab_kiba_cold_drug_ecfp.py"):
         sp = REPO_ROOT / "scripts" / "paper" / sname
         assert sp.exists() and sp.stat().st_size > 500, f"Script Colab ausente: {sp}"
+        py_compile.compile(str(sp), doraise=True)
+
+    pooling_src = (REPO_ROOT / "scripts" / "paper" / "colab_ridge_esm_pooling.py").read_text(encoding="utf-8")
+    assert "PHASE4_DECISION_CRITERION" in pooling_src
+    assert "100000000.0" in pooling_src

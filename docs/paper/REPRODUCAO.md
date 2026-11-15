@@ -1,7 +1,7 @@
 # Reprodutibilidade do Pacote do Artigo (Fases 1, 2 e 3)
 
-- **Gerado em (UTC):** `2026-11-15T15:37:36Z`
-- **Commit HEAD:** `fcc3046`
+- **Gerado em (UTC):** `2026-11-15T16:21:04Z`
+- **Commit HEAD:** `2fe4f45`
 - **Variável de raiz de artefatos:** `PHYSDUAL_ROOT` (padrão local: raiz do repositório Git; no Colab: `/content/drive/MyDrive/physdual-gnn`).
 
 ## 1. Ordem Exata de Execução
@@ -17,8 +17,11 @@ python scripts/paper/cpu_audits.py
 #    (ou fracionado em --step meta, --step v2, --step v1_cold, --step v1_random)
 python scripts/paper/phase3_audits.py --step all
 
-# 3. (CPU, determinístico) Análise intragrupo e baseline de empilhamento residual (somente leitura)
+# 3. (CPU, determinístico) Análise intragrupo por dobra e baseline de empilhamento residual (somente leitura)
 python scripts/paper/phase3_intragroup_and_stacking.py
+
+# 3b. (CPU, determinístico) Auditoria Smith-Waterman e razão min(len) dos splits seqid30/40
+python scripts/paper/seqid_identity_audit.py
 
 # 4. Pipeline completo do pacote do artigo (inventário, T1..T15, figuras F1..F11 e REPRODUCAO.md)
 python scripts/paper/build_all.py
@@ -80,7 +83,7 @@ Google Drive       : MONTADO em /content/drive/MyDrive (livre=223.54 GiB / total
 
 ## 3. Checksums SHA-256 dos Artefatos JSON de Entrada
 
-Total de arquivos JSON auditados: **276**.
+Total de arquivos JSON auditados: **277**.
 
 | Arquivo (relativo a `PHYSDUAL_ROOT`) | Tamanho (bytes) | SHA-256 |
 | :--- | :---: | :--- |
@@ -148,7 +151,8 @@ Total de arquivos JSON auditados: **276**.
 | `data/processed/splits/kiba_random_seed4.json` | 1307988 | `24ce643209963321aefa1de970a47b5b2be863c72457b0d548559eb5e0dc24af` |
 | `docs/paper/cpu_audits.json` | 147907 | `b9feb38f606fddb7a4bda1ddcb6105a9f0c7399fa80add2f225b53050d45d211` |
 | `docs/paper/phase3_audits.json` | 650457 | `00782e0b0b5ddeb20e6295a64ca8a471b80998f1e4281c4282f71697fa986dfc` |
-| `docs/paper/phase3_intragroup_and_stacking.json` | 187420 | `f8804e4578c49d20e54c91a8f48324392fbb61e4d9624694dfb8625584297baa` |
+| `docs/paper/phase3_intragroup_and_stacking.json` | 210741 | `5073c22bd28aff1cbf053680c935b0ffbca6dd2db86d943f22dadb58cbc81eac` |
+| `docs/paper/seqid_identity_audit.json` | 181913 | `cb5adf390f23aee49909e4b9130558a86c4549705660be239a09de46ba0f24d3` |
 | `outputs/logs/davis_seqid_cluster_map.json` | 577846 | `93df09eb21f9d546760f640f3aa25a0fa1ec6c454f0da24582507dd04ee81da6` |
 | `outputs/logs/davis_seqid_splits_summary.json` | 5532 | `60f5f828e4466911ab412827b6cbcc2ffa16597cfcc787ef1c9ed184d68e1867` |
 | `outputs/logs/kiba_seqid_cluster_map.json` | 341913 | `de2c01c36a03e29b97b135fc6dac428d181e838a1be27ac66f8bd167f481031b` |
