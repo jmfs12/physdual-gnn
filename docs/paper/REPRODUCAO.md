@@ -1,7 +1,7 @@
-# Reprodutibilidade do Pacote do Artigo (Fases 1 e 2)
+# Reprodutibilidade do Pacote do Artigo (Fases 1, 2 e 3)
 
-- **Gerado em (UTC):** `2026-11-14T03:31:43Z`
-- **Commit HEAD:** `06d1249`
+- **Gerado em (UTC):** `2026-11-15T03:41:11Z`
+- **Commit HEAD:** `936c32f`
 - **Variável de raiz de artefatos:** `PHYSDUAL_ROOT` (padrão local: raiz do repositório Git; no Colab: `/content/drive/MyDrive/physdual-gnn`).
 
 ## 1. Ordem Exata de Execução
@@ -10,23 +10,27 @@
 # 0. (Opcional, se os dados estiverem fora da raiz do repo)
 export PHYSDUAL_ROOT=/caminho/para/physdual-gnn
 
-# 1. (CPU, deterministico) Recomputar auditorias em CPU (noise floor, pKd>5, marginais/kNN v1, seq-id Davis)
+# 1. (CPU, determinístico) Recomputar auditorias base Fases 1-2
 python scripts/paper/cpu_audits.py
 
-# 2. (Opcional, se necessário reagregar os JSONs de baseline a partir de outputs/results/runs/)
-python scripts/run_phase2_baseline.py --aggregate-only
+# 2. (CPU, determinístico) Recomputar auditoria forense e bootstrap pareado da Fase 3
+#    (ou fracionado em --step meta, --step v2, --step v1_cold, --step v1_random)
+python scripts/paper/phase3_audits.py --step all
 
-# 3. Pipeline completo do pacote do artigo (inventário, tabelas T1..T8, figuras F1..F6 e REPRODUCAO.md)
+# 3. (Opcional — recomendação Fase 3 para atualizar outputs/results/phase3_davis_paired_bootstrap.json)
+# python scripts/run_phase3_paired_bootstrap.py --dataset davis
+
+# 4. Pipeline completo do pacote do artigo (inventário, T1..T15, figuras F1..F11 e REPRODUCAO.md)
 python scripts/paper/build_all.py
 
-# 4. Validação automatizada de esquema, ausência de NaNs e bloqueio contra valores-p de cauda extremos
+# 5. Validação automatizada de esquema, completude, ausência de NaNs e proteção contra valores-p extremos
 pytest tests/test_paper_pipeline.py
 
-# 5. (Executar no Google Colab com Drive montado) Auditoria física dos .pt do cache ESM-2
+# 6. (Opcional Colab Drive) Auditoria física dos .pt do cache ESM-2
 PHYSDUAL_ROOT=/content/drive/MyDrive/physdual-gnn python scripts/paper/audit_esm_cache_colab.py
 ```
 
-Ou invocando os módulos individuais do passo 3 na ordem exata:
+Ou invocando os módulos individuais do passo 4 na ordem exata:
 1. `python scripts/paper/build_inventory_and_repro.py`
 2. `python scripts/paper/build_tables.py`
 3. `python scripts/paper/make_figures.py`
@@ -70,7 +74,7 @@ Google Drive       : MONTADO em /content/drive/MyDrive (livre=223.54 GiB / total
 
 ## 3. Checksums SHA-256 dos Artefatos JSON de Entrada
 
-Total de arquivos JSON auditados: **167**.
+Total de arquivos JSON auditados: **275**.
 
 | Arquivo (relativo a `PHYSDUAL_ROOT`) | Tamanho (bytes) | SHA-256 |
 | :--- | :---: | :--- |
@@ -96,6 +100,16 @@ Total de arquivos JSON auditados: **167**.
 | `data/processed/splits/davis_cold_target_seed2.json` | 319556 | `9cd8c424ac6cfe99654cacb2bc7ee3acdfa6c064b9815146f4b8c93d7c10b048` |
 | `data/processed/splits/davis_cold_target_seed3.json` | 319556 | `69f6064940078262c9a091ff257eb3ff5430632fcd4d240cc3b9a967ed6ad6cb` |
 | `data/processed/splits/davis_cold_target_seed4.json` | 319556 | `e121dcf3c1a376c49e806fc50dc2f5de0d3bd748c0cc86cbeaad2f4af6cd3d0c` |
+| `data/processed/splits/davis_cold_target_seqid30_fold0.json` | 350451 | `e87688be77e95eef6c3386276888c0265850dcf569e6cec3ea070d4622d19bae` |
+| `data/processed/splits/davis_cold_target_seqid30_fold1.json` | 350452 | `44fa6c886f1194006e2d55c25f144714cb8b4ac47e0de2e5e3ecd71e0fd8c40b` |
+| `data/processed/splits/davis_cold_target_seqid30_fold2.json` | 350452 | `aa0820ce9d5664a9ca6a04020344dc679925cce8d3b74348cbe7e4c19a745c20` |
+| `data/processed/splits/davis_cold_target_seqid30_fold3.json` | 350452 | `20ceb2e3f4a5906dba818bc2aa59f1f81f34de69639f751135335113abae5e9e` |
+| `data/processed/splits/davis_cold_target_seqid30_fold4.json` | 350451 | `be8e18c08d9fa7526f9bde2e9cd9229ddfb93d92d39007251ba087d91f15a127` |
+| `data/processed/splits/davis_cold_target_seqid40_fold0.json` | 350454 | `9a9e12ed4c47502ef25c0be24aad67b6a378b6158a7a758574d3c9a6c63d0327` |
+| `data/processed/splits/davis_cold_target_seqid40_fold1.json` | 350454 | `922049d2be648226244bb52943a023a67a1fcb20e21f6ff52da438972cd95a34` |
+| `data/processed/splits/davis_cold_target_seqid40_fold2.json` | 350454 | `513da1a7ee5380200f79064fbe3f72abb0977188137b1a7b0b9983db053b6997` |
+| `data/processed/splits/davis_cold_target_seqid40_fold3.json` | 350454 | `f961e4bc3618deb3b72f9b738e7bb30cc1e6accf585a068728540c2f3d46c720` |
+| `data/processed/splits/davis_cold_target_seqid40_fold4.json` | 350454 | `4d79655d4ad8e32ca1c04825012ea00f4481686e6846962433c67f21122c2b00` |
 | `data/processed/splits/davis_random_seed0.json` | 319556 | `a22f23571e254733f43589ee35e1e56ad1fa2e321a7f7d460f8658cca3b4e143` |
 | `data/processed/splits/davis_random_seed1.json` | 319556 | `a8b1f050caa26db2afa508f869005dc2d9281291f8b11ada3c8c03ddd56a6f7b` |
 | `data/processed/splits/davis_random_seed2.json` | 319556 | `be861eb354c31a0a32704af1738161af4f2cf655f1b2a92a6bd11c265da15aeb` |
@@ -111,12 +125,27 @@ Total de arquivos JSON auditados: **167**.
 | `data/processed/splits/kiba_cold_target_seed2.json` | 1307988 | `7ef0ee187d32b9c2f2793ea781a2ba284f44e590d80e527906004dcfa46540ca` |
 | `data/processed/splits/kiba_cold_target_seed3.json` | 1307988 | `ab503014c378f6f0d90bb63878589188826eb5336ec39a2f75d1ddebc0c9dc82` |
 | `data/processed/splits/kiba_cold_target_seed4.json` | 1307988 | `b5a249cbe9e01b4de0dede7f2c58d7755d37bad7da11ab7a2fd4237f36efbf82` |
+| `data/processed/splits/kiba_cold_target_seqid30_fold0.json` | 1427081 | `891a43640e550ea6ba576751591ad63087aa62bf5c7f63237c220db31cbc2890` |
+| `data/processed/splits/kiba_cold_target_seqid30_fold1.json` | 1427082 | `fe108140bf30ac8b2575a81adc3deaa5408570ba7a92a1b3c4b2909f68063b70` |
+| `data/processed/splits/kiba_cold_target_seqid30_fold2.json` | 1427082 | `691a7a6ced4f907b26c5610579876c8b838d5e565ce861d1000cb6e22effdb7f` |
+| `data/processed/splits/kiba_cold_target_seqid30_fold3.json` | 1427082 | `59cbb34bdbed025d9c76deae4e284af7603e13ef2fa5806ffa9bbd4af0c01835` |
+| `data/processed/splits/kiba_cold_target_seqid30_fold4.json` | 1427081 | `ff874745bcec8133d4364a51d4635e597d3143696031d15adc8ef6aa0cf6616d` |
+| `data/processed/splits/kiba_cold_target_seqid40_fold0.json` | 1427082 | `511835e7b294442e3b1e68dde48f421b2c234c5f21d4303c147fb89892abf9c0` |
+| `data/processed/splits/kiba_cold_target_seqid40_fold1.json` | 1427082 | `3fed439a5633fb98aa7db4b9c57e2eeb1bc8c9e663daab13f4cafaaad50c0b97` |
+| `data/processed/splits/kiba_cold_target_seqid40_fold2.json` | 1427082 | `2b7e2301063534b8d8b88839e521087c0eb9dad5b93b8bf713d6935b631e6490` |
+| `data/processed/splits/kiba_cold_target_seqid40_fold3.json` | 1427082 | `a74f77641295ecd80c96758303bccfd0566964f61d9b8e914a6d615407dbfd30` |
+| `data/processed/splits/kiba_cold_target_seqid40_fold4.json` | 1427082 | `7006f4cd632e3f768d9f1c1c35af5341906dd4d5020b8eba3cf83d1c6f036c3e` |
 | `data/processed/splits/kiba_random_seed0.json` | 1307988 | `cd57f53872266c1430d69ba7b4c07d0b03834afde9cb862183926201cc0126af` |
 | `data/processed/splits/kiba_random_seed1.json` | 1307988 | `d2a1a911afa38a14558e6e2ad5faeba5490693c9d8785bd1a847a4545c43afa8` |
 | `data/processed/splits/kiba_random_seed2.json` | 1307988 | `69c78b7e34640ea1b32f897c7fa26c319cbb18233691b5f19099f15e94e310e8` |
 | `data/processed/splits/kiba_random_seed3.json` | 1307988 | `427f5e0b0bb1bda6f7395029597be78f495df5aa79fe4f678384dc32cdf18996` |
 | `data/processed/splits/kiba_random_seed4.json` | 1307988 | `24ce643209963321aefa1de970a47b5b2be863c72457b0d548559eb5e0dc24af` |
 | `docs/paper/cpu_audits.json` | 147907 | `b9feb38f606fddb7a4bda1ddcb6105a9f0c7399fa80add2f225b53050d45d211` |
+| `docs/paper/phase3_audits.json` | 648787 | `2f8888d31334583ec5ecbb89336fb70d2018203bbb7815360fb6be75c3c0a09c` |
+| `outputs/logs/davis_seqid_cluster_map.json` | 577846 | `93df09eb21f9d546760f640f3aa25a0fa1ec6c454f0da24582507dd04ee81da6` |
+| `outputs/logs/davis_seqid_splits_summary.json` | 5532 | `60f5f828e4466911ab412827b6cbcc2ffa16597cfcc787ef1c9ed184d68e1867` |
+| `outputs/logs/kiba_seqid_cluster_map.json` | 341913 | `de2c01c36a03e29b97b135fc6dac428d181e838a1be27ac66f8bd167f481031b` |
+| `outputs/logs/kiba_seqid_splits_summary.json` | 3937 | `3bede4265a0b8a71fb468953e266025ca9b18eb3b3a4b7d4284b79d76016cfac` |
 | `outputs/logs/phase1_summary_report.json` | 21616 | `09ae6f898e996ce1799a65d3ac08bac9fe2ce57317d292eb820df630c31952c4` |
 | `outputs/results/baseline_graphdta_cnn3_davis_cold_drug.json` | 18578 | `c7c3f2228b17f476ff44241af42710da51619433881802212f2c23197a07061f` |
 | `outputs/results/baseline_graphdta_cnn3_davis_cold_drug_kfold.json` | 147454 | `6c8321cf323dea1e0c305aa25c55c36f6c9bdd503fbe90a545a55679fe2289a5` |
@@ -135,7 +164,29 @@ Total de arquivos JSON auditados: **167**.
 | `outputs/results/baseline_graphdta_gin_kiba_cold_drug.json` | 16534 | `dcec4e14431349790a5148ceecc6e37def46715570479e19e9aac9e007886899` |
 | `outputs/results/baseline_graphdta_gin_kiba_cold_target.json` | 16547 | `55baffb44713ff3eef9cf0ba9d51206dcf41b70613f769cb4a2f21d30cd7939e` |
 | `outputs/results/baseline_graphdta_gin_kiba_random.json` | 87448 | `23ee01dea5e235fc76b51939fe2d1a7089f288385022864939df66992f82a5db` |
+| `outputs/results/kiba_cpu_classical_baselines.json` | 63074 | `3414df48cb2ba5140a044458941a6b738cd7cd3acf3ff5d50bd1a6c35586fc30` |
 | `outputs/results/phase2_timing_benchmark.json` | 444 | `401f6b684e352779ad24e6553486106b2579c2043071c9baf07dc0d5e1c99213` |
+| `outputs/results/phase3_davis_paired_bootstrap.json` | 101792 | `e975fe2ef24b49c0447a81b004a7f6fab95b297d681df7224c48ed75e3ff0418` |
+| `outputs/results/phase3_esm_cpu_baselines.json` | 88087 | `c52850af1f80f4ab20a98dc5e1e584a231e7dbaa62f8a0d5eadce71ef7dd0092` |
+| `outputs/results/phase3_kiba_paired_bootstrap.json` | 34397 | `fedcfb78546e6adc9b231f51c1eba538fbe72cdae296e9c13fa27cb3aae681a7` |
+| `outputs/results/phase3_physdual_ecfp_esm_mlp_davis_cold_drug_kfold.json` | 108520 | `c6cfaee4d96451721d185c81aabc1c8852404a5ac28f0cead2708b3db5ed7e18` |
+| `outputs/results/phase3_physdual_ecfp_esm_mlp_davis_cold_target_kfold.json` | 287044 | `abf26948456555ef18779653915edd312bcaaa54c00b19c4548a43cca0bb566d` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_davis_cold_drug_kfold.json` | 193941 | `c491395ce3f34a9cbb47db3b8bbab978be44f74e96cebae30cd6e8df8d39b0e8` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_davis_cold_target_kfold.json` | 322923 | `b501c6bc6346e87321e23f0cc18bdc717c16d97295ab82ba4517b334a2748ffb` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_davis_cold_target_seqid30_kfold.json` | 192191 | `9bc251f3b09ac84514c0ca90985c157059a69075990d97e18f5269a69a617c10` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_davis_cold_target_seqid40_kfold.json` | 187883 | `e51db0a1f5c8f550452b1cd7550de0b3979da7696b5b9d9f48e4a9aff1ddcb90` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_davis_random.json` | 458734 | `8faa3b0c6d4b1e3dc3a9cdb66c7a0b8d927a2b5bb68f17955d14938a092c1bd6` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_kiba_cold_drug.json` | 244118 | `5d95500ceef5256d90d4557f980539545ffa740311c89278459e06ed5c036816` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_kiba_cold_target.json` | 307609 | `d162d1dc3bfdfe3a79cad614be2ad8ac50c76fd615fa48290d42dfed3b00e10d` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_kiba_cold_target_seqid30_kfold.json` | 165733 | `652268ca0f9d6fe55fb587e0fdbcbbe596f4c105417be49f0213cd68cf9bca09` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_kiba_cold_target_seqid40_kfold.json` | 199562 | `26531238643b19c459afc53fee09d785d0047501d132d90d35eca323534f75ad` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_kiba_random.json` | 549661 | `622b4a8f3fec744e8aa9480c618480981d1429963f3f3a4a0def43b1c243c996` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_shuf0_davis_cold_target_kfold.json` | 113378 | `19ca90783c82b95a6c2167abc6bbd73f3c9b46a944487db6c207f5dbe8882d08` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_shuf1_davis_cold_target_kfold.json` | 124175 | `acf302d0ad5dcb2a4cde57faab6a51dc9956cabb6f28b5f9090439d9e8f74eed` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_shuf2_davis_cold_target_kfold.json` | 109780 | `8de995330014111019dc5a9fff6ed9292788240829d7305a006c904687b8719f` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_tsoff1000_davis_cold_drug_kfold.json` | 27795 | `9fdea6cd963077d0c3357e47db34a3ea705bc31bfc1b88dc41cac9c8eeaa58f3` |
+| `outputs/results/phase3_physdual_gin_esm_mlp_tsoff1000_davis_cold_target_seqid30_kfold.json` | 246626 | `f0b6783af7559e8e0ffddd95d049de4b30c56f0fd83bb0206a56c6c8641d541c` |
+| `outputs/results/phase3_seqid_classical_baselines.json` | 26779 | `7469cced8678671286af2855c65bd5324bd4ca13939f4d0624f2b9ef12a0ea1f` |
 | `outputs/results/runs/graphdta_cnn3_davis_cold_drug_fold0.json` | 2224075 | `48f662d146e245ecb0f5e14d32e25037792debb1d03573fd48c6e4053f85d695` |
 | `outputs/results/runs/graphdta_cnn3_davis_cold_drug_fold1.json` | 2202652 | `6789b9366472026d79025756c651f1dc684418f389b8f44c5b82c6d72ee4b70f` |
 | `outputs/results/runs/graphdta_cnn3_davis_cold_drug_fold2.json` | 2252680 | `ee1747cdf103f53133ea2d008f8991289adf1c40a95086fdb2dfae4471ef9e1c` |
@@ -221,13 +272,23 @@ Total de arquivos JSON auditados: **167**.
 | `outputs/results/runs/graphdta_gin_kiba_random_seed2.json` | 1984 | `eadd886f9b8cd13534e7d55da0b7b20475f99f029de74eba1b71ef92eba4a354` |
 | `outputs/results/runs/graphdta_gin_kiba_random_seed3.json` | 4318620 | `2d9c9a6a15afa786191156fddabe6b9e4420879e7e77994039d9068ab00e6385` |
 | `outputs/results/runs/graphdta_gin_kiba_random_seed4.json` | 1984 | `fb81ac87be433c07d8151ed97ddbd9d6f3071e519100654e1eb8c395450f89bc` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_drug_fold0.json` | 6983691 | `262ec0b226352ea07dcb2cac6bbb96b625c8c25b2da8c4bbbed1ecdf4828e33b` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_drug_fold1.json` | 6959988 | `116debb2f701f159b3a73e5e56d9049ef52ea06a6358ed949f071a5a98072fc1` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_drug_fold2.json` | 6997702 | `8ea2aca37aa98593cca3382bd7e9d430b2fdb0fcf33bbd1cb5bed5fa498bdd10` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_drug_fold3.json` | 6470211 | `8cadc0f60fb758f6c38d9f6c5cff72443c85badceed3bbe8124f56bd0686f3da` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_drug_fold4.json` | 6440446 | `0c9535c436a5bf9899206f256012a740eeca7cb39c34e8b26f9e5c02689d8ac9` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_target_fold0.json` | 6663964 | `8e0bdc01bd237a7c6aa91971598bbf9b4f85bd6627f14e05cef0e645aa477c81` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_target_fold1.json` | 5892420 | `be90c29168a848116bfba54cf35fd794defdb2f4483c03266deb2f8922560895` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_target_fold2.json` | 7855742 | `01497ff5037d741828652f69e84b6f4f2c477080bbfb7f8f245bc692909f0118` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_target_fold3.json` | 6691280 | `5e8f2891e08ae55d641e4b42bd34c7a1826d68c9c04a472ad56c0f373f2000ca` |
+| `outputs/results/runs/physdual_ecfp_esm_mlp_davis_cold_target_fold4.json` | 6894368 | `6c23c50158141d535eea7988ec1ec1647052e91d7ac389e7c676a3a7c7a76abf` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_drug_fold0.json` | 7004154 | `0c172291a36fda81a27a16d0f68b920758110ff71078a4b55df1daaf8b93f73b` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_drug_fold1.json` | 6968653 | `dd18bef8ec25cd580fa86e94cf7fb099e1c6deb20574c02aa94fa83025e410c5` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_drug_fold2.json` | 6994767 | `9cc73acb3dc49e880598f64dde638f0bff6042e9d506045ec2b98166f058fcc6` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_drug_fold3.json` | 6489278 | `318e08032598f944eaffc93efce08194139d40ee02af36e3c79c4c88e578a96f` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_drug_fold4.json` | 6468158 | `b21d7ff9c242547e5c5e9c7052c734c472419dad487ba0c039d5e9b2c3849b9b` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_fold0.json` | 6677763 | `42df3cd00f53fe0b9b9e7ea33b52aa5203a971710c5feedcaeb5b0ee59540985` |
-| `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_fold1.json` | 5933417 | `17e9fd098087a4183e60e99f79363b38579c1b1b3e3d57db4b0d1d1441ece989` |
+| `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_fold1.json` | 5949024 | `01b05e667dacad7491c9a03c108322f30aabda8d0cad3bb594a5044ffdafab78` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_fold2.json` | 7813994 | `24fda41e2418c6ec48a5feb0a6958a9ed6b2e9e2ace1606f143181f5bb1784a4` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_fold3.json` | 6697169 | `7a2952725d417c364e75004c594a345d5dba6c003d9993e4983b4b33057bead3` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_fold4.json` | 6890755 | `c89a192c1173c70bece90b89039869dca80878fd6011ee3132004a86d57a2b9b` |
@@ -241,3 +302,54 @@ Total de arquivos JSON auditados: **167**.
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_seqid40_fold2.json` | 7466012 | `523c256299283cd8ddc587b7376397fa5862ecb9eb7bcf9c4aa0ed9374127f5e` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_seqid40_fold3.json` | 6742716 | `fcf9c276f095d34e4781029a1d3efb153d33c92c9cfe4fee5eb813601f8c8ccc` |
 | `outputs/results/runs/physdual_gin_esm_mlp_davis_cold_target_seqid40_fold4.json` | 5986914 | `12c94c785beb0430d5314767c7a692c180c5df845430fe7359cb8c687a162b2c` |
+| `outputs/results/runs/physdual_gin_esm_mlp_davis_random_seed0.json` | 3407831 | `fabfc30786c51f971b185f759e746e2f2ab614ffa0f223af83fde4f21bd55fd4` |
+| `outputs/results/runs/physdual_gin_esm_mlp_davis_random_seed1.json` | 3456435 | `0205c7beef8753c031d18e7bbef5a0efca69251463aa26a54ef957a58643577a` |
+| `outputs/results/runs/physdual_gin_esm_mlp_davis_random_seed2.json` | 3488426 | `bd8dca3becd5b71d79579a9be8288371ef9d2d9f4cd95d3f859642f3fbd306cb` |
+| `outputs/results/runs/physdual_gin_esm_mlp_davis_random_seed3.json` | 3456650 | `1154f4dcff5d46e4cc568f420c60f6a00b40c051895ddc0f78b86aa4b0e6ea2a` |
+| `outputs/results/runs/physdual_gin_esm_mlp_davis_random_seed4.json` | 3466932 | `940266f4d08f7c40966fb6475cbb2fb1e3f27129ee196030bc1d019802cfd038` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_drug_seed0.json` | 14729592 | `f68549ae5fa7ffeea30a0228210d7873befe4588edf2e6ddf286dc2fea7d65ff` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_drug_seed1.json` | 12611184 | `dbe28dda1983e2ea40c44a4637c0495564da77caa6a454bac8cb74e59ce71653` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_drug_seed2.json` | 13290253 | `a576c534a35698a9f21db53e731c02e957232ede50e55d207015b84b81494631` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_drug_seed3.json` | 12917946 | `9037a19e7b9688361abfa9006d537d2cde72de93863f92440b190af38f0c247e` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_drug_seed4.json` | 14529287 | `bf0481af778aca44a05f931511d9f1def4a79a9d42e2c4e9b46756dd7076b3d7` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seed0.json` | 8730905 | `cf3e6a68dafd8b4f70b75e32369d74eb7c7e1e8d121447f9cc3dc63926a0b6ca` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seed1.json` | 12703832 | `c468d7c3a396f4ef9b9d642de1d5fbdd33e99f7a5781aae5b830e3910a65710b` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seed2.json` | 13515762 | `bdb9eb5921f6d5840d54b7a21cb299777d7bf5731edd24c0242085f21c8f6f7c` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seed3.json` | 13694734 | `1eeb73d5843e8b13ca012b1aac0761303f6e448f53a2c075410f9dd72eda9f98` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seed4.json` | 11865118 | `dfca57542eb66efcec52e3451df60384f37863346e52be34641fd79675493409` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid30_fold0.json` | 29182570 | `3e8eff64155b18d08ce18e67b528155257365c9889e36bae114ed24485f2427d` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid30_fold1.json` | 26678473 | `81356468bd8f8cb1292657329f7a6a8f5ddecd9598184e0a4ddecb8e36facdd4` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid30_fold2.json` | 21838304 | `3fd957336dbe131ec2b67025a82e98cc9e9f6461d701f09e58e0b100718c4b25` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid30_fold3.json` | 23257156 | `2761ef2f9cf90d14793241ffe68d74c640a9376d191dbd9218e3c831b3143fd5` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid30_fold4.json` | 26286690 | `f5091326a46c2df17a30c63d7028517b4b613bdb502d9e9a421401afa8fcb25f` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid40_fold0.json` | 24027858 | `95d281196cb28747c91dd8b3e49f164b3c54c32542816130d3d2fe43d04a69bf` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid40_fold1.json` | 24837452 | `4717f9d658517d40e924bd42729299cc908541f24185e50b56465ff71f84dd31` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid40_fold2.json` | 25185690 | `fd8fd2ca78f30950b0b2fc806b587ca8c290d5c8686fe257a989865d3c009077` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid40_fold3.json` | 28356324 | `5e5de9b0c03f4db51aba0135e8e25c74e9940ec65da07d9105e77b4defc25921` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_cold_target_seqid40_fold4.json` | 24868502 | `dc8e8bf2fc400eba0a49528dfdc01cfd9ff083c069d3e24e7e75c2795049470c` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_random_seed0.json` | 12826760 | `2c00a5f06a70f662d6604ad3d6ffbd0b310d0bba825363b70221fad13a370fdb` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_random_seed1.json` | 12868701 | `5cac9458f4600fe9e8612aaec314e9d747cbe3cb8d501bf40940a52709129608` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_random_seed2.json` | 12834333 | `0e727d4b9bd963386622df783c2b826c30775b3d1435db4892fd788ebd89cef6` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_random_seed3.json` | 12897466 | `5ae5173678dbda23563f33c9ee76a2a194e1db233109efd1851691e874123f23` |
+| `outputs/results/runs/physdual_gin_esm_mlp_kiba_random_seed4.json` | 12769806 | `3bea70a62f834de535b9b3a29d5217d43ebbd20682addd05fdcded304bcf4e3d` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf0_davis_cold_target_fold0.json` | 6636904 | `604742d5aeb855b8657a4f740faac125e102e95e860947fb2952d44182c135da` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf0_davis_cold_target_fold1.json` | 5885812 | `6397b98bf090d85466d0f162767719fc74a566ff358ab480875f27f1c8305c16` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf0_davis_cold_target_fold2.json` | 7780431 | `cb5597c2f7831c52a80b85b5da8bcd4e32a93e24e35c752a59cd251c04b7b90c` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf0_davis_cold_target_fold3.json` | 6674491 | `a0d857ed187e9bcf88d37f4b11df8f463550c21b5ec36363dd1687d63a679922` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf0_davis_cold_target_fold4.json` | 6871236 | `71a2980cd9cd4bb990bdb9bef2bceb4c5189e98f3b0e5bce1e3329126fa72396` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf1_davis_cold_target_fold0.json` | 6637860 | `ad2de261af339c3f81c2475e546fb509345251f4863416fc4859e287b14ae338` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf1_davis_cold_target_fold1.json` | 5875597 | `69721b7b20a77bd7f20ec96dbaec2ce41ba6aebdcf091daf171bdabc5c2dd671` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf1_davis_cold_target_fold2.json` | 7786557 | `d6e01ac0d91a7f0c5a1619ab71d0b6a78c9a73e7e260e79c4dd6622380fbeff4` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf1_davis_cold_target_fold3.json` | 6684478 | `de144c3cb7359729c49f3805c8366fd32b423b0567cdbf7382793f28cb5abc9f` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf1_davis_cold_target_fold4.json` | 6873254 | `e2cba1532900092052a5e436d7e3b8035b8aa780daf3197d47ba621a74a9554c` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf2_davis_cold_target_fold0.json` | 6637568 | `cbf7ac7b706cdb423a32791018c2b10e55aa282195a1947c81233a7e108f159c` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf2_davis_cold_target_fold1.json` | 5878378 | `484f209b74f246d760cae957bf6efa56e40485cdf3b4378c81fca141341a50f9` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf2_davis_cold_target_fold2.json` | 7782262 | `6bf7a18049d2365812e733e440206784789074f97d6ef6f1ed9a7f42477bd0d1` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf2_davis_cold_target_fold3.json` | 6676331 | `b72aa43669be9b52a3dd599b9b8562133eb3fcf7c09321b745ae8e3c8488a448` |
+| `outputs/results/runs/physdual_gin_esm_mlp_shuf2_davis_cold_target_fold4.json` | 6871176 | `eb7c97c633b35bac8e5c163f774e78d450fbe8ea0ae7e70ea1512be7333398eb` |
+| `outputs/results/runs/physdual_gin_esm_mlp_tsoff1000_davis_cold_drug_fold2.json` | 6998675 | `7bc72a7da17255bec5b816747df43cea0522a499e5c264bf6123153d59808edd` |
+| `outputs/results/runs/physdual_gin_esm_mlp_tsoff1000_davis_cold_target_seqid30_fold0.json` | 5444825 | `4fff5c0f5d3a93cd61ca0d5dc695975615c60310828249349c15c780d66d1d69` |
+| `outputs/results/runs/physdual_gin_esm_mlp_tsoff1000_davis_cold_target_seqid30_fold1.json` | 7015405 | `63579d8bc8a70dbd620a8235eff7ced038a83a671471235ace49092f1ccebdb9` |
+| `outputs/results/runs/physdual_gin_esm_mlp_tsoff1000_davis_cold_target_seqid30_fold2.json` | 6673017 | `253a375d5c2bcda3ed550ed98dae3426842758aea671984408e2a44df6f3564c` |
+| `outputs/results/runs/physdual_gin_esm_mlp_tsoff1000_davis_cold_target_seqid30_fold3.json` | 7617150 | `8efd6564d365730401092db88bf18ae38b969839dd92d2599e8630810e6d027a` |
+| `outputs/results/runs/physdual_gin_esm_mlp_tsoff1000_davis_cold_target_seqid30_fold4.json` | 7219694 | `2ee22d895e6a19bb6d2f12893db351084dfd74f58b46daba785d30ef8d7c593b` |
