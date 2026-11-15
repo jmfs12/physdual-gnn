@@ -1,4 +1,4 @@
-"""Passo 2: Gera figuras F1..F6 em PDF e PNG (paleta Okabe-Ito) + `CAPTIONS.md`."""
+"""Passo 2: Gera figuras F1..F11 em PDF e PNG (paleta Okabe-Ito) + `CAPTIONS.md`."""
 
 from __future__ import annotations
 
@@ -452,6 +452,376 @@ def make_f6(data_root: Path, figures_dir: Path) -> dict[str, Path]:
     return _save_fig(fig, figures_dir, "F6_seq_length_stratification")
 
 
+def _normalize_phase3_model(name: str) -> str:
+    s = str(name)
+    return s[len("physdual_") :] if s.startswith("physdual_") else s
+
+
+def make_f7(repo_root: Path, figures_dir: Path) -> dict[str, Path]:
+    """F7: Curva de generalização (Δ vs ridge_esm e melhor não-ESM) com IC bootstrap; v1 e v2 separados."""
+    pa = load_json_strict(repo_root / "docs" / "paper" / "phase3_audits.json")
+    fig, axes = plt.subplots(2, 2, figsize=(13.8, 8.2))
+
+    # Configuracao por coluna: Davis (esquerda) e KIBA (direita), mantendo v1_seeds e v2_kfold disjuntos
+    davis_ticks = [
+        ("v1_seeds", "davis/random", "random\n(v1, ±DP)"),
+        ("v2_kfold", "davis/cold_target", "cold_target\n(v2)"),
+        ("v2_kfold", "davis/cold_target_seqid40", "seqid40\n(v2)"),
+        ("v2_kfold", "davis/cold_target_seqid30", "seqid30\n(v2)"),
+        ("v2_kfold", "davis/cold_drug", "cold_drug\n(v2)"),
+    ]
+    kiba_ticks = [
+        ("v1_seeds", "kiba/random", "random\n(v1, ±DP)"),
+        ("v1_seeds", "kiba/cold_target", "cold_target\n(v1)"),
+        ("v1_seeds", "kiba/cold_drug", "cold_drug\n(v1)"),
+        ("v2_kfold", "kiba/cold_target_seqid40", "seqid40\n(v2)"),
+        ("v2_kfold", "kiba/cold_target_seqid30", "seqid30\n(v2)"),
+    ]
+
+    for row_idx, (metric_key, boot_field, ylabel, better_note) in enumerate([
+        ("delta_mse", "delta_mse", "Δ MSE (gin_esm_mlp − Baseline) ↓", "Δ MSE (< 0 favorece modelo)"),
+        ("delta_ci", "delta_ci", "Δ CI (gin_esm_mlp − Baseline) ↑", "Δ CI (> 0 favorece modelo)"),
+    ]):
+        for col_idx, (ds_title, specs, grad_indices, v1_sep_x, extra_sep_x) in enumerate([
+            ("Davis (v1 sanidade | v2 exploratório)", davis_ticks, [1, 2, 3], 0.5, 3.5),
+            ("KIBA (v1 primário | v2 seqid secundário)", kiba_ticks, [3, 4], 2.5, None),
+        ]):
+            ax = axes[row_idx, col_idx]
+            x_vals = np.arange(len(specs))
+
+            for comp_kind, off, col, mk, ls, comp_label in [
+                ("ridge", -0.11, BLUE, "o", "-", "vs. ridge_esm"),
+                ("best_non", 0.11, VERMILION, "s", "--", "vs. melhor baseline não-ESM"),
+            ]:
+                pts_x, pts_y, err_lo, err_hi = [], [], [], []
+                is_boot = []
+                for xi, (proto, rkey, _lbl) in enumerate(specs):
+                    reg = pa[proto]["regimes"][rkey]
+                    if comp_kind == "ridge":
+                        comp_name = "ridge_esm"
+                    else:
+                        if proto == "v1_seeds":
+                            comp_name = reg.get("best_non_esm_mse")
+                        else:
+                            comp_name = reg.get("best_non_esm_oof_mse")
+                        if not comp_name:
+                            continue
+
+                    paired = reg["paired_vs_baselines_seeds" if proto == "v1_seeds" else "paired_vs_baselines_folds"][comp_name]
+                    boot_map = reg.get("bootstrap_vs_baselines_pooled_clusters" if proto == "v1_seeds" else "bootstrap_vs_baselines") or {}
+                    bt = boot_map.get(comp_name)
+                    if bt is not None:
+                        val = bt[boot_field]["mean"]
+                        ci95 = bt[boot_field]["ci_95"]
+                        pts_x.append(xi + off)
+                        pts_y.append(val)
+                        err_lo.append(max(0.0, val - ci95[0]))
+                        err_hi.append(max(0.0, ci95[1] - val))
+                        is_boot.append(True)
+                    else:
+                        val = paired[f"{metric_key}_mean"]
+                        sd = paired[f"{metric_key}_std"]
+                        pts_x.append(xi + off)
+                        pts_y.append(val)
+                        err_lo.append(sd)
+                        err_hi.append(sd)
+                        is_boot.append(False)
+
+                # Plotar pontos individuais com seus respectivos ICs/DPs
+                for px, py, elo, ehi, bflag, idx_pt in zip(pts_x, pts_y, err_lo, err_hi, is_boot, range(len(pts_x))):
+                    ax.errorbar(
+                        [px], [py], yerr=[[elo], [ehi]],
+                        fmt=mk, color=col, ecolor=col, elinewidth=1.8 if bflag else 1.2,
+                        capsize=4.0, markersize=6.0, alpha=0.95 if bflag else 0.72,
+                        label=comp_label if idx_pt == 0 else None, zorder=5,
+                    )
+
+                # Conectar exclusivamente a curva seqid contínua do protocolo v2_kfold (sem misturar v1 e v2)
+                if comp_kind == "ridge":
+                    grad_map = {int(round(px - off)): (px, py) for px, py in zip(pts_x, pts_y)}
+                    gx = [grad_map[g][0] for g in grad_indices if g in grad_map]
+                    gy = [grad_map[g][1] for g in grad_indices if g in grad_map]
+                    if len(gx) >= 2:
+                        ax.plot(gx, gy, color=col, linestyle="-", linewidth=1.7, alpha=0.85, zorder=4)
+                else:
+                    grad_map = {int(round(px - off)): (px, py) for px, py in zip(pts_x, pts_y)}
+                    gx = [grad_map[g][0] for g in grad_indices if g in grad_map]
+                    gy = [grad_map[g][1] for g in grad_indices if g in grad_map]
+                    if len(gx) >= 2:
+                        ax.plot(gx, gy, color=col, linestyle="--", linewidth=1.5, alpha=0.85, zorder=4)
+
+            ax.axhline(0.0, color=BLACK, linestyle="--", linewidth=1.1, zorder=2)
+            ax.axvline(v1_sep_x, color=GRAY, linestyle=":", linewidth=1.3, zorder=2)
+            if extra_sep_x is not None:
+                ax.axvline(extra_sep_x, color=GRAY, linestyle=":", linewidth=1.1, zorder=2)
+
+            ax.set_xticks(x_vals)
+            ax.set_xticklabels([s[2] for s in specs], fontsize=8.2)
+            if col_idx == 0:
+                ax.set_ylabel(ylabel)
+            ax.set_title(f"{ds_title} — {better_note}", fontsize=9.6)
+            ax.legend(loc="best", fontsize=7.8, frameon=True)
+
+    fig.suptitle(
+        "F7 — Curva de Generalização (gin_esm_mlp vs. ridge_esm e Melhor Não-ESM; v1 e v2 Estritamente Separados)",
+        fontweight="bold", y=0.98,
+    )
+    fig.subplots_adjust(hspace=0.36, wspace=0.22, top=0.90)
+    return _save_fig(fig, figures_dir, "F7_generalization_curve")
+
+
+def make_f8(repo_root: Path, figures_dir: Path) -> dict[str, Path]:
+    """F8: Δ pareado por unidade (seed/dobra) contra ridge_esm e melhor baseline não-ESM em painéis v1 vs v2."""
+    pa = load_json_strict(repo_root / "docs" / "paper" / "phase3_audits.json")
+    fig, axes = plt.subplots(2, 2, figsize=(14.0, 8.0), gridspec_kw={"width_ratios": [1.0, 2.35]})
+
+    v1_specs = [("kiba/cold_drug", "KIBA\ncold_drug"), ("kiba/cold_target", "KIBA\ncold_target")]
+    v2_specs = [
+        ("kiba/cold_target_seqid40", "KIBA\nseqid40"),
+        ("kiba/cold_target_seqid30", "KIBA\nseqid30"),
+        ("davis/cold_target", "Davis\ncold_target"),
+        ("davis/cold_target_seqid40", "Davis\nseqid40"),
+        ("davis/cold_target_seqid30", "Davis\nseqid30"),
+        ("davis/cold_drug", "Davis\ncold_drug"),
+    ]
+
+    for row_idx, (field, ylabel, subtitle) in enumerate([
+        ("delta_mse", "Δ MSE Pareado (gin_esm_mlp − Baseline)", "Δ MSE (< 0 favorece modelo)"),
+        ("delta_ci", "Δ CI Pareado (gin_esm_mlp − Baseline)", "Δ CI (> 0 favorece modelo)"),
+    ]):
+        for col_idx, (proto, specs, panel_title) in enumerate([
+            ("v1_seeds", v1_specs, "v1_seeds (5 Seeds — KIBA Primário)"),
+            ("v2_kfold", v2_specs, "v2_kfold (5-Fold GroupKFold — KIBA seqid & Davis Expl.)"),
+        ]):
+            ax = axes[row_idx, col_idx]
+            x_vals = np.arange(len(specs))
+            for comp_kind, off, col, mk, lbl in [
+                ("ridge_esm", -0.17, BLUE, "o", "vs. ridge_esm"),
+                ("best_non", 0.17, VERMILION, "s", "vs. melhor baseline não-ESM"),
+            ]:
+                for idx, (rkey, _) in enumerate(specs):
+                    reg = pa[proto]["regimes"][rkey]
+                    comp = "ridge_esm" if comp_kind == "ridge_esm" else (
+                        reg["best_non_esm_mse"] if proto == "v1_seeds" else reg["best_non_esm_oof_mse"]
+                    )
+                    pm = reg["paired_vs_baselines_seeds" if proto == "v1_seeds" else "paired_vs_baselines_folds"][comp]
+                    vals = pm[f"{field}_per_unit"]
+                    jit = np.linspace(-0.045, 0.045, len(vals))
+                    xpos = x_vals[idx] + off
+                    ax.scatter(
+                        np.full(len(vals), xpos) + jit, vals,
+                        color=col, marker=mk, alpha=0.72, s=34, zorder=4,
+                        label=lbl if idx == 0 else None,
+                    )
+                    m = pm[f"{field}_mean"]
+                    s = pm[f"{field}_std"]
+                    ax.errorbar(
+                        [xpos], [m], yerr=[[s], [s]], fmt="D", color=BLACK,
+                        ecolor=col, elinewidth=1.8, capsize=4.0, markersize=5.2, zorder=6,
+                    )
+            ax.axhline(0.0, color=BLACK, linestyle="--", linewidth=1.1, zorder=2)
+            ax.set_xticks(x_vals)
+            ax.set_xticklabels([lbl for _, lbl in specs], fontsize=8.2)
+            if col_idx == 0:
+                ax.set_ylabel(ylabel)
+            ax.set_title(f"{panel_title} | {subtitle}", fontsize=9.3)
+            ax.legend(loc="best", fontsize=7.6, frameon=True)
+
+    fig.suptitle(
+        "F8 — Δ Pareado por Seed/Dobra vs. ridge_esm e Melhor Não-ESM (Pontos Individuais e Média ± DP)",
+        fontweight="bold", y=0.98,
+    )
+    fig.subplots_adjust(hspace=0.36, wspace=0.22, top=0.90)
+    return _save_fig(fig, figures_dir, "F8_paired_deltas_by_unit")
+
+
+def make_f9(repo_root: Path, figures_dir: Path) -> dict[str, Path]:
+    """F9: Controles diagnósticos no Davis cold_target (modelo real vs shuffle-esm vs ecfp_esm_mlp vs baselines)."""
+    pa = load_json_strict(repo_root / "docs" / "paper" / "phase3_audits.json")
+    reg = pa["v2_kfold"]["regimes"]["davis/cold_target"]
+    pms = reg["per_model_summary"]
+    pfm = reg["per_fold_by_model"]
+
+    items = [
+        ("gin_esm_mlp", "gin_esm_mlp (real)", BLUE),
+        ("ecfp_esm_mlp", "ecfp_esm_mlp (ECFP4)", GREEN),
+        ("ridge_esm", "ridge_esm (linear)", SKY),
+        ("knn_kmer_target", "knn_kmer (não-ESM)", GRAY),
+        ("drug_mean_predictor", "drug_mean (marginal)", BLACK),
+        ("shuf0", "shuf0 (ESM perm.)", VERMILION),
+        ("shuf1", "shuf1 (ESM perm.)", ORANGE),
+        ("shuf2", "shuf2 (ESM perm.)", PURPLE),
+    ]
+
+    fig, axes = plt.subplots(1, 2, figsize=(14.4, 5.2))
+    x = np.arange(len(items))
+
+    for ax, metric_k, pf_k, ylabel, title in [
+        (axes[0], "ci_per_fold", "ci", "Concordance Index (CI ↑)", "CI Médio (± DP) e Dobras em Davis cold_target"),
+        (axes[1], "mse_per_fold", "mse", "MSE (↓)", "MSE Médio (± DP) e Dobras em Davis cold_target"),
+    ]:
+        means = [pms[m][metric_k]["mean"] for m, _, _ in items]
+        stds = [pms[m][metric_k]["std"] for m, _, _ in items]
+        cols = [c for _, _, c in items]
+
+        ax.bar(x, means, yerr=stds, capsize=3.5, color=cols, alpha=0.78, edgecolor="white", zorder=3)
+        dm_ref = pms["drug_mean_predictor"][metric_k]["mean"]
+        ax.axhline(dm_ref, color=BLACK, linestyle="--", linewidth=1.3, label=f"drug_mean ({dm_ref:.4f})", zorder=4)
+
+        for xi, (m_key, _, _col) in enumerate(items):
+            vals = [float(e[pf_k]) for e in pfm[m_key]]
+            jit = np.linspace(-0.14, 0.14, len(vals))
+            ax.scatter(np.full(len(vals), xi) + jit, vals, color=BLACK, s=18, alpha=0.75, zorder=5)
+
+        ax.set_xticks(x)
+        ax.set_xticklabels([lbl for _, lbl, _ in items], fontsize=8.0, rotation=28, ha="right")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.legend(loc="best", fontsize=8.0, frameon=True)
+
+    fig.suptitle(
+        "F9 — Controles Diagnósticos em Davis cold_target: gin_esm_mlp vs. --shuffle-esm vs. ecfp_esm_mlp vs. drug_mean (Exploratório)",
+        fontweight="bold", y=0.98,
+    )
+    fig.subplots_adjust(wspace=0.20, bottom=0.25, top=0.85)
+    return _save_fig(fig, figures_dir, "F9_diagnostic_controls_cold_target")
+
+
+def make_f10(repo_root: Path, figures_dir: Path) -> dict[str, Path]:
+    """F10: Desempenho por dobra (0..4) em Davis cold_drug para todos os modelos com a dobra 2 destacada."""
+    pa = load_json_strict(repo_root / "docs" / "paper" / "phase3_audits.json")
+    reg = pa["v2_kfold"]["regimes"]["davis/cold_drug"]
+    pfm = reg["per_fold_by_model"]
+    f2_tsoff = pa["v2_kfold"]["davis_cold_drug_fold2_tsoff1000"]["test_metrics_full"]
+
+    series = [
+        ("gin_esm_mlp", "gin_esm_mlp (5 folds)", BLUE, "o", "-", 2.3),
+        ("ecfp_esm_mlp", "ecfp_esm_mlp (ECFP4)", GREEN, "s", "--", 1.8),
+        ("graphdta_cnn3", "graphdta_cnn3", ORANGE, "^", "-.", 1.5),
+        ("graphdta_gin", "graphdta_gin", PURPLE, "v", ":", 1.5),
+        ("ridge_esm", "ridge_esm", SKY, "D", "-", 1.6),
+        ("knn_kmer_target", "knn_kmer_target", VERMILION, "P", "--", 1.6),
+        ("knn_tanimoto_drug", "knn_tanimoto_drug", GRAY, "X", "-.", 1.6),
+        ("target_mean_predictor", "target_mean_predictor", BLACK, "_", ":", 1.5),
+    ]
+
+    fig, axes = plt.subplots(1, 2, figsize=(13.6, 5.6))
+    folds = np.arange(5)
+
+    for ax_idx, (ax, field, ylabel, title) in enumerate([
+        (axes[0], "ci", "Concordance Index (CI ↑)", "CI por Dobra em Davis cold_drug"),
+        (axes[1], "mse", "MSE (↓)", "MSE por Dobra em Davis cold_drug"),
+    ]):
+        ax.axvspan(1.65, 2.35, color=VERMILION, alpha=0.12, zorder=1, label="Dobra 2 (extrema)" if ax_idx == 0 else None)
+        for mod, lbl, col, mk, ls, lw in series:
+            entries = sorted(pfm[mod], key=lambda e: int(e["fold"]))
+            ys = [float(e[field]) for e in entries]
+            ax.plot(folds, ys, color=col, marker=mk, linestyle=ls, linewidth=lw, markersize=6.0, label=lbl if ax_idx == 0 else None, zorder=4)
+
+        ax.scatter(
+            [2.0], [float(f2_tsoff[field])],
+            marker="*", s=175, color=VERMILION, edgecolor=BLACK, linewidths=0.8,
+            label="tsoff1000 fold 2 (CI=0.7090; MSE=1.0765)" if ax_idx == 0 else None, zorder=7,
+        )
+        ax.set_xticks(folds)
+        ax.set_xticklabels([f"Fold {f}" for f in folds])
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=5, fontsize=8.0, frameon=True, bbox_to_anchor=(0.5, 0.01))
+    fig.suptitle(
+        "F10 — Desempenho Lado a Lado por Dobra em Davis cold_drug (Dobra 2 Destacada + Controle tsoff1000)",
+        fontweight="bold", y=0.98,
+    )
+    fig.subplots_adjust(wspace=0.18, bottom=0.20, top=0.87)
+    return _save_fig(fig, figures_dir, "F10_cold_drug_per_fold")
+
+
+def make_f11(data_root: Path, figures_dir: Path) -> dict[str, Path]:
+    """F11: Gap treino-validação no melhor checkpoint e best_epoch para todas as 81 execuções da Fase 3."""
+    runs_dir = data_root / "outputs" / "results" / "runs"
+    p3_runs = []
+    for p in sorted(runs_dir.glob("*.json")):
+        d = load_json_strict(p)
+        if str(d.get("model", "")).startswith("graphdta_"):
+            continue
+        d["_proto"] = "v2_kfold" if d.get("fold") is not None else "v1_seeds"
+        d["_mod_norm"] = _normalize_phase3_model(d["model"])
+        p3_runs.append(d)
+
+    v1_groups = [
+        ("davis", "random", "gin_esm_mlp", "Davis\nrandom"),
+        ("kiba", "random", "gin_esm_mlp", "KIBA\nrandom"),
+        ("kiba", "cold_drug", "gin_esm_mlp", "KIBA\ncold_drug"),
+        ("kiba", "cold_target", "gin_esm_mlp", "KIBA\ncold_target"),
+    ]
+    v2_groups = [
+        ("davis", "cold_target", "gin_esm_mlp", "Davis\ncold_target"),
+        ("davis", "cold_drug", "gin_esm_mlp", "Davis\ncold_drug"),
+        ("davis", "cold_target_seqid40", "gin_esm_mlp", "Davis\nseqid40"),
+        ("davis", "cold_target_seqid30", "gin_esm_mlp", "Davis\nseqid30"),
+        ("davis", "cold_target", "ecfp_esm_mlp", "Davis CT\nECFP4"),
+        ("davis", "cold_drug", "ecfp_esm_mlp", "Davis CD\nECFP4"),
+        ("davis", "cold_target", "gin_esm_mlp_shuf0", "Davis CT\nshuf0"),
+        ("davis", "cold_target", "gin_esm_mlp_shuf1", "Davis CT\nshuf1"),
+        ("davis", "cold_target", "gin_esm_mlp_shuf2", "Davis CT\nshuf2"),
+        ("davis", "cold_target_seqid30", "gin_esm_mlp_tsoff1000", "Davis s30\ntsoff1k"),
+        ("kiba", "cold_target_seqid40", "gin_esm_mlp", "KIBA\nseqid40"),
+        ("kiba", "cold_target_seqid30", "gin_esm_mlp", "KIBA\nseqid30"),
+    ]
+
+    fig, axes = plt.subplots(2, 2, figsize=(14.6, 8.2), gridspec_kw={"width_ratios": [1.0, 2.7]})
+
+    for row_idx, (field, ylabel, ref_lines, _kind) in enumerate([
+        ("best_epoch", "best_epoch", [(15, VERMILION, "--", "best_epoch = 15 (alerta cold)"), (800, GRAY, ":", "0.8 × 1000 = 800")], "epoch"),
+        ("train_val_mse_gap_at_best", "Gap (val_mse − train_loss) no best_epoch", [(0.0, BLACK, "--", "gap = 0 (val = treino)")], "gap"),
+    ]):
+        for col_idx, (proto, groups, col_title) in enumerate([
+            ("v1_seeds", v1_groups, "v1_seeds (5 Seeds — Fase 3)"),
+            ("v2_kfold", v2_groups, "v2_kfold (5-Fold GroupKFold — Principais e Controles)"),
+        ]):
+            ax = axes[row_idx, col_idx]
+            x = np.arange(len(groups))
+            for idx, (ds, sp, mod_norm, _) in enumerate(groups):
+                vals = [
+                    float(r[field])
+                    for r in p3_runs
+                    if r["_proto"] == proto and r["dataset"] == ds and r["split"] == sp and r["_mod_norm"] == mod_norm
+                ]
+                if not vals:
+                    continue
+                jit = np.linspace(-0.14, 0.14, len(vals))
+                if "shuf" in mod_norm:
+                    col, mk = VERMILION, "x"
+                elif "ecfp" in mod_norm:
+                    col, mk = GREEN, "s"
+                elif "tsoff" in mod_norm:
+                    col, mk = PURPLE, "^"
+                else:
+                    col, mk = BLUE, "o"
+                ax.scatter(np.full(len(vals), idx) + jit, vals, color=col, marker=mk, s=40, alpha=0.88, zorder=4)
+                ax.scatter([idx], [float(np.mean(vals))], color=BLACK, marker="_", s=180, linewidths=2.0, zorder=5)
+
+            for ry, rcol, rls, rlbl in ref_lines:
+                ax.axhline(ry, color=rcol, linestyle=rls, linewidth=1.2, label=rlbl, zorder=2)
+
+            ax.set_xticks(x)
+            ax.set_xticklabels([g[3] for g in groups], fontsize=7.6)
+            if col_idx == 0:
+                ax.set_ylabel(ylabel)
+            if row_idx == 0:
+                ax.set_title(col_title, fontsize=9.8)
+            ax.legend(loc="best", fontsize=7.5, frameon=True)
+
+    fig.suptitle(
+        "F11 — Diagnóstico de Treinamento da Fase 3: best_epoch e Gap val_mse − train_loss (v1 e v2 Separados)",
+        fontweight="bold", y=0.98,
+    )
+    fig.subplots_adjust(hspace=0.35, wspace=0.18, top=0.90)
+    return _save_fig(fig, figures_dir, "F11_train_val_gap_and_best_epoch")
+
+
 def make_all_figures() -> dict[str, dict[str, Path]]:
     _setup_style()
     repo_root, data_root = resolve_roots()
@@ -465,6 +835,11 @@ def make_all_figures() -> dict[str, dict[str, Path]]:
         "F4": make_f4(data_root, figures_dir),
         "F5": make_f5(data_root, figures_dir),
         "F6": make_f6(data_root, figures_dir),
+        "F7": make_f7(repo_root, figures_dir),
+        "F8": make_f8(repo_root, figures_dir),
+        "F9": make_f9(repo_root, figures_dir),
+        "F10": make_f10(repo_root, figures_dir),
+        "F11": make_f11(data_root, figures_dir),
     }
 
     captions = [
@@ -474,8 +849,13 @@ def make_all_figures() -> dict[str, dict[str, Path]]:
         "- **F2 (`F2_ci_mse_by_model_split.{pdf,png}`):** Concordance Index (CI) e MSE (média $\\pm$ desvio amostral) de `graphdta_gin` e `graphdta_cnn3` nos protocolos **v1 (5 seeds)** (painel superior) e **v2 (5-Fold GroupKFold)** (painel inferior), mantidos estritamente separados. Linhas/marcadores indicam `mean_predictor` (v1), o baseline marginal relevante (`drug_mean` ou `target_mean`) e o `kNN` de similaridade relevante (`Tanimoto` / `3-mer`) para todos os grupos (via `cpu_audits.json` no v1 e JSONs no v2). `*` indica teto efetivo de `1000` épocas em `kiba_random` (seeds 0, 2, 4 pararam por *early stopping* antes de 500; seeds 1 e 3 estendidas até 1000). **Tabelas de referência:** `T3_main_results`, `T4_marginal_and_paired`. **Fontes:** `outputs/results/baseline_*.json`, `docs/paper/cpu_audits.json`.",
         "- **F3 (`F3_paired_delta_mse_cold.{pdf,png}`):** Diferença pareada $\\Delta\\text{MSE}$ (`modelo - baseline marginal relevante`) nos regimes cold em **dois painéis separados**: **Painel A (Protocolo v1, 5 seeds)** mostrando cada seed individual e média $\\pm$ desvio padrão (`Davis cold_drug`, `Davis cold_target`, `KIBA cold_drug`, `KIBA cold_target`); **Painel B (Protocolo v2, 5-Fold GroupKFold)** exibindo cada dobra, média e IC 95% via bootstrap agrupado no nível de cluster (**comparação exploratória**). Valores negativos (`< 0`) indicam superioridade do modelo sobre o baseline marginal. **Tabela de referência:** `T4_marginal_and_paired`. **Fontes:** `docs/paper/cpu_audits.json`, `outputs/results/baseline_*_kfold.json`.",
         "- **F4 (`F4_learning_curves_davis_cold_target.{pdf,png}`):** Curvas de perda de treino (`train_loss`) e validação (`val_mse`) ao longo das épocas para execuções representativas no Davis `cold_target` sob Protocolo v2 (`graphdta_gin` fold 3 com `best_epoch = 6` vs. `graphdta_cnn3` fold 2 com `best_epoch = 59`). Nota-se que os 43 runs originais de `v1_seeds` não gravaram `history` por época (apenas `v2_kfold` e a retomada das seeds 1 e 3 de `kiba_random` possuem `history`). **Tabela de referência:** `T7_training_diagnostics`. **Fontes:** `outputs/results/runs/graphdta_gin_davis_cold_target_fold3.json`, `outputs/results/runs/graphdta_cnn3_davis_cold_target_fold2.json`.",
-        "- **F5 (`F5_best_epoch_distribution.{pdf,png}`):** Distribuição de `best_epoch` para todas as 65 execuções, separando Protocolo v1 (painel esquerdo) e Protocolo v2 (painel direito), com linhas de alerta em $0{,}8 \\times 500 = 400$ e $0{,}8 \\times 1000 = 800$. Evidencia o colapso precoce de `graphdta_gin` em Davis `cold_target` (`2..7` em v1; `3..13` em 4 de 5 dobras de v2, com `fold0=236`) e `kiba_random` com teto efetivo `1000` (seeds 0, 2, 4 em `286..343`; seed 1 em `774`; seed 3 em `509`). **Tabela de referência:** `T7_training_diagnostics`. **Fontes:** `outputs/results/runs/*.json`.",
+        "- **F5 (`F5_best_epoch_distribution.{pdf,png}`):** Distribuição de `best_epoch` para as 65 execuções GraphDTA das Fases 1–2, separando Protocolo v1 (painel esquerdo) e Protocolo v2 (painel direito), com linhas de alerta em $0{,}8 \\times 500 = 400$ e $0{,}8 \\times 1000 = 800$. Evidencia o colapso precoce de `graphdta_gin` em Davis `cold_target` (`2..7` em v1; `3..13` em 4 de 5 dobras de v2, com `fold0=236`) e `kiba_random` com teto efetivo `1000` (seeds 0, 2, 4 em `286..343`; seed 1 em `774`; seed 3 em `509`). **Tabela de referência:** `T7_training_diagnostics`. **Fontes:** `outputs/results/runs/graphdta_*.json`.",
         "- **F6 (`F6_seq_length_stratification.{pdf,png}`):** Comparação de MSE entre proteínas com comprimento $\\le 1000$ aa e $> 1000$ aa (truncadas no GraphDTA) nos protocolos v1 e v2 separados. **Tabela de referência:** `T6_seq_length`. **Fontes:** `outputs/results/baseline_*.json`.",
+        "- **F7 (`F7_generalization_curve.{pdf,png}`):** Curva de generalização da Fase 3 (`gin_esm_mlp` menos `ridge_esm` e menos o melhor baseline não-ESM de cada regime) em Davis (esquerda) e KIBA (direita), mantendo `v1_seeds` (com DP em `random` e IC 95% de bootstrap em clusters empilhados nos regimes frios do KIBA) estritamente separado da sequência contínua `v2_kfold` (`cold_target` → `seqid40` → `seqid30`; `cold_drug` separado). Evidencia a erosão da margem em função da dissimilaridade proteica e a ausência de superação consistente do melhor baseline não-ESM. **Tabelas de referência:** `T9_phase3_decision_adr15`, `T13_phase3_paired_and_generalization`. **Fontes:** `docs/paper/phase3_audits.json`.",
+        "- **F8 (`F8_paired_deltas_by_unit.{pdf,png}`):** Diferenças pareadas $\\Delta\\text{MSE}$ e $\\Delta\\text{CI}$ por seed/dobra (`gin_esm_mlp` − `ridge_esm` e − melhor baseline não-ESM) nos painéis separados `v1_seeds` (esquerda: KIBA `cold_drug` e `cold_target`) e `v2_kfold` (direita: KIBA `seqid40/30` e Davis exploratório), exibindo pontos individuais das 5 unidades e média $\\pm$ desvio-padrão amostral. **Tabelas de referência:** `T9_phase3_decision_adr15`, `T13_phase3_paired_and_generalization`. **Fontes:** `docs/paper/phase3_audits.json`.",
+        "- **F9 (`F9_diagnostic_controls_cold_target.{pdf,png}`):** Controles diagnósticos exploratórios em Davis `cold_target` (`v2_kfold`, 5 dobras), comparando `gin_esm_mlp` (modelo real) contra `ecfp_esm_mlp` (ECFP4 + ESM), `ridge_esm`, `knn_kmer_target`, `drug_mean_predictor` e as três permutações de ESM (`--shuffle-esm` seeds `0, 1, 2`). Todos os controles embaralhados caem abaixo de `drug_mean_predictor` (ICs 95% de bootstrap excluem zero), enquanto `ecfp_esm_mlp` empata estatisticamente com `gin_esm_mlp`. **Tabelas de referência:** `T10_phase3_results_summary`, `T14_phase3_diagnostic_controls`. **Fontes:** `docs/paper/phase3_audits.json`.",
+        "- **F10 (`F10_cold_drug_per_fold.{pdf,png}`):** Desempenho por dobra (`0..4`) em Davis `cold_drug` (`v2_kfold`) para `gin_esm_mlp`, controles e baselines, com destaque sombreado na **dobra 2** (ponto `gin_esm_mlp` extremo `CI=0.5720, MSE=1.3670`, acompanhado de controle `--train-seed-offset 1000` em estrela vermelha com `CI=0.7090, MSE=1.0765`). Evidencia se a dificuldade da dobra é generalizada ou amplificada por inicialização em um subconjunto pequeno (~14 fármacos). **Tabelas de referência:** `T12_phase3_per_fold_or_seed`, `T14_phase3_diagnostic_controls`. **Fontes:** `docs/paper/phase3_audits.json`.",
+        "- **F11 (`F11_train_val_gap_and_best_epoch.{pdf,png}`):** Distribuição de `best_epoch` (linha superior, com alerta em `best_epoch = 15` para memorização precoce em regimes frios) e gap `val_mse − train_loss` no `best_epoch` (linha inferior) para as 81 execuções da Fase 3, mantendo `v1_seeds` (esquerda) e `v2_kfold` (direita) separados. **Tabelas de referência:** `T7_training_diagnostics`, `T15_phase3_configuration`. **Fontes:** `outputs/results/runs/physdual_*.json`.",
     ]
     cap_path = figures_dir / "CAPTIONS.md"
     cap_path.write_text("\n".join(captions) + "\n", encoding="utf-8")
