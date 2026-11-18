@@ -2,8 +2,8 @@
 
 Executa em ordem:
 1. Inventário e guia de reprodução (`00_INVENTARIO.md`, `REPRODUCAO.md`)
-2. Tabelas consolidadas (`T1`–`T15` em `.csv`, `.md`, `.tex`)
-3. Figuras com paleta daltônica (`F1`–`F11` em `.pdf`, `.png` e `CAPTIONS.md`)
+2. Tabelas consolidadas (`T1`–`T17` em `.csv`, `.md`, `.tex`)
+3. Figuras com paleta daltônica (`F1`–`F12` em `.pdf`, `.png` e `CAPTIONS.md`)
 
 Verifica que todos os artefatos de entrada obrigatórios e todas as saídas
 esperadas existam e não estejam vazios, saindo com código != 0 em caso de falha.
@@ -36,6 +36,7 @@ REQUIRED_REPO_INPUTS = [
     "docs/FASE1_DADOS.md",
     "docs/FASE2_BASELINE.md",
     "docs/colab_env_snapshot.txt",
+    "docs/paper/continuous_identity_margin.json",
     "docs/paper/cpu_audits.json",
     "docs/paper/phase3_audits.json",
     "docs/paper/phase3_intragroup_and_stacking.json",
@@ -49,6 +50,7 @@ REQUIRED_DATA_INPUTS = [
     "data/processed/kiba_ingestion_report.json",
     "outputs/logs/phase1_summary_report.json",
     "outputs/results/phase2_timing_benchmark.json",
+    "outputs/results/phase3_colab_ridge_pooling.json",
 ]
 
 MANUAL_PAPER_DOCS = [
@@ -58,6 +60,7 @@ MANUAL_PAPER_DOCS = [
     "docs/paper/04_REGISTRO_DE_AFIRMACOES.md",
     "docs/paper/05_LACUNAS.md",
     "docs/paper/06_AUDITORIA_FASE3.md",
+    "docs/paper/06_SINTESE_LITERATURA_CORRELACIONADA.md",
 ]
 
 
@@ -109,7 +112,7 @@ def run_pipeline(check_manual_docs: bool = True, output_dir: Path | None = None)
         figure_outputs = make_all_figures()
 
         generated_paths: list[Path] = [inv_path, repro_path]
-        for tid in [f"T{i}" for i in range(1, 16)]:
+        for tid in [f"T{i}" for i in range(1, 18)]:
             if tid not in table_outputs:
                 print(f"[OUTPUT] Tabela {tid} ausente no retorno", file=sys.stderr)
                 return 3
@@ -119,7 +122,7 @@ def run_pipeline(check_manual_docs: bool = True, output_dir: Path | None = None)
                     return 3
                 generated_paths.append(table_outputs[tid][ext])
 
-        for fid in [f"F{i}" for i in range(1, 12)]:
+        for fid in [f"F{i}" for i in range(1, 13)]:
             if fid not in figure_outputs:
                 print(f"[OUTPUT] Figura {fid} ausente no retorno", file=sys.stderr)
                 return 3

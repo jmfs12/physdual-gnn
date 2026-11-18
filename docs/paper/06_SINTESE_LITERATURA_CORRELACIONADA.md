@@ -1,7 +1,7 @@
-# Passo 6 — Síntese Crítica da Literatura Correlacionada (MAFI-DTA, CIP e TUNA)
+# Passo 6 — Síntese Crítica da Literatura Correlacionada e Posicionamento Metodológico (2023–2026)
 
-> **Data de Consolidação:** 13 de Novembro de 2026  
-> **Escopo:** Correlação metodológica, arquitetural e experimental entre três trabalhos recentes de predição de afinidade droga-alvo (DTA) e o protocolo do **PhysDual-GNN** ([TRANSFERENCIA_CONHECIMENTO.md](../../TRANSFERENCIA_CONHECIMENTO.md), [docs/PLANO_AJUSTADO.md](../PLANO_AJUSTADO.md), [docs/DECISOES.md](../DECISOES.md) — ADR #14 e [docs/paper/05_LACUNAS.md](05_LACUNAS.md)).
+> **Data de Atualização:** 18 de Novembro de 2026  
+> **Escopo:** Correlação metodológica, arquitetural e experimental entre trabalhos recentes de predição de afinidade droga-alvo (DTA) e o enquadramento unificado de avaliação e diagnóstico do **PhysDual-GNN** ([TRANSFERENCIA_CONHECIMENTO.md](../../TRANSFERENCIA_CONHECIMENTO.md), [docs/DECISOES.md](../DECISOES.md) — ADRs #14 e #15, [docs/paper/02_RESULTADOS_PRELIMINARES.md](02_RESULTADOS_PRELIMINARES.md) e [docs/paper/05_LACUNAS.md](05_LACUNAS.md)).
 
 ---
 
@@ -55,51 +55,74 @@
 
 ## 3. Matriz Comparativa com o PhysDual-GNN
 
-| Eixo | **MAFI-DTA (2026)** | **CIP (2024)** | **TUNA (2026)** | **PhysDual-GNN (Fase 2 $\to$ Fases 3–6)** |
+| Eixo | **MAFI-DTA (2026)** | **CIP (2024)** | **TUNA (2026)** | **PhysDual-GNN (Fases 1–3 Executadas)** |
 | :--- | :--- | :--- | :--- | :--- |
-| **Codificador de Proteína** | `ESM-3` + `ESM-2` (`1280d`) + GEM + BiLSTM + 3 subgrafos de contato `ESM-2` | GNN 3D + RBF de distância ao ligante | `ESM2-650M` (`Bi-LSTM+Transformer`) + `ESM2-8M` de bolso | **Fase 3:** `ESM2-650M` (`1280d` `fp16` congelado em cache, janela `1024/256`) |
-| **Codificador de Ligante** | SMILES + Grafo GCN | Grafo 2D/3D (MBP + GNN) | `Chemformer` (1D) $\odot$ `Graph Diffusion` (2D, *one-padding*) | **Fase 3:** `GINEncoder` (`78d L1`); **Fase 4:** fragmentos BRICS/RECAP ou 1D |
-| **Interação / Fusão** | Atenção + concatenação + FCN | *Conditional Updating* por descritor global ($O(N+L)$) | *Cross-attention* 2 estágios + concatenação | **Fase 3:** *late fusion* (`MLP`); **Fases 4–5:** *Conditional Updating* ou *Cross-Attention* |
-| **Dependência 3D / Bolso** | Sem 3D (contatos do próprio ESM-2) | Exige complexo 3D ligado | Experimental (PDBbind) ou AlphaFold DB + `fpocket`/`DeepSurf` | **Sem 3D na Fase 3/4**; contatos ESM-2 vs. AlphaFold DB apenas na Fase 5 |
-| **Avaliação Cold-Start** | `Unseen drug`, `Unseen target`, `All unseen` | **Nenhuma** (`Test2016_290` apenas) | `Unseen protein` + 4 famílias (sem `cold_drug`) | `v2_kfold` (`cold_drug`, `cold_target`) + `v1_seeds` |
-| **Controle de Homologia** | Nenhum (`442` IDs brutos no Davis) | Nenhum | Nenhum (`seqid` não controlado) | Deduplicação por conteúdo (`442 -> 379` no Davis) + **`seqid30` e `seqid40`** (`BLOSUM62`) |
-| **Baselines Triviais / Lineares** | Nenhum | Nenhum | Nenhum | **Obrigatórios e pareados:** `drug/target_mean`, `knn_tanimoto`, `knn_kmer`, `knn_esm`, `ridge_esm` |
-| **Auditoria de Ruído/Censura** | Apenas citada na Discussão | Não | Não | Quantificada (`69,64%` censura $pK_d=5.0$; piso de ruído `MSE=0.0322` / `0.3347`) |
+| **Codificador de Proteína** | `ESM-3` + `ESM-2` (`1280d`) + GEM + BiLSTM + 3 subgrafos de contato `ESM-2` | GNN 3D + RBF de distância ao ligante | `ESM2-650M` (`Bi-LSTM+Transformer`) + `ESM2-8M` de bolso | `ESM2-650M` (`1280d` `fp16` congelado em cache `429/429`, janela `1022/256`); ablação `mean`/`max`/`mean_std` (`T16`) |
+| **Codificador de Ligante** | SMILES + Grafo GCN | Grafo 2D/3D (MBP + GNN) | `Chemformer` (1D) $\odot$ `Graph Diffusion` (2D, *one-padding*) | `GINEncoder` (`78d L1`) vs. controle `ECFP4` (`ecfp_esm_mlp`, `T14`) |
+| **Interação / Fusão** | Atenção + concatenação + FCN | *Conditional Updating* por descritor global ($O(N+L)$) | *Cross-attention* 2 estágios + concatenação | *Late fusion* (`MLP`); arquitetura `L×1280` com atenção cruzada encerrada por **`NO-GO`** (`T16`) |
+| **Dependência 3D / Bolso** | Sem 3D (contatos do próprio ESM-2) | Exige complexo 3D ligado | Experimental (PDBbind) ou AlphaFold DB + `fpocket`/`DeepSurf` | **Sem 3D** (foco estritamente *sequence/graph-only* e diagnóstico de representação) |
+| **Avaliação Cold-Start** | `Unseen drug`, `Unseen target`, `All unseen` | **Nenhuma** (`Test2016_290` apenas) | `Unseen protein` + 4 famílias (sem `cold_drug`) | `v2_kfold` (`cold_drug`, `cold_target`) + `v1_seeds` (estritamente separados) |
+| **Controle de Homologia** | Nenhum (`442` IDs brutos no Davis) | Nenhum | Nenhum (`seqid` não controlado) | Deduplicação (`442 -> 379` no Davis) + **`seqid40`/`seqid30`** (`BLOSUM62`) + curva contínua SW (`T17`, `F12`) |
+| **Baselines Triviais / Lineares** | Nenhum | Nenhum | Nenhum | **Obrigatórios e pareados:** `drug/target_mean`, `knn_tanimoto`, `knn_kmer`, `knn_esm`, `ridge_esm` (`T9`–`T17`) |
+| **Auditoria de Ruído/Censura** | Apenas citada na Discussão | Não | Não | Quantificada (`69,64%` censura $pK_d=5.0$; piso de ruído `MSE=0.0322` / `0.3347`; sobreposição `78,17%` KIBA–Davis) |
 
 ---
 
-## 4. Implicações Diretas para o Roadmap do PhysDual-GNN
+## 4. Releitura Crítica após o Resultado Negativo da Fase 3 e o `NO-GO` da Fase 4
 
-### 4.1 O que os três artigos validam na estratégia da Fase 3 (`GIN + ESM2-650M congelado + MLP`)
-1. **ESM2-650M congelado como núcleo proteico principal:**
-   - **MAFI-DTA** (via ablação de `MEFseq`) e **TUNA** (`Models 1–4` nas Tabelas V–VI) demonstram de forma convergente que a maior parte do ganho em regimes *complex-free* vem da substituição de codificações rasas por representações de PLM (`ESM-2 1280d`).
-   - Isso valida diretamente a escolha do PhysDual-GNN ([docs/DECISOES.md](../DECISOES.md#L185-L206)) de consolidar primeiro `GINEncoder (78d L1) + ESM2-650M congelado + MLP` com regularização forte e cache `fp16` (cabendo em T4/L4 `16–22,5 GB`), antes de introduzir módulos pesados.
-2. **Proibição empírica de bolsos preditos ou *docking* prematuros (Fase 3 e 4):**
-   - A Tabela VI e a Fig. 4c do **TUNA** provam que, quando não há cristalografia (BindingDB), inserir bolsos preditos (`AlphaFold2 + fpocket`) degrada `ESM2 + encoder de ligante` (`Model 4 -> Model 5`), e tentar gerar complexos 3D completos (`AlphaFold2 + fpocket + AutoDock`) derruba modelos 3D (`GIGN`, Fig. 3).
-   - Isso confirma o acerto da diretriz em [docs/PLANO_AJUSTADO.md](../PLANO_AJUSTADO.md#L11-L14) de não usar *docking* e manter qualquer informação estrutural/de contato isolada para a **Fase 5**.
-3. **Consistência externa do colapso do `GraphDTA`:**
-   - Em Davis *random*, nossos números locais ([`T3_main_results.csv`](tables/T3_main_results.csv): `graphdta_gin` `MSE = 0.2348 ± 0.0166`, `CI = 0.8845 ± 0.0057`; `graphdta_cnn3` `MSE = 0.2216 ± 0.0128`, `CI = 0.8895 ± 0.0035`) coincidem com a literatura citada no MAFI-DTA (`MSE = 0.229`, `CI = 0.893`).
-   - Em proteínas não vistas, o **TUNA** (Tabela IV, BindingDB 5-fold CV: `GraphDTA` cai de `PCC = 0.820` para `0.302 ± 0.044`) confirma o diagnóstico forense que encontramos no Davis `cold_target` (`graphdta_gin` `v2_kfold`: `CI = 0.7117 ± 0.0112`, derrotado `0/5` em CI e `1/5` em MSE por `drug_mean_predictor` `CI = 0.7488 ± 0.0150` em [`T4_marginal_and_paired.csv`](tables/T4_marginal_and_paired.csv)).
+### 4.1 O que os três artigos contextualizaram e o que os diagnósticos `T9`–`T17` demonstraram
+1. **ESM2-650M congelado como núcleo proteico (`T9`, `T16`):**
+   - **MAFI-DTA** (via ablação de `MEFseq`) e **TUNA** (`Models 1–4` nas Tabelas V–VI) motivaram a avaliação disciplinada de `GINEncoder (78d L1) + ESM2-650M congelado + MLP` antes de introduzir módulos pesados.
+   - Na execução pré-registrada do **PhysDual-GNN (ADR #15)**, porém, `gin_esm_mlp` recebeu veredito **`nao_atendido_negativo` em `2/2` regimes primários (`kiba/cold_drug`, `kiba/cold_target`) e `2/2` secundários (`kiba/seqid40`, `kiba/seqid30`)**, não superando o melhor baseline sem ESM-2 (`knn_tanimoto_drug` ou `knn_kmer_target`, `T9`, `T13`) e ficando abaixo do próprio `drug_mean_predictor` em `kiba/seqid40` (`0.5072` vs `0.4553`) e `kiba/seqid30` (`0.5069` vs `0.4929`).
+   - Adicionalmente, o diagnóstico `T16_ridge_pooling_ablation` (`outputs/results/phase3_colab_ridge_pooling.json`) mostrou que, embora `max` pooling sobre `[L, 1280]` eleve `intra_CI` em `5/5` dobras em `davis/cold_target` (`0.6211 -> 0.6450`) e `kiba/seqid40` (`0.5352 -> 0.5714`), **nem `max` nem `mean_std` recuperam ordenação intrafármaco em `kiba/cold_target_seqid30`** (`residual_drug_mean_esm`: `mean = 0.5075 ± 0.0231`, `max = 0.5155 ± 0.0415` com `4/5` dobras entre `0.4865` e `0.5056` e ganho isolado na dobra `3`, `mean_std = 0.5060 ± 0.0179`), decretando **`NO-GO` para a Fase 4 (`L × 1280` + atenção cruzada)**.
+2. **Consistência da proibição de bolsos preditos prematuros e do comportamento do `GraphDTA`:**
+   - A Tabela VI e a Fig. 4c do **TUNA** mostram que, no BindingDB (bolsos preditos sem cristalografia), inserir bolsos preditos degrada ou não supera significativamente `ESM2 + encoder de ligante` (`p = 0.249` entre `Model 4` e `Model 6`). De modo convergente, nosso resultado em `T14` e `T17` reforça que, sem controle rigoroso contra baselines lineares (`Ridge-ESM`) e marginais (`drug_mean_predictor`), melhorias aparentes de arquiteturas profundas confundem-se com captura do viés marginal do fármaco ou suporte homólogo (`rho = 0.3982` no Davis e `0.2958` no KIBA).
+   - Em Davis *random*, nossos resultados (`T3`: `graphdta_gin` `MSE = 0.2348 ± 0.0166`, `CI = 0.8845 ± 0.0057`; `graphdta_cnn3` `MSE = 0.2216 ± 0.0128`, `CI = 0.8895 ± 0.0035`) coincidem com a literatura citada no **MAFI-DTA** (`MSE = 0.229`, `CI = 0.893`). Em proteínas inéditas, a queda de `GraphDTA` reportada pelo **TUNA** no BindingDB (`PCC = 0.820 -> 0.302 ± 0.044`) converge com o colapso de `graphdta_gin` que medimos em `davis/cold_target` (`v2_kfold`: `CI = 0.7117 ± 0.0112`, margem negativa em todas as `4` faixas de identidade em `T17`, derrotado `0/5` em CI e `1/5` em MSE por `drug_mean_predictor` `0.7488 ± 0.0150` em `T4`).
 
-### 4.2 O que aproveitar seletivamente nas Fases 4, 5 e 9 (sem importar complexidade gratuita)
-1. **Ordem disciplinada entre *late fusion* (Fase 3) e interação entre ramos (Fases 4–5):**
-   - **CIP** fornece o argumento teórico contra a concatenação tardia e oferece um mecanismo de baixo custo computacional (**Conditional Updating** por descritor global, complexidade $O(N_{\text{átomos}} + L)$ em vez de $O(N_{\text{átomos}} \times L)$), muito atrativo para sequências longas ($>1.000$ aa, presentes em `70` sequências únicas do Davis e `42` do KIBA em [`T1_dataset_stats.csv`](tables/T1_dataset_stats.csv)).
-   - **TUNA** mostra que *Cross-Attention* ligante$\times$resíduo sobre `ESM2-650M` permite inferir resíduos do sítio de ligação sem 3D de entrada (Fig. 8 e Fig. 10), criando uma ponte direta com a **Fase 9 (Interpretabilidade)** — desde que dispensado o ramo ruidoso `ESM2-8M + fpocket`.
-2. **Alternativa sem MSA/bolso para grafos proteicos (Fase 5):**
-   - Se a Fase 5 investigar topologia proteica, o **MAFI-DTA** (mapa de contato predito pelo próprio `ESM-2`) é preferível à cadeia `AlphaFold2 + fpocket/DeepSurf` do TUNA em cenários *sequence-only*, desde que validado em ablação estrita contra `GIN + ESM-2 + MLP`.
-3. **Cuidados na fusão multimodal do ligante (Fase 4):**
-   - Caso experimentos futuros combinem SMILES 1D pré-treinado (`ChemBERTa`/`Chemformer`) com grafos `GIN` 2D, a Fig. 5 do **TUNA** alerta que concatenação direta e *zero-padding* degradam o desempenho frente ao 1D puro, exigindo alinhamento átomo-token com *one-padding* no produto de Hadamard.
+### 4.2 Direções arquiteturais condicionais (não constituem roadmap ativo pós-`NO-GO`)
+Em vista do resultado negativo consolidado na Fase 3 (`T9`) e do **`NO-GO` da Fase 4 (`T16`)**, o presente estudo **encerra o ciclo de desenvolvimento arquitetural** e não executará módulos de *Conditional Updating*, *Cross-Attention*, contatos/AlphaFold ou interpretabilidade sobre `L × 1280`. Qualquer linha arquitetural futura inspirada nesses trabalhos exigiria **superar primeiro o gargalo diagnosticado em `T16` e `T17`** (ausência de sinal linear ou de estatísticas por resíduo `[L, 1280]` do `ESM-2` congelado abaixo de `30%` de identidade no KIBA):
+1. **Substituição de *late fusion* (CIP / TUNA):** o *Conditional Updating* por descritor global ($O(N_{\text{átomos}} + L)$) do **CIP** e a *Cross-Attention* ligante$\times$resíduo do **TUNA** permanecem referências arquiteturais apenas caso se supere o limite da representação proteica congelada (por exemplo, via ajuste fino direcionado ou informação experimental de sítio, e adotando critérios alternativos de *early stopping* quando houver validação pequena como `5–6` fármacos em `davis/cold_drug`).
+2. **Informação estrutural sem cadeia de *docking* (MAFI-DTA / TUNA):** caso trabalhos futuros investiguem topologia proteica ou fusão multimodal 1D+2D do ligante, o contraste **MAFI-DTA** (contatos sem MSA) vs. **TUNA** (Fig. 3 e Fig. 5: falha do pipeline `AlphaFold2 + fpocket + AutoDock` em `GIGN` e superioridade de *one-padding* no produto de Hadamard) orienta o desenho, mas sempre condicionado à comparação pré-registrada contra `drug_mean`, `kNN` e `Ridge-ESM`.
 
-### 4.3 Diferencial metodológico exclusivo do PhysDual-GNN frente aos três artigos
-Nenhum dos três trabalhos avalia:
-1. **Baselines marginais, `kNN` e modelos lineares sobre PLM (`ridge_esm`, `knn_esm_target`):** Sem esses controles pareados, não é possível separar o viés marginal do fármaco (`drug_mean_predictor`: `CI = 0.7488 ± 0.0150` em `v2_kfold`) ou a separabilidade linear do próprio `ESM-2` do ganho real da arquitetura neural — risco explicitamente exposto pelo resultado `p = 0.249` entre `Model 4` e `Model 6` no BindingDB do TUNA.
-2. **Partições por identidade global de sequência (`seqid30` e `seqid40`, `BLOSUM62`):** Como já medido em [`outputs/results/phase3_seqid_classical_baselines.json`](../../outputs/results/phase3_seqid_classical_baselines.json), remover homólogos próximos derruba `knn_kmer_target` de `CI = 0.8128` (`v2_kfold`) para `0.7051 ± 0.0397` (`seqid30`) e `0.7217 ± 0.0562` (`seqid40`), abaixo inclusive de `drug_mean_predictor` (`0.7360 ± 0.0291` em `seqid30`).
-3. **Auditoria de conteúdo e qualidade de rótulos:** Deduplicação de `442 -> 379` sequências únicas no Davis (`81 target_id`s colapsando em `18` sequências), separação estrita Davis vs. KIBA (`179` sequências compartilhadas entre ambos), censura de `69,64%` em $pK_d = 5.0$ e piso de ruído de duplicatas (`MSE = 0.0322` global / `0.3347` nas `546` duplicatas divergentes).
+### 4.3 Diferencial metodológico exclusivo do protocolo de avaliação do PhysDual-GNN frente aos três artigos
+Nenhum dos três trabalhos avalia sistematicamente:
+1. **Baselines marginais, `kNN` e modelos lineares sobre PLM (`Ridge-ESM` em `mean`/`max`/`mean_std` e *residual stacking*):** sem esses controles pareados, não se separa o viés marginal do fármaco (`drug_mean_predictor`) ou a leitura linear do `ESM-2` do ganho real da arquitetura neural.
+2. **Partições por identidade de sequência (`seqid40`/`seqid30`, `BLOSUM62`) combinadas com curva contínua SW (`T17`, `F12`):** permitem quantificar exatamente como a margem de erro sobre `drug_mean` e `Ridge-ESM` decai monotonicamente com a distância ao treino até colapsar abaixo de `30%–40%`.
+3. **Auditoria de conteúdo e qualidade de rótulos:** deduplicação `442 -> 379` no Davis (`81 target_id`s em `18` sequências), quantificação da sobreposição Davis–KIBA (`179/229 = 78,17%`), censura de `69,64%` em $pK_d = 5.0$ e piso irreduzível de ruído (`MSE = 0.0322` global / `0.3347` nas `546` duplicatas divergentes).
 
 ---
 
-## 5. Como Posicionar os Três Artigos no Manuscrito (Trabalhos Relacionados e Justificativa)
+## 5. Como Posicionar os Três Artigos no Manuscrito (Trabalhos Relacionados)
 
-- **MAFI-DTA (Jiang et al., 2026):** Citar como evidência recente por ablação de que o ramo baseado em `ESM-2 1280d` concentra a maior parte do poder preditivo *sequence-only*, e como contraste frente à ausência de controle por `seqid30/seqid40`, marginais e `Ridge-ESM`.
-- **TUNA (Yoon et al., 2026):** Citar como referência estado-da-arte *complex-free* baseada em `ESM2-650M` + *Cross-Attention*, destacando seu próprio achado de ablação no BindingDB (Tabela VI / Fig. 4c) de que bolsos preditos sem cristalografia degradam ou não superam significativamente `ESM2 + encoder de ligante`, justificando a não utilização de `fpocket`/docking na Fase 3 do PhysDual-GNN.
-- **CIP (Cui et al., 2024):** Citar como motivação arquitetural para superar o gargalo de *late fusion* via condicionamento global leve ($O(N+L)$) nas fases posteriores à validação da linha de base limpa (`GIN + ESM-2 + MLP`), contrastando com a dependência de coordenadas 3D do módulo de proximidade e com a ausência de testes *cold-start*/*seqid*.
+- **MAFI-DTA (Jiang et al., 2026):** Citar como referência representativa de modelos *sequence-only* baseados em `ESM-2 1280d`, destacando sua ablação de `MEFseq` e contrastando com a ausência de controle por `seqid30/seqid40`, marginais e `Ridge-ESM`.
+- **TUNA (Yoon et al., 2026):** Citar como referência estado-da-arte *complex-free* baseada em `ESM2-650M` + *Cross-Attention*, destacando seu próprio achado de ablação no BindingDB (Tabela VI / Fig. 4c) de que bolsos preditos sem cristalografia degradam ou não superam significativamente `ESM2 + encoder de ligante` (`p = 0.249`).
+- **CIP (Cui et al., 2024):** Citar como abordagem 3D com *Conditional Updating* ($O(N+L)$) que motiva interações ligante–alvo além da concatenação tardia, contrastando com a exigência de complexos 3D e a ausência de testes *cold-start*/*seqid*.
+
+---
+
+## 6. Posicionamento Frente à Literatura Recente de Avaliação Rigorosa e Limites de Generalização em DTA (2023–2026)
+
+Sob o enquadramento unificado de avaliação e diagnóstico deste trabalho, nossos achados dialogam diretamente com estudos recentes (2023–2026) voltados a auditar vieses, vazamento de homologia e poder preditivo real em predição de afinidade droga-alvo:
+
+1. **MIRAGE (Yazdani-Jahromi, Padhi & Garibay, 2026, `arXiv:2609.14491`):**
+   - Propõe um protocolo rigoroso para modelos 3D e de *co-folding* no PDBbind, estruturado por suporte de família (clusterização MMseqs2 a `30%`), baselines simples (*family-mean* e *ligand-kNN*) e *bootstrap* agrupado em 2 níveis.
+   - **Contraste de domínio e contribuição complementar:** enquanto o MIRAGE avalia modelos 3D/*co-folding* em PDBbind, nosso estudo transfere o rigor equivalente para o domínio predominante em triagem virtual larga baseada em **sequência e grafo (`GraphDTA` e `GIN + ESM-2`) nos benchmarks Davis e KIBA**, adicionando três peças diagnósticas complementares: (i) leitura linear direta do mesmo PLM congelado (**`Ridge-ESM`** com ablação `mean`/`max`/`mean_std` em `T16` e *residual stacking*), (ii) ranqueamento relativo condicional por fármaco em `cold-target` (**`intra_CI`** / `intra_Spearman` estritamente sem concatenação entre dobras) e (iii) **curva contínua de margem de erro** sobre `drug_mean_predictor` e `Ridge-ESM` contra identidade global (`global_id_max`) e local de domínio (`sw_id_aln_len_ge150aa`) com *cluster bootstrap* (`B=2000`, `T17`, `F12`).
+
+2. **PLABench (Wang & Cheng, 2026, `bioRxiv 10.64898/2026.09.17.752433`):**
+   - Investiga benchmarks e limites de generalização na predição de afinidade proteína–ligante, discutindo inclusive o fenômeno de modelos aprenderem a média do alvo.
+   - **Precisão de escopo:** no PLABench, as análises *within-target* e a discussão detalhada sobre predição da média concentram-se em **CASP16 e ChEMBL35**; já **Davis e KIBA figuram apenas com métricas globais** em partições *warm*/*cold*, **sem** métricas intragrupo (`intra_CI` por fármaco) e **sem** comparação pareada contra baselines marginais (`drug_mean_predictor`/`target_mean_predictor`), de similaridade (`kNN`) ou lineares sobre PLM (`Ridge-ESM`). Nosso estudo preenche exatamente essa lacuna em Davis e KIBA, demonstrando quantitativamente que em `kiba/seqid30` a ordenação intrafármaco desaparece (`intra_CI <= 0.5155` mesmo com `max`/`mean_std` em `T16`) e que modelos profundos podem cair abaixo de `drug_mean_predictor` (`T9`, `T17`).
+
+3. **PLM-GraphDTA (Marijan & Tanasijević, 2026, `bioRxiv 10.64898/2026.08.31.748056`):**
+   - Integra modelos de linguagem proteica (PLMs) ao arcabouço do `GraphDTA` (incluindo `GIN`) e relata com exatidão a censura massiva de **`20.931/30.056` (`69,64%`)** pares em `10.000 nM` ($pK_d = 5{,}0$) no Davis, examinando também a contribuição *por proteína* ao CI.
+   - **Diferencial frente ao nosso protocolo:** apesar de compartilhar a arquitetura base `GIN + PLM` e a caracterização da censura no Davis, o PLM-GraphDTA **não** deduplica os `442 -> 379` alvos do Davis (`81` `target_id`s colapsados em `18` sequências idênticas), **não** inclui `drug_mean_predictor`, `kNN` (`knn_tanimoto_drug`, `knn_kmer_target`) ou `Ridge-ESM` como baselines pareados, e **não** avalia ranqueamento relativo por fármaco (`intra_CI`) em `cold-target` nem partições por identidade de sequência (`seqid40`/`seqid30`) com curva contínua de margem (`T17`).
+
+4. **Kanakala et al. (2023, *ACS Omega* `8(2):2389–2397`, `doi:10.1021/acsomega.2c06781`):**
+   - Utilizam ablações unimodais e validação cruzada agrupada para demonstrar o quanto métricas globais em DTA são sustentadas por informação unilateral e vieses marginais de entidade. Nosso protocolo converge com essa linha ao combinar validação cruzada agrupada (`v2_kfold`), baselines marginais/unimodais (`ridge_aa_composition`, `drug_mean_predictor`, `target_mean_predictor`) e ablação de ligante (`ecfp_esm_mlp` vs `gin_esm_mlp` em `T14`), estendendo-a para leitura linear/não linear de tensores `[L, 1280]` do `ESM-2` (`T16`) e estratificação contínua por identidade (`T17`).
+
+5. **Pré-print `ChemRxiv 10.26434/chemrxiv.15011207/v1` (out. 2026):**
+   - Avalia `ESM-2 650M` congelado acoplado a GBDT, inclui uma seção explícita de **resultados negativos** e documenta que o benchmark Davis atribui sequências *wild-type* completas tanto a variantes mutantes quanto a **`18` nomes de domínios `JAK1–3` e `RSK1–4`**.
+   - **Convergência:** corrobora independentemente nossa auditoria de colisão de sequências em `davis_clean.csv` (`442` IDs em `379` sequências, piso `MSE = 0.0322`, Seção 1.2 de [03_LIMITACOES_E_AMEACAS_A_VALIDADE.md](03_LIMITACOES_E_AMEACAS_A_VALIDADE.md)) e reforça a conclusão negativa convergente sobre os limites de generalização obtidos com embeddings congelados do `ESM-2 650M` sob controle rigoroso de homologia (`T16`, `T17`).
+
+6. **Controles de permutação/perturbação proteica — *All That Glitters Is Not Gold* (*J. Chem. Inf. Model.* `65(19):10239`) e Gorantla et al. (*J. Chem. Inf. Model.* `64(7):2496`, PMID `37983381`):**
+   - Estabelecem controles de permutação/randomização de representações proteicas (também empregados em abordagens como `InceptionDTA` e `ReGeoDTA`) para verificar se modelos de afinidade proteína–ligante exploram de fato o descritor da proteína ou dependem apenas de atalhos do ligante.
+   - **Posicionamento e divergência empírica:** posicionamos nosso `--shuffle-esm` (`C4`, `T14`) estritamente como **controle diagnóstico de protocolo** derivado dessa literatura, sem reivindicação de novidade metodológica. Enquanto estudos em proteoquimiometria frequentemente observam pouca degradação sob perturbação do ramo proteico (sugerindo contribuição proteica mínima), em `davis/cold_target` embaralhar os embeddings `ESM-2` derruba `gin_esm_mlp` significativamente **abaixo de `drug_mean_predictor`** (`CI` cai de `0.8195 ± 0.0272` para `0.7146..0.7251` vs `0.7488 ± 0.0150`, `boot dMSE` excluindo zero em `shuf0/1/2`). Isso demonstra que o modelo efetivamente usa a representação `ESM-2` quando há suporte homólogo no treino — mas a decomposição contínua (`T17`, `F12`) mostra que esse ganho sobre `Ridge-ESM` e `drug_mean_predictor` se anula na cauda `<30%` de identidade no Davis e torna-se negativo abaixo de `40%` no KIBA.

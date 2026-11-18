@@ -1,7 +1,7 @@
 # Reprodutibilidade do Pacote do Artigo (Fases 1, 2 e 3)
 
-- **Gerado em (UTC):** `2026-11-15T16:21:04Z`
-- **Commit HEAD:** `2fe4f45`
+- **Gerado em (UTC):** `2026-11-18T21:42:18Z`
+- **Commit HEAD:** `d737b3d`
 - **Variável de raiz de artefatos:** `PHYSDUAL_ROOT` (padrão local: raiz do repositório Git; no Colab: `/content/drive/MyDrive/physdual-gnn`).
 
 ## 1. Ordem Exata de Execução
@@ -23,7 +23,10 @@ python scripts/paper/phase3_intragroup_and_stacking.py
 # 3b. (CPU, determinístico) Auditoria Smith-Waterman e razão min(len) dos splits seqid30/40
 python scripts/paper/seqid_identity_audit.py
 
-# 4. Pipeline completo do pacote do artigo (inventário, T1..T15, figuras F1..F11 e REPRODUCAO.md)
+# 3c. (CPU, determinístico) Curva contínua identidade-margem estilo MIRAGE e faixas intragrupo (T17, F12)
+python scripts/paper/continuous_identity_margin.py
+
+# 4. Pipeline completo do pacote do artigo (inventário, T1..T17, figuras F1..F12 e REPRODUCAO.md)
 python scripts/paper/build_all.py
 
 # 5. Gate técnico Fase 3 (verifica INTEGRIDADE estrutural/numérica; NÃO implica sucesso científico ADR #15)
@@ -32,10 +35,11 @@ python scripts/verify_phase3.py --full --no-require-paired-win
 # 6. Validação automatizada de esquema, completude, ausência de NaNs e proteção contra valores-p extremos
 pytest tests/test_paper_pipeline.py
 
-# 7. (Opcional Colab Drive) Auditoria física dos .pt do cache ESM-2 e scripts diagnósticos pós-ADR #15
+# 7. (Colab Drive) Auditoria física dos .pt do cache ESM-2 e diagnósticos pós-ADR #15
 PHYSDUAL_ROOT=/content/drive/MyDrive/physdual-gnn python scripts/paper/audit_esm_cache_colab.py
-# Diagnósticos Colab (não confirmatórios):
+# Ablação de pooling já executada no Colab (outputs/results/phase3_colab_ridge_pooling.json -> veredito NO-GO Fase 4):
 # python scripts/paper/colab_ridge_esm_pooling.py --data-root /content/drive/MyDrive/physdual-gnn
+# Diagnóstico opcional adicional não executado no Colab após o NO-GO da Fase 4 (não confirmatório):
 # python scripts/paper/colab_kiba_cold_drug_ecfp.py --root /content/drive/MyDrive/physdual-gnn --device cuda
 ```
 
@@ -83,7 +87,7 @@ Google Drive       : MONTADO em /content/drive/MyDrive (livre=223.54 GiB / total
 
 ## 3. Checksums SHA-256 dos Artefatos JSON de Entrada
 
-Total de arquivos JSON auditados: **277**.
+Total de arquivos JSON auditados: **279**.
 
 | Arquivo (relativo a `PHYSDUAL_ROOT`) | Tamanho (bytes) | SHA-256 |
 | :--- | :---: | :--- |
@@ -149,6 +153,7 @@ Total de arquivos JSON auditados: **277**.
 | `data/processed/splits/kiba_random_seed2.json` | 1307988 | `69c78b7e34640ea1b32f897c7fa26c319cbb18233691b5f19099f15e94e310e8` |
 | `data/processed/splits/kiba_random_seed3.json` | 1307988 | `427f5e0b0bb1bda6f7395029597be78f495df5aa79fe4f678384dc32cdf18996` |
 | `data/processed/splits/kiba_random_seed4.json` | 1307988 | `24ce643209963321aefa1de970a47b5b2be863c72457b0d548559eb5e0dc24af` |
+| `docs/paper/continuous_identity_margin.json` | 3765903 | `e7cb6633d185eda749d511b1836f2fa3c6c1f9711c0a8ac5aee62831ed09f173` |
 | `docs/paper/cpu_audits.json` | 147907 | `b9feb38f606fddb7a4bda1ddcb6105a9f0c7399fa80add2f225b53050d45d211` |
 | `docs/paper/phase3_audits.json` | 650457 | `00782e0b0b5ddeb20e6295a64ca8a471b80998f1e4281c4282f71697fa986dfc` |
 | `docs/paper/phase3_intragroup_and_stacking.json` | 210741 | `5073c22bd28aff1cbf053680c935b0ffbca6dd2db86d943f22dadb58cbc81eac` |
@@ -177,6 +182,7 @@ Total de arquivos JSON auditados: **277**.
 | `outputs/results/baseline_graphdta_gin_kiba_random.json` | 87448 | `23ee01dea5e235fc76b51939fe2d1a7089f288385022864939df66992f82a5db` |
 | `outputs/results/kiba_cpu_classical_baselines.json` | 63074 | `3414df48cb2ba5140a044458941a6b738cd7cd3acf3ff5d50bd1a6c35586fc30` |
 | `outputs/results/phase2_timing_benchmark.json` | 444 | `401f6b684e352779ad24e6553486106b2579c2043071c9baf07dc0d5e1c99213` |
+| `outputs/results/phase3_colab_ridge_pooling.json` | 163824 | `0161e6980d43ace0158822f3f1e57b7bcb41a0247ca6d7860344abee0035a1c5` |
 | `outputs/results/phase3_davis_paired_bootstrap.json` | 104137 | `14a54f290f5e5f9fdfe6cbfe18b9fe7964337efef3411643b075cca727e3f472` |
 | `outputs/results/phase3_esm_cpu_baselines.json` | 88087 | `c52850af1f80f4ab20a98dc5e1e584a231e7dbaa62f8a0d5eadce71ef7dd0092` |
 | `outputs/results/phase3_kiba_paired_bootstrap.json` | 34397 | `fedcfb78546e6adc9b231f51c1eba538fbe72cdae296e9c13fa27cb3aae681a7` |

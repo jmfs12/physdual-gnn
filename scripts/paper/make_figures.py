@@ -1,4 +1,4 @@
-"""Passo 2: Gera figuras F1..F11 em PDF e PNG (paleta Okabe-Ito) + `CAPTIONS.md`."""
+"""Passo 2: Gera figuras F1..F12 em PDF e PNG (paleta Okabe-Ito) + `CAPTIONS.md`."""
 
 from __future__ import annotations
 
@@ -822,6 +822,118 @@ def make_f11(data_root: Path, figures_dir: Path) -> dict[str, Path]:
     return _save_fig(fig, figures_dir, "F11_train_val_gap_and_best_epoch")
 
 
+def make_f12(repo_root: Path, figures_dir: Path) -> dict[str, Path]:
+    """F12: Curva contínua identidade-margem estilo MIRAGE em painel 2x2 (Davis v2_kfold vs KIBA v1_seeds)."""
+    cim_path = ensure_paper_dirs(repo_root)["paper"] / "continuous_identity_margin.json"
+    if not cim_path.exists():
+        cim_path = repo_root / "docs" / "paper" / "continuous_identity_margin.json"
+    cim = load_json_strict(cim_path)
+
+    col_specs = [
+        ("davis/cold_target", "Davis cold_target (v2_kfold, 5 dobras)"),
+        ("kiba/cold_target", "KIBA cold_target (v1_seeds, 5 seeds)"),
+    ]
+    row_specs = [
+        ("global_id_max", "Identidade Global BLOSUM62 (max vs. treino)"),
+        ("sw_id_aln_len_ge150aa", "Identidade Local Smith-Waterman ≥ 150 aa (max vs. treino)"),
+    ]
+    model_styles = [
+        ("gin_esm_mlp", "gin_esm_mlp (Fase 3)", BLUE, "o", "-", -0.004),
+        ("graphdta_gin", "graphdta_gin (Fase 2)", PURPLE, "^", "--", 0.0),
+        ("ridge_esm", "ridge_esm (linear ESM+ECFP4)", ORANGE, "s", "-.", 0.004),
+    ]
+
+    fig, axes = plt.subplots(2, 2, figsize=(13.2, 8.8))
+
+    for row_idx, (axis_key, x_label) in enumerate(row_specs):
+        for col_idx, (rkey, col_title) in enumerate(col_specs):
+            ax = axes[row_idx, col_idx]
+            reg = cim["regimes"][rkey]
+            bins = reg["quantile_curves"][axis_key]["bins"]
+
+            ax.axhline(
+                0.0,
+                color=BLACK,
+                linestyle="--",
+                linewidth=1.2,
+                label="drug_mean_predictor (margem = 0)" if (row_idx == 0 and col_idx == 0) else None,
+                zorder=2,
+            )
+
+            for mod, lbl, col, mk, ls, x_jit in model_styles:
+                if not bins or mod not in bins[0]["models"]:
+                    continue
+                xs = np.asarray([float(b["id_median"]) + x_jit for b in bins], dtype=np.float64)
+                ys = np.asarray(
+                    [float(b["models"][mod]["margin_vs_drug_mean_mean"]) for b in bins],
+                    dtype=np.float64,
+                )
+                lo = np.asarray(
+                    [float(b["models"][mod]["margin_vs_drug_mean_ci95"][0]) for b in bins],
+                    dtype=np.float64,
+                )
+                hi = np.asarray(
+                    [float(b["models"][mod]["margin_vs_drug_mean_ci95"][1]) for b in bins],
+                    dtype=np.float64,
+                )
+                yerr_lo = np.maximum(0.0, ys - lo)
+                yerr_hi = np.maximum(0.0, hi - ys)
+                ax.errorbar(
+                    xs,
+                    ys,
+                    yerr=[yerr_lo, yerr_hi],
+                    color=col,
+                    marker=mk,
+                    linestyle=ls,
+                    linewidth=2.0 if mod == "gin_esm_mlp" else 1.6,
+                    markersize=6.0,
+                    capsize=3.5,
+                    alpha=0.92,
+                    label=lbl if (row_idx == 0 and col_idx == 0) else None,
+                    zorder=5 if mod == "gin_esm_mlp" else 4,
+                )
+
+            tr_gin = reg["continuous_trends"][axis_key]["margin_vs_drug_mean"].get("gin_esm_mlp")
+            if tr_gin is not None:
+                rho = float(tr_gin["spearman_rho"])
+                ci_lo, ci_hi = tr_gin["spearman_ci95"]
+                ax.text(
+                    0.03,
+                    0.95,
+                    f"gin_esm_mlp Spearman ρ = {rho:+.3f}\nIC 95% [{ci_lo:+.3f}, {ci_hi:+.3f}]",
+                    transform=ax.transAxes,
+                    va="top",
+                    ha="left",
+                    fontsize=8.0,
+                    bbox={"boxstyle": "round,pad=0.3", "fc": "white", "ec": BLUE, "alpha": 0.90},
+                    zorder=6,
+                )
+
+            ax.set_xlabel(x_label)
+            if col_idx == 0:
+                ax.set_ylabel("Margem MSE(drug_mean) − MSE(modelo) (↑ melhor)")
+            if row_idx == 0:
+                ax.set_title(col_title, fontsize=10.2)
+
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=4,
+        fontsize=8.5,
+        frameon=True,
+        bbox_to_anchor=(0.5, 0.01),
+    )
+    fig.suptitle(
+        "F12 — Curva Contínua Identidade-Margem Estilo MIRAGE (5 Quantis e IC 95% via Cluster Bootstrap por Proteína)",
+        fontweight="bold",
+        y=0.98,
+    )
+    fig.subplots_adjust(hspace=0.30, wspace=0.18, bottom=0.12, top=0.90)
+    return _save_fig(fig, figures_dir, "F12_continuous_identity_margin")
+
+
 def make_all_figures() -> dict[str, dict[str, Path]]:
     _setup_style()
     repo_root, data_root = resolve_roots()
@@ -840,6 +952,7 @@ def make_all_figures() -> dict[str, dict[str, Path]]:
         "F9": make_f9(repo_root, figures_dir),
         "F10": make_f10(repo_root, figures_dir),
         "F11": make_f11(data_root, figures_dir),
+        "F12": make_f12(repo_root, figures_dir),
     }
 
     captions = [
@@ -856,6 +969,7 @@ def make_all_figures() -> dict[str, dict[str, Path]]:
         "- **F9 (`F9_diagnostic_controls_cold_target.{pdf,png}`):** Controles diagnósticos exploratórios em Davis `cold_target` (`v2_kfold`, 5 dobras), comparando `gin_esm_mlp` (modelo real) contra `ecfp_esm_mlp` (ECFP4 + ESM), `ridge_esm`, `knn_kmer_target`, `drug_mean_predictor` e as três permutações de ESM (`--shuffle-esm` seeds `0, 1, 2`). Todos os controles embaralhados caem abaixo de `drug_mean_predictor` (ICs 95% de bootstrap excluem zero), enquanto `ecfp_esm_mlp` empata estatisticamente com `gin_esm_mlp`. **Tabelas de referência:** `T10_phase3_results_summary`, `T14_phase3_diagnostic_controls`. **Fontes:** `docs/paper/phase3_audits.json`.",
         "- **F10 (`F10_cold_drug_per_fold.{pdf,png}`):** Desempenho por dobra (`0..4`) em Davis `cold_drug` (`v2_kfold`) para `gin_esm_mlp`, controles e baselines, com destaque sombreado na **dobra 2** (ponto `gin_esm_mlp` extremo `CI=0.5720, MSE=1.3670`, acompanhado de controle `--train-seed-offset 1000` em estrela vermelha com `CI=0.7090, MSE=1.0765`). Evidencia se a dificuldade da dobra é generalizada ou amplificada por inicialização em um subconjunto pequeno (~14 fármacos). **Tabelas de referência:** `T12_phase3_per_fold_or_seed`, `T14_phase3_diagnostic_controls`. **Fontes:** `docs/paper/phase3_audits.json`.",
         "- **F11 (`F11_train_val_gap_and_best_epoch.{pdf,png}`):** Distribuição de `best_epoch` (linha superior, com alerta em `best_epoch = 15` para memorização precoce em regimes frios) e gap `val_mse − train_loss` no `best_epoch` (linha inferior) para as 81 execuções da Fase 3, mantendo `v1_seeds` (esquerda) e `v2_kfold` (direita) separados. **Tabelas de referência:** `T7_training_diagnostics`, `T15_phase3_configuration`. **Fontes:** `outputs/results/runs/physdual_*.json`.",
+        "- **F12 (`F12_continuous_identity_margin.{pdf,png}`):** Curva contínua identidade-margem estilo MIRAGE em painel 2×2 separando estritamente `Davis cold_target` (`v2_kfold`, 5 dobras, coluna esquerda) e `KIBA cold_target` (`v1_seeds`, 5 seeds, coluna direita), nos eixos `global_id_max` (linha superior) e `sw_id_aln_len_ge150aa` Smith-Waterman $\\ge 150\\text{ aa}$ (linha inferior). Cada ponto representa um dos 5 quantis de igual contagem de observações `(u, p)` com a margem média $\\text{MSE}(\\text{drug\\_mean}) - \\text{MSE}(\\text{modelo})$ (valores positivos indicam superação do preditor médio por fármaco) e IC 95% via cluster bootstrap agrupado por sequência proteica única ($B = 2000$, `seed = 42`), acompanhado do coeficiente de Spearman $\\rho$ [IC 95%] de `gin_esm_mlp`. **Tabela de referência:** `T17_continuous_identity_margin`. **Fontes:** `docs/paper/continuous_identity_margin.json`.",
     ]
     cap_path = figures_dir / "CAPTIONS.md"
     cap_path.write_text("\n".join(captions) + "\n", encoding="utf-8")

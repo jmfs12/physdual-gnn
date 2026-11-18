@@ -188,16 +188,32 @@ def build_inventory_and_repro() -> tuple[Path, Path]:
                 st = f"completo ({n_units} unidades; marginais/kNN em `cpu_audits.json`)"
         inv_rows.append((f"`outputs/results/{af.name}`", fase_lbl, proto, "gitignored (local)", st))
 
+    davis_boot_is_stale = (
+        (phase3_audits or {})
+        .get("run_integrity", {})
+        .get("stale_artifacts", {})
+        .get("phase3_davis_paired_bootstrap_json", {})
+        .get("is_stale")
+    )
     for aux_name in (
         "phase3_esm_cpu_baselines.json",
         "kiba_cpu_classical_baselines.json",
         "phase3_seqid_classical_baselines.json",
+        "phase3_colab_ridge_pooling.json",
         "phase3_kiba_paired_bootstrap.json",
         "phase3_davis_paired_bootstrap.json",
     ):
         aux_p = res_dir / aux_name
         if aux_p.exists():
-            note_aux = "DEFASADO (pré-extensão fold 1 `davis/cold_target`; ver `06_AUDITORIA_FASE3.md`)" if "davis_paired" in aux_name else "completo"
+            if "davis_paired" in aux_name:
+                if davis_boot_is_stale is False:
+                    note_aux = "completo (regenerado e sincronizado pós-extensão fold 1 davis/cold_target)"
+                else:
+                    note_aux = "DEFASADO (pré-extensão fold 1 `davis/cold_target`; ver `06_AUDITORIA_FASE3.md`)"
+            elif "ridge_pooling" in aux_name:
+                note_aux = "completo (Colab L4; veredito NO-GO Fase 4)"
+            else:
+                note_aux = "completo"
             inv_rows.append((f"`outputs/results/{aux_name}`", "Fase 3", "auditoria / CPU", "gitignored (local)", note_aux))
 
     for of in oof_files:
@@ -287,7 +303,7 @@ def build_inventory_and_repro() -> tuple[Path, Path]:
         f"7. **Limpeza de inchaço, regeneração do bootstrap e significado do gate de integridade (`outputs/results/`):**",
         f"   - Removido `oof_predictions` de `baseline_graphdta_gin_kiba_random.json` (reduzido para `{kiba_agg_bytes:,} bytes`).",
         f"   - **Bootstrap do Davis regenerado e sincronizado:** `outputs/results/phase3_davis_paired_bootstrap.json` foi regenerado via `python scripts/run_phase3_paired_bootstrap.py --dataset davis` após a extensão da dobra `1` de `davis/cold_target` (`525/605/1000` épocas), convergindo exatamente com `docs/paper/phase3_audits.json` (`CI = 0.8149`, `MSE = 0.4372`).",
-        f"   - **Análises pós-auditoria em CPU e scripts Colab:** `scripts/paper/phase3_intragroup_and_stacking.py` gerou `docs/paper/phase3_intragroup_and_stacking.json` (ranking intragrupo por dobra e stacking residual com grade `1e-3..1e8` em CPU, somente leitura) e `scripts/paper/seqid_identity_audit.py` gerou `docs/paper/seqid_identity_audit.json` (auditoria BLOSUM62 global `min(len)`/`max(len)` e Smith-Waterman por dobra); `scripts/paper/colab_ridge_esm_pooling.py` e `scripts/paper/colab_kiba_cold_drug_ecfp.py` foram gerados para diagnóstico no Colab sem execução local.",
+        f"   - **Análises pós-auditoria em CPU e diagnóstico Colab:** `scripts/paper/phase3_intragroup_and_stacking.py` gerou `docs/paper/phase3_intragroup_and_stacking.json` (ranking intragrupo por dobra e stacking residual com grade `1e-3..1e8` em CPU, somente leitura), `scripts/paper/seqid_identity_audit.py` gerou `docs/paper/seqid_identity_audit.json` (auditoria BLOSUM62 global `min(len)`/`max(len)` e Smith-Waterman por dobra) e `scripts/paper/continuous_identity_margin.py` gerou `docs/paper/continuous_identity_margin.json` (curva contínua identidade-margem estilo MIRAGE e faixas intragrupo `T17`/`F12`); `scripts/paper/colab_ridge_esm_pooling.py` já foi executado no Colab gerando `outputs/results/phase3_colab_ridge_pooling.json` (`T16`) com veredito **NO-GO** para a Fase 4 (`intra_CI <= 0.5155 < 0.53` em `kiba/cold_target_seqid30` para `max` e `mean_std`), restando apenas `scripts/paper/colab_kiba_cold_drug_ecfp.py` como diagnóstico opcional não executado.",
         f"   - **Escopo do gate `verify_phase3.py --full --no-require-paired-win`:** aprovação (`EXIT: 0`) significa **apenas integridade estrutural, numérica e de contratos** (esquema, isolamento, completude e ausência de NaNs), **NÃO sucesso científico** (o veredito negativo do ADR #15 permanece registrado em `T9` e `06_AUDITORIA_FASE3.md`).",
         "",
         "## 4. Histórico Recente de Commits (`git log`)",
@@ -314,12 +330,14 @@ def build_inventory_and_repro() -> tuple[Path, Path]:
     # Checksums SHA-256 de todos os JSONs de entrada usados (Fases 1–3)
     extra_phase3_jsons = [
         p for p in [
+            repo_root / "docs" / "paper" / "continuous_identity_margin.json",
             repo_root / "docs" / "paper" / "phase3_audits.json",
             repo_root / "docs" / "paper" / "phase3_intragroup_and_stacking.json",
             repo_root / "docs" / "paper" / "seqid_identity_audit.json",
             data_root / "outputs" / "results" / "phase3_esm_cpu_baselines.json",
             data_root / "outputs" / "results" / "kiba_cpu_classical_baselines.json",
             data_root / "outputs" / "results" / "phase3_seqid_classical_baselines.json",
+            data_root / "outputs" / "results" / "phase3_colab_ridge_pooling.json",
             data_root / "outputs" / "results" / "phase3_kiba_paired_bootstrap.json",
             data_root / "outputs" / "results" / "phase3_davis_paired_bootstrap.json",
             *(data_root / "outputs" / "logs").glob("*.json"),
@@ -363,7 +381,10 @@ def build_inventory_and_repro() -> tuple[Path, Path]:
         "# 3b. (CPU, determinístico) Auditoria Smith-Waterman e razão min(len) dos splits seqid30/40",
         "python scripts/paper/seqid_identity_audit.py",
         "",
-        "# 4. Pipeline completo do pacote do artigo (inventário, T1..T15, figuras F1..F11 e REPRODUCAO.md)",
+        "# 3c. (CPU, determinístico) Curva contínua identidade-margem estilo MIRAGE e faixas intragrupo (T17, F12)",
+        "python scripts/paper/continuous_identity_margin.py",
+        "",
+        "# 4. Pipeline completo do pacote do artigo (inventário, T1..T17, figuras F1..F12 e REPRODUCAO.md)",
         "python scripts/paper/build_all.py",
         "",
         "# 5. Gate técnico Fase 3 (verifica INTEGRIDADE estrutural/numérica; NÃO implica sucesso científico ADR #15)",
@@ -372,10 +393,11 @@ def build_inventory_and_repro() -> tuple[Path, Path]:
         "# 6. Validação automatizada de esquema, completude, ausência de NaNs e proteção contra valores-p extremos",
         "pytest tests/test_paper_pipeline.py",
         "",
-        "# 7. (Opcional Colab Drive) Auditoria física dos .pt do cache ESM-2 e scripts diagnósticos pós-ADR #15",
+        "# 7. (Colab Drive) Auditoria física dos .pt do cache ESM-2 e diagnósticos pós-ADR #15",
         "PHYSDUAL_ROOT=/content/drive/MyDrive/physdual-gnn python scripts/paper/audit_esm_cache_colab.py",
-        "# Diagnósticos Colab (não confirmatórios):",
+        "# Ablação de pooling já executada no Colab (outputs/results/phase3_colab_ridge_pooling.json -> veredito NO-GO Fase 4):",
         "# python scripts/paper/colab_ridge_esm_pooling.py --data-root /content/drive/MyDrive/physdual-gnn",
+        "# Diagnóstico opcional adicional não executado no Colab após o NO-GO da Fase 4 (não confirmatório):",
         "# python scripts/paper/colab_kiba_cold_drug_ecfp.py --root /content/drive/MyDrive/physdual-gnn --device cuda",
         "```",
         "",

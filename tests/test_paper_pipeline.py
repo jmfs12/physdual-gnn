@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +24,7 @@ EXPECTED_DOCS = [
     PAPER_DIR / "04_REGISTRO_DE_AFIRMACOES.md",
     PAPER_DIR / "05_LACUNAS.md",
     PAPER_DIR / "06_AUDITORIA_FASE3.md",
+    PAPER_DIR / "06_SINTESE_LITERATURA_CORRELACIONADA.md",
     PAPER_DIR / "REPRODUCAO.md",
     FIGURES_DIR / "CAPTIONS.md",
 ]
@@ -109,6 +111,44 @@ EXPECTED_TABLES = {
             "sec_per_epoch_medio",
         ],
     ),
+    "T16_ridge_pooling_ablation": (
+        54,
+        [
+            "protocolo",
+            "dataset",
+            "split",
+            "tarefa",
+            "pooling",
+            "ci_media_dp",
+            "mse_media_dp",
+            "rm2_media_dp",
+            "intra_ci_media_dp",
+            "intra_spearman_media_dp",
+            "delta_intra_ci_vs_mean",
+            "vitorias_intra_ci_vs_mean",
+            "alphas_escolhidos",
+            "fonte",
+        ],
+    ),
+    "T17_continuous_identity_margin": (
+        80,
+        [
+            "protocolo",
+            "dataset",
+            "split",
+            "eixo_identidade",
+            "faixa_identidade",
+            "modelo",
+            "n_unidades_ativas",
+            "proteinas_teste_media",
+            "mse_media_dp",
+            "margem_vs_drug_mean",
+            "margem_vs_ridge_esm",
+            "intra_ci_por_farmaco",
+            "intra_spearman_por_farmaco",
+            "fonte",
+        ],
+    ),
 }
 
 EXPECTED_FIGURES = [
@@ -123,6 +163,7 @@ EXPECTED_FIGURES = [
     "F9_diagnostic_controls_cold_target",
     "F10_cold_drug_per_fold",
     "F11_train_val_gap_and_best_epoch",
+    "F12_continuous_identity_margin",
 ]
 
 
@@ -143,7 +184,36 @@ def test_build_all_orchestrator_runs_cleanly(tmp_path: Path) -> None:
     assert (tmp_path / "00_INVENTARIO.md").exists() and (tmp_path / "REPRODUCAO.md").exists()
     assert (tmp_path / "tables" / "T1_dataset_stats.csv").exists()
     assert (tmp_path / "tables" / "T15_phase3_configuration.csv").exists()
+    assert (tmp_path / "tables" / "T16_ridge_pooling_ablation.csv").exists()
+    assert (tmp_path / "tables" / "T17_continuous_identity_margin.csv").exists()
     assert (tmp_path / "figures" / "F11_train_val_gap_and_best_epoch.png").exists()
+    assert (tmp_path / "figures" / "F12_continuous_identity_margin.png").exists()
+
+    gen_inv = (tmp_path / "00_INVENTARIO.md").read_text(encoding="utf-8")
+    gen_rep = (tmp_path / "REPRODUCAO.md").read_text(encoding="utf-8")
+    for tok in ("phase3_colab_ridge_pooling.json", "NO-GO", "continuous_identity_margin.json"):
+        assert tok in gen_inv, f"Token '{tok}' ausente no 00_INVENTARIO.md gerado"
+        assert tok in gen_rep, f"Token '{tok}' ausente no REPRODUCAO.md gerado"
+    boot_lines = [ln for ln in gen_inv.splitlines() if "phase3_davis_paired_bootstrap.json" in ln]
+    assert boot_lines and all("DEFASADO" not in ln.upper() for ln in boot_lines)
+
+
+def test_inventory_repro_and_audit_sync_nogo_and_davis_bootstrap() -> None:
+    required_tokens = (
+        "phase3_colab_ridge_pooling.json",
+        "NO-GO",
+        "continuous_identity_margin.json",
+    )
+    for name in ("00_INVENTARIO.md", "REPRODUCAO.md", "06_AUDITORIA_FASE3.md"):
+        content = (PAPER_DIR / name).read_text(encoding="utf-8")
+        for tok in required_tokens:
+            assert tok in content, f"Token obrigatório '{tok}' ausente em {name}"
+
+    inv_lines = (PAPER_DIR / "00_INVENTARIO.md").read_text(encoding="utf-8").splitlines()
+    boot_lines = [ln for ln in inv_lines if "phase3_davis_paired_bootstrap.json" in ln]
+    assert boot_lines, "Linha de phase3_davis_paired_bootstrap.json ausente em 00_INVENTARIO.md"
+    for ln in boot_lines:
+        assert "DEFASADO" not in ln.upper(), f"Status DEFASADO residual em 00_INVENTARIO.md: {ln}"
 
 
 def test_all_expected_paper_markdown_docs_exist_and_nonempty() -> None:
@@ -187,6 +257,8 @@ def test_protocols_v1_and_v2_are_strictly_separated() -> None:
         "T12_phase3_per_fold_or_seed",
         "T13_phase3_paired_and_generalization",
         "T15_phase3_configuration",
+        "T16_ridge_pooling_ablation",
+        "T17_continuous_identity_margin",
     ):
         df = pd.read_csv(TABLES_DIR / f"{stem}.csv", dtype=str, keep_default_na=False)
         protocols = set(df["protocolo"].unique())
@@ -274,6 +346,7 @@ def test_phase3_model_nomenclature_adr15() -> None:
         ("T12_phase3_per_fold_or_seed", "modelo"),
         ("T14_phase3_diagnostic_controls", "controle_ou_modelo"),
         ("T15_phase3_configuration", "modelo"),
+        ("T17_continuous_identity_margin", "modelo"),
     ):
         df = pd.read_csv(TABLES_DIR / f"{stem}.csv", dtype=str, keep_default_na=False)
         bad = [v for v in df[col].unique() if "physdual" in str(v).lower()]
@@ -417,3 +490,90 @@ def test_colab_kiba_cold_drug_ecfp_summarize_real_schema(tmp_path: Path) -> None
     assert summary["wins_ecfp_vs_gin_ci"] == 2
     assert summary["wins_ecfp_vs_knn_tanimoto_ci"] == 0
     assert (res_dir / "phase3_colab_kiba_cold_drug_ecfp_diagnostic.json").exists()
+
+
+def test_pooling_and_continuous_margin_schemas() -> None:
+    pool_path = REPO_ROOT / "outputs" / "results" / "phase3_colab_ridge_pooling.json"
+    assert pool_path.exists() and pool_path.stat().st_size > 1000
+    pool = json.loads(pool_path.read_text(encoding="utf-8"))
+    assert pool["alpha_grid"][-1] == 100_000_000.0
+    expected_regimes = (
+        "davis/cold_target",
+        "davis/cold_target_seqid40",
+        "davis/cold_target_seqid30",
+        "kiba/cold_target",
+        "kiba/cold_target_seqid40",
+        "kiba/cold_target_seqid30",
+    )
+    expected_modes = ("mean", "max", "mean_std")
+    expected_tasks = ("raw_y_esm_only", "raw_y_esm_ecfp", "residual_drug_mean_esm")
+    for reg in expected_regimes:
+        assert reg in pool["results"], f"Regime ausente em phase3_colab_ridge_pooling.json: {reg}"
+        modes_map = pool["results"][reg]["modes"]
+        for mode in expected_modes:
+            assert mode in modes_map, f"Modo '{mode}' ausente em {reg}"
+            for task in expected_tasks:
+                assert task in modes_map[mode], f"Tarefa '{task}' ausente em {reg}.{mode}"
+
+    k30 = pool["results"]["kiba/cold_target_seqid30"]["modes"]
+    for mode in ("max", "mean_std"):
+        for task in expected_tasks:
+            intra_ci_mean = float(k30[mode][task]["intra_ci"][0])
+            assert intra_ci_mean < 0.53, (
+                f"Critério NO-GO violado em kiba/cold_target_seqid30.{mode}.{task}: intra_ci={intra_ci_mean}"
+            )
+
+    cim_path = PAPER_DIR / "continuous_identity_margin.json"
+    assert cim_path.exists() and cim_path.stat().st_size > 1000
+    cim = json.loads(cim_path.read_text(encoding="utf-8"))
+    for key in (
+        "alignment_specs",
+        "bootstrap_config",
+        "band_definitions",
+        "statistical_guardrails",
+        "regimes",
+    ):
+        assert key in cim, f"Chave '{key}' ausente em continuous_identity_margin.json"
+
+    assert cim["bootstrap_config"]["B"] == 2000
+    assert cim["statistical_guardrails"]["cross_fold_ci_spearman_concatenation"] is False
+
+    forbidden_concat_keys = {
+        "oof_global",
+        "pooled_oof",
+        "oof_concat",
+        "concat_across_folds",
+        "across_all_units_ci",
+        "across_all_units_spearman",
+        "p_value",
+    }
+
+    def _walk_check_forbidden(obj: object, path: str = "") -> None:
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                assert k not in forbidden_concat_keys, f"Chave proibida '{k}' em {path}"
+                _walk_check_forbidden(v, f"{path}.{k}")
+        elif isinstance(obj, list):
+            for idx, item in enumerate(obj):
+                _walk_check_forbidden(item, f"{path}[{idx}]")
+
+    _walk_check_forbidden(cim["regimes"], "regimes")
+
+    for reg in expected_regimes:
+        assert reg in cim["regimes"], f"Regime ausente em continuous_identity_margin.json: {reg}"
+        r_obj = cim["regimes"][reg]
+        for axis in ("global_id_max", "sw_id_aln_len_ge150aa"):
+            tr_axis = r_obj["continuous_trends"][axis]
+            for cmp_key in ("margin_vs_drug_mean", "margin_vs_ridge_esm"):
+                cmp_map = tr_axis.get(cmp_key)
+                if cmp_map is None:
+                    continue
+                for mod, stats_obj in cmp_map.items():
+                    for field in ("spearman_rho", "slope_per_10pct_id"):
+                        val = float(stats_obj[field])
+                        assert math.isfinite(val), f"Valor não finito em {reg}.{axis}.{cmp_key}.{mod}.{field}"
+                    for ci_field in ("spearman_ci95", "slope_per_10pct_ci95"):
+                        lo, hi = stats_obj[ci_field]
+                        assert math.isfinite(float(lo)) and math.isfinite(float(hi)), (
+                            f"IC não finito em {reg}.{axis}.{cmp_key}.{mod}.{ci_field}"
+                        )

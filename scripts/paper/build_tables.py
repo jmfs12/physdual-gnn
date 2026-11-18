@@ -1,4 +1,4 @@
-"""Passo 1: Consolida as tabelas T1..T15 em CSV, Markdown e LaTeX em `docs/paper/tables/`."""
+"""Passo 1: Consolida as tabelas T1..T17 em CSV, Markdown e LaTeX em `docs/paper/tables/`."""
 
 from __future__ import annotations
 
@@ -1459,6 +1459,201 @@ def build_t15(repo_root: Path, data_root: Path, runs_all: list[dict[str, Any]], 
     )
 
 
+def build_t16(data_root: Path, tables_dir: Path) -> dict[str, Path]:
+    """T16: Ablação de pooling ESM-2 (`mean`, `max`, `mean_std`) no Ridge em Colab (decisão NO-GO Fase 4)."""
+    pool_path = data_root / "outputs" / "results" / "phase3_colab_ridge_pooling.json"
+    pool = load_json_strict(pool_path)
+    results = pool["results"]
+
+    reg_order = (
+        "davis/cold_target",
+        "davis/cold_target_seqid40",
+        "davis/cold_target_seqid30",
+        "kiba/cold_target",
+        "kiba/cold_target_seqid40",
+        "kiba/cold_target_seqid30",
+    )
+    task_order = ("raw_y_esm_only", "raw_y_esm_ecfp", "residual_drug_mean_esm")
+    mode_order = ("mean", "max", "mean_std")
+
+    rows: list[dict[str, Any]] = []
+    for rkey in reg_order:
+        reg = results[rkey]
+        ds, sp = rkey.split("/", 1)
+        proto = str(reg["protocol"])
+        modes_map = reg["modes"]
+        for task in task_order:
+            ref_entry = modes_map["mean"][task]
+            ref_intra_ci = float(ref_entry["intra_ci"][0])
+            ref_units = ref_entry["per_unit"]
+            for mode in mode_order:
+                entry = modes_map[mode][task]
+                if mode == "mean":
+                    delta_str = "0.0000"
+                    wins_str = "ref"
+                else:
+                    delta_val = float(entry["intra_ci"][0]) - ref_intra_ci
+                    delta_str = f"{delta_val:+.4f}"
+                    wins = sum(
+                        1
+                        for uc, ur in zip(entry["per_unit"], ref_units)
+                        if float(uc["intra_ci_mean"]) > float(ur["intra_ci_mean"])
+                    )
+                    wins_str = f"{wins}/{len(entry['per_unit'])}"
+
+                alphas_str = ", ".join(f"{float(u['alpha']):g}" for u in entry["per_unit"])
+                rows.append({
+                    "protocolo": proto,
+                    "dataset": ds,
+                    "split": sp,
+                    "tarefa": task,
+                    "pooling": mode,
+                    "ci_media_dp": fmt_mean_std(entry["ci"][0], entry["ci"][1]),
+                    "mse_media_dp": fmt_mean_std(entry["mse"][0], entry["mse"][1]),
+                    "rm2_media_dp": fmt_mean_std(entry["rm2"][0], entry["rm2"][1]),
+                    "intra_ci_media_dp": fmt_mean_std(entry["intra_ci"][0], entry["intra_ci"][1]),
+                    "intra_spearman_media_dp": fmt_mean_std(
+                        entry["intra_spearman"][0], entry["intra_spearman"][1]
+                    ),
+                    "delta_intra_ci_vs_mean": delta_str,
+                    "vitorias_intra_ci_vs_mean": wins_str,
+                    "alphas_escolhidos": alphas_str,
+                    "fonte": f"outputs/results/phase3_colab_ridge_pooling.json (results.{rkey}.modes.{mode}.{task})",
+                })
+
+    df_t16 = pd.DataFrame(rows)
+    return write_table(
+        "T16_ridge_pooling_ablation",
+        "T16 — Ablação de Pooling ESM-2 (`mean`, `max`, `mean_std`) em Ridge e Decisão NO-GO para Fase 4",
+        df_t16,
+        "outputs/results/phase3_colab_ridge_pooling.json",
+        tables_dir,
+        extra_notes=[
+            "Grade de regularização `alpha`: `1e-3..1e8` (15 valores), padronização z-score ajustada apenas em `train` e seleção em `val`.",
+            "Critério pré-definido da Fase 4: exigir recuperação substancial de `intra_CI` no KIBA `cold_target_seqid30` acima de `mean` (`max` ou `mean_std`). Todos os modos permanecem em `intra_CI <= 0.5155` (`< 0.53`), resultando em veredito **NO-GO** para arquitetura pesada `[L, 1280]`.",
+        ],
+    )
+
+
+def build_t17(repo_root: Path, tables_dir: Path) -> dict[str, Path]:
+    """T17: Margem de MSE e ranking intragrupo por faixa fixa de identidade em Davis e KIBA `cold_target`."""
+    cim_path = ensure_paper_dirs(repo_root)["paper"] / "continuous_identity_margin.json"
+    if not cim_path.exists():
+        cim_path = repo_root / "docs" / "paper" / "continuous_identity_margin.json"
+    cim = load_json_strict(cim_path)
+
+    def _fmt_ms_na(m: Any, s: Any, signed: bool = False) -> str:
+        if m is None or s is None:
+            return "N/A"
+        return fmt_mean_std(m, s, signed=signed)
+
+    reg_order = ("davis/cold_target", "kiba/cold_target")
+    axes_order = ("global_id_max", "sw_id_aln_len_ge150aa")
+    band_order = ("<0.30", "[0.30, 0.40)", "[0.40, 0.55)", ">=0.55")
+    model_order = ("gin_esm_mlp", "graphdta_gin", "ridge_esm", "knn_kmer_target", "drug_mean_predictor")
+
+    rows: list[dict[str, Any]] = []
+    for rkey in reg_order:
+        reg = cim["regimes"][rkey]
+        ds, sp = str(reg["dataset"]), str(reg["split"])
+        proto = str(reg["protocol"])
+        model_sources = reg.get("model_sources", {})
+        for axis in axes_order:
+            axis_bands = reg["bands"][axis]
+            for band in band_order:
+                b_obj = axis_bands[band]
+                b_models = b_obj["models"]
+                n_active_band = int(b_obj["n_units_nonempty"])
+                mean_prot = float(b_obj["mean_test_proteins_per_unit"])
+                for mod in model_order:
+                    if mod not in b_models:
+                        rows.append({
+                            "protocolo": proto,
+                            "dataset": ds,
+                            "split": sp,
+                            "eixo_identidade": axis,
+                            "faixa_identidade": band,
+                            "modelo": mod,
+                            "n_unidades_ativas": "N/A",
+                            "proteinas_teste_media": "N/A",
+                            "mse_media_dp": "N/A",
+                            "margem_vs_drug_mean": "N/A",
+                            "margem_vs_ridge_esm": "N/A",
+                            "intra_ci_por_farmaco": "N/A",
+                            "intra_spearman_por_farmaco": "N/A",
+                            "fonte": f"N/A ({model_sources.get(mod, 'OOF par-a-par ausente')})",
+                        })
+                        continue
+
+                    ms = b_models[mod]
+                    n_act = int(ms["n_units_active"])
+                    if n_act == 0:
+                        rows.append({
+                            "protocolo": proto,
+                            "dataset": ds,
+                            "split": sp,
+                            "eixo_identidade": axis,
+                            "faixa_identidade": band,
+                            "modelo": mod,
+                            "n_unidades_ativas": str(n_active_band),
+                            "proteinas_teste_media": "0.0",
+                            "mse_media_dp": "N/A",
+                            "margem_vs_drug_mean": "N/A",
+                            "margem_vs_ridge_esm": "N/A",
+                            "intra_ci_por_farmaco": "N/A",
+                            "intra_spearman_por_farmaco": "N/A",
+                            "fonte": f"docs/paper/continuous_identity_margin.json (regimes.{rkey}.bands.{axis}.{band})",
+                        })
+                        continue
+
+                    if mod == "drug_mean_predictor":
+                        marg_dm_str = "0.0000 (ref)"
+                    else:
+                        marg_dm_str = _fmt_ms_na(
+                            ms["margin_vs_drug_mean_mean"], ms["margin_vs_drug_mean_std"], signed=True
+                        )
+
+                    if mod == "ridge_esm" and "ridge_esm" in b_models:
+                        marg_rg_str = "0.0000 (ref)"
+                    else:
+                        marg_rg_str = _fmt_ms_na(
+                            ms["margin_vs_ridge_esm_mean"], ms["margin_vs_ridge_esm_std"], signed=True
+                        )
+
+                    rows.append({
+                        "protocolo": proto,
+                        "dataset": ds,
+                        "split": sp,
+                        "eixo_identidade": axis,
+                        "faixa_identidade": band,
+                        "modelo": mod,
+                        "n_unidades_ativas": str(n_act),
+                        "proteinas_teste_media": f"{mean_prot:.1f}",
+                        "mse_media_dp": _fmt_ms_na(ms["mse_mean"], ms["mse_std"]),
+                        "margem_vs_drug_mean": marg_dm_str,
+                        "margem_vs_ridge_esm": marg_rg_str,
+                        "intra_ci_por_farmaco": _fmt_ms_na(ms["intra_ci_mean"], ms["intra_ci_std"]),
+                        "intra_spearman_por_farmaco": _fmt_ms_na(
+                            ms["intra_spearman_mean"], ms["intra_spearman_std"]
+                        ),
+                        "fonte": f"docs/paper/continuous_identity_margin.json (regimes.{rkey}.bands.{axis}.{band})",
+                    })
+
+    df_t17 = pd.DataFrame(rows)
+    return write_table(
+        "T17_continuous_identity_margin",
+        "T17 — Margem de MSE e Ranking Intragrupo por Faixa Fixa de Identidade (Davis v2_kfold e KIBA v1_seeds Separados)",
+        df_t17,
+        "docs/paper/continuous_identity_margin.json",
+        tables_dir,
+        extra_notes=[
+            "Protocolos `v2_kfold` (Davis `cold_target`, 5 dobras) e `v1_seeds` (KIBA `cold_target`, 5 seeds) permanecem estritamente separados.",
+            "Convenção de margem: `MSE(baseline) − MSE(modelo)` (positivo indica superioridade sobre `drug_mean_predictor` ou `ridge_esm`).",
+            "`intra_ci_por_farmaco` e `intra_spearman_por_farmaco` são calculados estritamente dentro de cada unidade `u` e faixa `b` (`smiles`, `min_pairs=2`, `>=2` valores distintos de `y_true`), sem concatenação entre dobras/seeds.",
+        ],
+    )
+
+
 def build_all_tables() -> dict[str, dict[str, Path]]:
     repo_root, data_root = resolve_roots()
     dirs = ensure_paper_dirs(repo_root)
@@ -1483,6 +1678,8 @@ def build_all_tables() -> dict[str, dict[str, Path]]:
         "T13": build_t13(phase3_audits, tables_dir),
         "T14": build_t14(phase3_audits, tables_dir),
         "T15": build_t15(repo_root, data_root, runs_all, tables_dir),
+        "T16": build_t16(data_root, tables_dir),
+        "T17": build_t17(repo_root, tables_dir),
     }
 
     # Verificacao estrita de ausencia de NaN em todos os CSVs gerados
