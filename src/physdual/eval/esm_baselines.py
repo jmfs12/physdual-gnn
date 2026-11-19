@@ -28,11 +28,16 @@ try:
     try:
         from rdkit.Chem import rdFingerprintGenerator
 
+        _HAS_MORGAN_GEN = True
         _ECFP4_GEN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
     except Exception:
+        rdFingerprintGenerator = None  # type: ignore[assignment]
+        _HAS_MORGAN_GEN = False
         _ECFP4_GEN = None
     _HAS_RDKIT = True
 except ImportError:
+    rdFingerprintGenerator = None  # type: ignore[assignment]
+    _HAS_MORGAN_GEN = False
     _ECFP4_GEN = None
     _HAS_RDKIT = False
 
@@ -48,14 +53,22 @@ def compute_morgan_ecfp4_map(
     """Gera dicionário `smiles -> vetor float64 (n_bits,)` de fingerprints ECFP4."""
     if not _HAS_RDKIT:
         raise ImportError("RDKit é obrigatório para calcular ECFP4.")
+    if _HAS_MORGAN_GEN and rdFingerprintGenerator is not None:
+        if radius == 2 and n_bits == 1024 and _ECFP4_GEN is not None:
+            gen = _ECFP4_GEN
+        else:
+            gen = rdFingerprintGenerator.GetMorganGenerator(radius=int(radius), fpSize=int(n_bits))
+    else:
+        gen = None
+
     out: dict[str, np.ndarray] = {}
     for smi in set(str(s) for s in smiles_list):
         mol = Chem.MolFromSmiles(smi)
         if mol is None:
             out[smi] = np.zeros(n_bits, dtype=np.float64)
             continue
-        if _ECFP4_GEN is not None and radius == 2 and n_bits == 1024:
-            arr = _ECFP4_GEN.GetFingerprintAsNumPy(mol).astype(np.float64)
+        if gen is not None:
+            arr = gen.GetFingerprintAsNumPy(mol).astype(np.float64)
         else:
             bv = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=n_bits)
             arr = np.asarray(bv, dtype=np.float64)
